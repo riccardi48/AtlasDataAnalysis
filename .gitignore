@@ -1,0 +1,9 @@
+# Ignore output pdfs
+*.pdf
+
+# Ignore Cached Data
+*.npy
+
+# Ignore python Cache
+*.pyc
+
