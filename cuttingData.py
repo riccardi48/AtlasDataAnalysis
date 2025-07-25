@@ -3,8 +3,10 @@
 
 from glob import glob
 
-files = glob("/home/atlas/rballard/for_magda/data/202204*udp*_decode.dat")
-files_done = glob("/home/atlas/rballard/for_magda/data/Cut/202204*udp*_decode.dat")
+pathToOrigin = "/home/atlas/rballard/for_magda/data/202204*udp*_decode.dat"
+pathToOutput = "/home/atlas/rballard/for_magda/data/Cut/202204*udp*_decode.dat"
+files = glob(pathToOrigin)
+files_done = glob(pathToOutput)
 for file in files:
     to_be_saved_as =  "/".join(file.split("/")[:-1])+"/Cut/"+file.split("/")[-1].split(".")[0]+".dat"
     if to_be_saved_as not in files_done:

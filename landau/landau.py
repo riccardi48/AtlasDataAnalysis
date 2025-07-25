@@ -1,3 +1,5 @@
+# Code for landaupy taken from https://github.com/SengerM/landaupy
+
 # This code was adapted from the Root implementation on 2.Feb.2022 by Matías Senger (matias.senger@cern.ch). The links below point to the Root documentation and implementation.
 # https://root.cern.ch/doc/master/group__PdfFunc.html#ga53d01e04de833eda26560c40eb207cab
 # https://root.cern.ch/doc/master/PdfFuncMathCore_8cxx_source.html

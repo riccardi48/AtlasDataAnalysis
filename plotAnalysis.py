@@ -1,27 +1,11 @@
-from dataAnalysis import *
+from dataAnalysis import dataAnalysis,calcDataFileManager,crossTalkFinder,clusterClass
 from lowLevelFunctions import *
 import matplotlib.pyplot as plt
 from  matplotlib import patheffects
 import os
 import scipy
 
-def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}):
-    dataFiles = []
-    for dataFile in allDataFiles:
-        boolList = []
-        for f in filterDict.keys():
-            attr = getattr(dataFile, "get_" + f)
-            try:
-                boolList.append((np.isin(attr(), filterDict[f])))
-            except:
-                boolList.append((attr() == filterDict[f]))
-        if np.all(boolList):
-            dataFiles.append(dataFile)
-    dataFiles = np.array(dataFiles)[np.argsort([dataFile.get_angle() * 1000 + dataFile.get_voltage() for dataFile in dataFiles])]
-    for dataFile in dataFiles:
-        if dataFile.get_telescope() == "lancs":
-            dataFile.dataHandler.getCrossTalk()
-    return np.flip(dataFiles)
+
 
 
 class depthAnalysis:

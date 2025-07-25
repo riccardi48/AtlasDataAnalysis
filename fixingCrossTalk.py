@@ -1,10 +1,12 @@
-from dataAnalysis import *
-from lowLevelFunctions import *
-from plotAnalysis import *
+from plotAnalysis import plotClass, correlationPlotter
+from dataAnalysis import dataAnalysis, crossTalkFinder, filterDataFiles
+import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
-from glob import glob
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from glob import glob
+import numpy as np
+import configLoader
 
 def RowRowCorrelation(dataFile : dataAnalysis,pathToOutput,pathToCalcData ,layers:list[int] = [1,2,3,4],excludeCrossTalk=True,recalc:bool=False,log=True):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/",sizePerPlot=(8, 8))
@@ -44,20 +46,18 @@ def RowRowCorrelation(dataFile : dataAnalysis,pathToOutput,pathToCalcData ,layer
     axs.scatter(x, y, c="r", s=1)
     plot.saveToOutput(f"RowRowCorrelation{"_cut" if excludeCrossTalk else ""}{"_"+"".join(str(x) for x in layers) if layers is not None else ""}")
 
-pathToOutput = "/home/atlas/rballard/Code_v2/output/"
-pathToCalcData = "/home/atlas/rballard/Code_v2/calculatedData/"
+config = configLoader.loadConfig()
 
-files = glob("/home/atlas/rballard/for_magda/data/Cut/202204*udp*_decode.dat")
-allDataFiles = [dataAnalysis(pathToData, pathToCalcData, maxLine=None) for pathToData in files]
-filterDict = {"telescope": "kit", "fileName": ["angle6_6Gev_kit_4"]}
+files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
+allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
 dataFiles = filterDataFiles(
     allDataFiles,
-    filterDict=filterDict,
+    filterDict=config["filterDict"],
 )
 for dataFile in dataFiles:
     #dataFile.get_base_attr("Row",excludeCrossTalk = True)
-    RowRowCorrelation(dataFile,pathToOutput,pathToCalcData,layers=[4] ,excludeCrossTalk=False,recalc=False,log=True)
-    RowRowCorrelation(dataFile,pathToOutput,pathToCalcData,layers=[4] ,excludeCrossTalk=True,recalc=False,log=True)
+    RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=False,recalc=False,log=True)
+    RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=True,recalc=False,log=True)
     clusters = dataFile.get_clusters(layers=[4])
     for cluster in clusters:
         print(dataFile.get_dataFrame().iloc[cluster.getIndexes()])

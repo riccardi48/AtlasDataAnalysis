@@ -1,4 +1,4 @@
-from lowLevelFunctions import *
+from lowLevelFunctions import isFiltered,readFileName,print_mem_usage,calcToT,calcHit_VoltageError,calcHit_Voltage,TStoMS,calcClusters
 import os
 import pandas as pd
 import numpy as np
@@ -671,6 +671,25 @@ class crossTalkFinder:
         crossTalkArray = crossTalkArray.astype(int)
         crossTalkArray = np.append(crossTalkArray, np.append([[248, 267]],np.full((1,7),-1),axis=1), axis=0)
         return crossTalkArray
+
+def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}):
+    dataFiles = []
+    for dataFile in allDataFiles:
+        boolList = []
+        for f in filterDict.keys():
+            attr = getattr(dataFile, "get_" + f)
+            try:
+                boolList.append((np.isin(attr(), filterDict[f])))
+            except:
+                boolList.append((attr() == filterDict[f]))
+        if np.all(boolList):
+            dataFiles.append(dataFile)
+    dataFiles = np.array(dataFiles)[np.argsort([dataFile.get_angle() * 1000 + dataFile.get_voltage() for dataFile in dataFiles])]
+    for dataFile in dataFiles:
+        if dataFile.get_telescope() == "lancs":
+            dataFile.dataHandler.getCrossTalk()
+    return np.flip(dataFiles)
+
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
     pathToOutput = "/home/atlas/rballard/AtlasDataAnalysis/output"
