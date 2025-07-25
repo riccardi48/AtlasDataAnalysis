@@ -1,9 +1,9 @@
-from lowLevelFunctions import isFiltered,readFileName,print_mem_usage,calcToT,calcHit_VoltageError,calcHit_Voltage,TStoMS,calcClusters
+from lowLevelFunctions import isFiltered,readFileName,print_mem_usage,calcToT,calcHit_VoltageError,calcHit_Voltage,TStoMS,calcClusters,trueTimeStamps
 import os
 import pandas as pd
 import numpy as np
-
-
+from glob import glob
+import configLoader
 class dataAnalysis:
     def __init__(self, pathToData: str, pathToCalcData: str, maxLine: int = None):
         self.dataHandler = dataHandler(pathToData, pathToCalcData, maxLine=maxLine)
@@ -56,7 +56,7 @@ class dataAnalysis:
         self.dataHandler.initClusterVoltages()
 
     def save_nonCrossTalk_to_csv(self, path):
-        self.dataHandler.save_nonCrossTalk_to_csv(path)
+        self.dataHandler.save_nonCrossTalk_to_csv(path,self.get_fileName())
 
 class calcDataFileManager:
     def __init__(self, pathToCalcData: str, fileName: str, maxLine: int = None):
@@ -245,8 +245,8 @@ class dataHandler:
             array = (array, indexes)
         return array
 
-    def save_nonCrossTalk_to_csv(self, path):
-        self.dataFrameHandler.saveNonCrossTalkToCSV(self.getCrossTalk(), path)
+    def save_nonCrossTalk_to_csv(self, path,name):
+        self.dataFrameHandler.saveNonCrossTalkToCSV(self.getCrossTalk(), path,name,self.getClusters())
 
 
 class dataFrameHandler:
@@ -309,10 +309,11 @@ class dataFrameHandler:
             self.dataLength = len(self.data)
             return self.dataLength
 
-    def saveNonCrossTalkToCSV(self, crosstalk, path):
+    def saveNonCrossTalkToCSV(self, crosstalk, path,name,clusters):
         outputDF = self.data
-        outputDF.drop(index=np.where(crosstalk))
-        self.dataFileManager.saveFile(outputDF, path)
+        outputDF["ext_TS"] = trueTimeStamps(clusters,outputDF["ext_TS"].values)
+        outputDF = outputDF.drop(index=np.where(crosstalk)[0])
+        self.dataFileManager.saveFile(outputDF, path,name)
 
 
 class clusterHandler:
@@ -557,10 +558,17 @@ class rawDataFileManager:
         }
         return pd.read_csv(self.pathToData, delimiter="\t", names=self.columns, dtype=dtypes, header=0, nrows=self.maxLine)
 
-    def saveFile(self, dataFrame, path):
-        dataFrame.to_csv(path, sep="\t", index=False)
+    def saveFile(self, dataFrame, path, name):
+        self.makeDirIfNeeded(path)
+        with open(f"{path}{name}_decode.dat", 'w') as file:
+            file.write('# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n')
+            dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
+            print(f"Save to csv: {path}{name}_decode.dat")
 
-
+    def makeDirIfNeeded(self, fileName):
+        dirName = "/".join(fileName.split("/")[:-1])
+        if not os.path.isdir(dirName):
+            os.makedirs(dirName)
 
 
 
@@ -689,6 +697,17 @@ def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}):
         if dataFile.get_telescope() == "lancs":
             dataFile.dataHandler.getCrossTalk()
     return np.flip(dataFiles)
+
+def initDataFiles(config:dict={})->list[dataAnalysis]:
+    if config == {}:
+        config = configLoader.defaultConfig()
+    files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
+    allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
+    dataFiles = filterDataFiles(
+        allDataFiles,
+        filterDict=config["filterDict"],
+    )
+    return dataFiles
 
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"

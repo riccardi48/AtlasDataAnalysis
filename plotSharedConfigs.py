@@ -1,5 +1,5 @@
 from plotAnalysis import depthAnalysis, plotClass
-from dataAnalysis import dataAnalysis, filterDataFiles
+from dataAnalysis import dataAnalysis, initDataFiles
 from lowLevelFunctions import calcDepth, adjustPeakVoltage, fitVoltageDepth, chargeCollectionEfficiencyFunc, depletionWidthFunc
 from matplotlib.ticker import MultipleLocator
 from glob import glob
@@ -64,6 +64,7 @@ def Comparison_ClustersCountOverTime(dataFiles: list[dataAnalysis], pathToOutput
 def Comparison_AngleDistribution(
     dataFiles: list[dataAnalysis],
     pathToOutput,
+    pathToCalcData,
     layer=4,
     name="",
     minTimes=None,
@@ -134,6 +135,8 @@ def fit_dataFile(
 
 def Comparison_CCE_Vs_Depth(
     dataFiles: list[dataAnalysis],
+    pathToOutput,
+    pathToCalcData,
     depthCorrection=True,
     hideLowWidths=True,
     fitting="histogram",
@@ -180,7 +183,7 @@ def Comparison_CCE_Vs_Depth(
     if measuredAttribute == "Hit_Voltage":
         plot.set_config(
             axs,
-            ylim=(-0.4, 1.4),
+            ylim=(-0.3, 1),
             xlim=(0, None),
             title="Voltage change withing a Cluster",
             xlabel="Depth [μm]",
@@ -214,6 +217,8 @@ def Comparison_CCE_Vs_Depth(
 
 def Scatter_Epi_Thickness_Vs_Bias_Voltage(
     dataFiles: list[dataAnalysis],
+    pathToOutput,
+    pathToCalcData,
     depthCorrection=True,
     hideLowWidths=True,
     fitting="histogram",
@@ -289,26 +294,17 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
     )
 
 
-pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
-pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071512_udp_beamonall_angle6_4Gev_kit_2_decode.dat"
-pathToOutput = "/home/atlas/rballard/Code_v2/output/"
-pathToCalcData = "/home/atlas/rballard/Code_v2/calculatedData/"
-
 config = configLoader.loadConfig()
 
-files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
-allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
-dataFiles = filterDataFiles(
-    allDataFiles,
-    filterDict=config["filterDict"],
-)[8:]
-firstPeaks = Comparison_ClustersCountOverTime(dataFiles, pathToOutput, layer=4, name="_kit")
+dataFiles = initDataFiles(config)
+firstPeaks = Comparison_ClustersCountOverTime(dataFiles[:8], config["pathToOutput"], layer=4, name="_kit")
 Comparison_RowWidthDistribution(
-    dataFiles, pathToOutput, layer=4, name="_kit", minTimes=firstPeaks, maxTimes=firstPeaks + 200000, excludeCrossTalk=True
+    dataFiles[:8], config["pathToOutput"], layer=4, name="_kit", minTimes=firstPeaks, maxTimes=firstPeaks + 200000, excludeCrossTalk=True
 )
 Comparison_AngleDistribution(
-    dataFiles,
-    pathToOutput,
+    dataFiles[:8],
+    config["pathToOutput"],
+    config["pathToCalcData"],
     maxClusterWidth=30,
     layer=4,
     name="_kit",
@@ -318,8 +314,9 @@ Comparison_AngleDistribution(
     xlim=(0, 90),
 )
 Comparison_AngleDistribution(
-    dataFiles,
-    pathToOutput,
+    dataFiles[:8],
+    config["pathToOutput"],
+    config["pathToCalcData"],
     maxClusterWidth=30,
     layer=4,
     name="_kit_tight",
@@ -328,11 +325,7 @@ Comparison_AngleDistribution(
     excludeCrossTalk=True,
     xlim=(82, 90),
 )
-dataFiles = filterDataFiles(
-    allDataFiles,
-    filterDict=config["filterDict"],
-)
-Comparison_CCE_Vs_Depth(dataFiles, maxClusterWidth=30)
-Comparison_CCE_Vs_Depth(dataFiles, maxClusterWidth=30, measuredAttribute="ToT")
-Scatter_Epi_Thickness_Vs_Bias_Voltage(dataFiles, maxClusterWidth=30, measuredAttribute="Hit_Voltage")
-Scatter_Epi_Thickness_Vs_Bias_Voltage(dataFiles, maxClusterWidth=30, measuredAttribute="ToT")
+Comparison_CCE_Vs_Depth(dataFiles,config["pathToOutput"],config["pathToCalcData"], maxClusterWidth=30)
+Comparison_CCE_Vs_Depth(dataFiles,config["pathToOutput"],config["pathToCalcData"], maxClusterWidth=30, measuredAttribute="ToT")
+Scatter_Epi_Thickness_Vs_Bias_Voltage(dataFiles,config["pathToOutput"],config["pathToCalcData"], maxClusterWidth=30, measuredAttribute="Hit_Voltage")
+Scatter_Epi_Thickness_Vs_Bias_Voltage(dataFiles,config["pathToOutput"],config["pathToCalcData"], maxClusterWidth=30, measuredAttribute="ToT")

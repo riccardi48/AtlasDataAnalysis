@@ -82,7 +82,7 @@ def calcHit_Voltage(rows,columns,ToTs,Layers):
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]*2, u_0, a, b, c))
+        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]*1.5, u_0, a, b, c))
     return hit_voltage
 
 def calcHit_VoltageError(rows,columns,ToTs,Layers):
@@ -97,7 +97,7 @@ def calcHit_VoltageError(rows,columns,ToTs,Layers):
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]*2, u_0, a, b, c))
+        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]*1.5, u_0, a, b, c))
         upper = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]+2, u_0, a, b, c))
         lower = np.real(lambert_W_ToT_to_u(ToTs[Layers == k]-2, u_0, a, b, c))
         upperError = upper-hit_voltage[Layers == k]
@@ -325,9 +325,9 @@ def chargeCollectionEfficiencyFunc(depth,V_0,t_epi,edl,base=0.13):
     return voltage
 
 def fitVoltageDepth(x,y,yerr):
-    bounds = [(0,np.inf), (0,300), (1,np.inf)]
+    bounds = [(0,np.inf), (0,100), (1,np.inf)]
     bounds = tuple(zip(*bounds))
-    initial_guess = [0.25, 10, 80]
+    initial_guess = [0.25, 10, 50]
     cut = x>0#(x<70) & (y > 0.17)
     popt, pcov = scipy.optimize.curve_fit(chargeCollectionEfficiencyFunc, x[cut], y[cut], p0=initial_guess, maxfev=10000000, bounds=bounds,sigma=yerr[cut]/y[cut],absolute_sigma=False)
     return popt,pcov
@@ -346,3 +346,11 @@ def fitAndPlotCCE(ax,plot,x,y,yerr):
 
 def depletionWidthFunc(V,a,b):
     return (a*(V+b))**0.5
+
+def trueTimeStamps(clusters,ext_TS):
+    new_ext_TS = np.zeros(ext_TS.size)
+    for cluster in clusters:
+        firstTS = np.min(cluster.getTSs(excludeCrossTalk=True))
+        firstTS1024 = firstTS%1024
+        new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs()%1024)-firstTS1024)
+    return new_ext_TS

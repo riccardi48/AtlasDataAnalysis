@@ -1,5 +1,5 @@
 from plotAnalysis import depthAnalysis, plotClass, correlationPlotter
-from dataAnalysis import dataAnalysis, crossTalkFinder, filterDataFiles
+from dataAnalysis import dataAnalysis, crossTalkFinder,initDataFiles
 from lowLevelFunctions import calcDepth, adjustPeakVoltage, lowess, fitAndPlotCCE, histogramErrors, landauFunc
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -200,7 +200,7 @@ def VoltageDepthScatter(
     if measuredAttribute == "Hit_Voltage":
         plot.set_config(
             axs,
-            ylim=(0, 1.4),
+            ylim=(0, 1),
             xlim=(0, rightSide),
             title="Voltage change withing a Cluster",
             xlabel="Depth [μm]",
@@ -564,15 +564,10 @@ def RowRowCorrelation(
 
 config = configLoader.loadConfig()
 
-files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
-allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
-dataFiles = filterDataFiles(
-    allDataFiles,
-    filterDict=config["filterDict"],
-)
+dataFiles = initDataFiles(config)
 
 for dataFile in dataFiles:
-    depth = depthAnalysis(config["pathToCalcData"], maxLine=None, maxClusterWidth=30, layers=[4], excludeCrossTalk=True)
+    depth = depthAnalysis(config["pathToCalcData"], maxLine=config["maxLine"], maxClusterWidth=30, layers=[4], excludeCrossTalk=True)
 
     AngleDistribution(dataFile, depth, config["pathToOutput"])
     WidthDistribution(dataFile, depth, config["pathToOutput"])
@@ -591,15 +586,15 @@ for dataFile in dataFiles:
     VoltageDepthScatter(dataFile, depth, config["pathToOutput"], annotate=False, depthCorrection=False, hideLowWidths=True)
     VoltageDepthScatter(dataFile, depth, config["pathToOutput"], annotate=False, depthCorrection=True, hideLowWidths=False)
 
-    # HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=30)
-    # HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=15)
-    # HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=16,vmax=30)
+    #HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=30)
+    #HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=15)
+    #HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=16,vmax=30)
     # cutting_comparison(dataFile,config["pathToOutput"],layer=4)
     # RowRowCorrelation(dataFile,config["pathToOutput"],pathToCalcData,layers=[4] ,excludeCrossTalk=False,maxLine=maxLine)
     # RowRowCorrelation(dataFile,config["pathToOutput"],pathToCalcData,layers=[4] ,excludeCrossTalk=True,maxLine=maxLine)
-    # iList = [3, 5, 8, 14, 20, 25]#, 30, 38]
-    # for i in iList:
-    # HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
-    # Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(0, 256))
-    # Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"])
-# import plotSharedConfigs
+    #iList = [3, 5, 8, 14, 20, 25]#, 30, 38]
+    #for i in iList:
+        #HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
+        #Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(0, 256))
+        #Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"])
+import plotSharedConfigs

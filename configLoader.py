@@ -2,7 +2,12 @@ import json
 
 
 def setConfigDefaults():
-    data = {
+    path = "defaultConfig.json"
+    config = defaultConfig()
+    with open(path, "w") as f:
+        json.dump(config, f)
+def defaultConfig():
+    config = {
         "maxLine": None,
         "pathToOutput": "/home/atlas/rballard/AtlasDataAnalysis/output/",
         "pathToCalcData": "/home/atlas/rballard/AtlasDataAnalysis/calculatedData/",
@@ -14,13 +19,24 @@ def setConfigDefaults():
             "angle":86.5,
         }
     }
-    with open("config.json", "w") as f:
-        json.dump(data, f)
-
-
-def loadConfig():
-    data = json.load("config.json")
-    return data
+    return config
+def saveConfig(config:dict,path:str="defaultConfig.json"):
+    with open(path, "w") as f:
+        json.dump(config, f)
+def loadConfig(path:str = "")->dict:
+    if path == "":
+        return defaultConfig()
+    try:
+        with open(path) as json_file:
+            config = json.load(json_file)
+    except:
+        print(f"{path} does not exist. Loading default config")
+        return defaultConfig()
+    default = defaultConfig()
+    for key in default.keys():
+        if key not in config:
+            config[key] = default[key]
+    return config
 
 
 if __name__ == "__main__":
