@@ -1,12 +1,24 @@
-from lowLevelFunctions import isFiltered,readFileName,print_mem_usage,calcToT,calcHit_VoltageError,calcHit_Voltage,TStoMS,calcClusters,trueTimeStamps
+from lowLevelFunctions import (
+    isFiltered,
+    readFileName,
+    print_mem_usage,
+    calcToT,
+    calcHit_VoltageError,
+    calcHit_Voltage,
+    TStoMS,
+    calcClusters,
+    trueTimeStamps,
+)
 from clusterClass import clusterClass
 import os
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from glob import glob
-from typing import Optional,Any, TypeAlias
+from typing import Optional, Any, TypeAlias
 import configLoader
+from collections import defaultdict
+
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
 
@@ -34,7 +46,9 @@ class dataAnalysis:
     def get_dataFrame(self) -> pd.DataFrame:
         return self.dataHandler.getDataFrame()
 
-    def get_base_attr(self, attribute: str, **kwargs) -> npt.NDArray[np.int_]:
+    def get_base_attr(
+        self, attribute: str, **kwargs
+    ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[Any]]]:
         if "layer" in kwargs:
             kwargs["layers"] = [kwargs["layer"]]
             kwargs.pop("layer")
@@ -50,20 +64,25 @@ class dataAnalysis:
                 kwargs.pop("layer")
         return self.dataHandler.getClusters(**kwargs)
 
-    def get_cluster_attr(self, attribute, excludeCrossTalk: bool = False, **kwargs) -> npt.NDArray[np.float64]:
+    def get_cluster_attr(
+        self, attribute, excludeCrossTalk: bool = False, **kwargs
+    ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[np.int_]]]:
         if "layer" in kwargs:
             kwargs["layers"] = [kwargs["layer"]]
             kwargs.pop("layer")
-        return self.dataHandler.getClustersAttr(attribute, excludeCrossTalk=excludeCrossTalk, **kwargs)
+        return self.dataHandler.getClustersAttr(
+            attribute, excludeCrossTalk=excludeCrossTalk, **kwargs
+        )
 
-    def get_crossTalk(self,recalc:bool=False)  -> npt.NDArray[np.bool_]:
+    def get_crossTalk(self, recalc: bool = False) -> npt.NDArray[np.bool_]:
         return self.dataHandler.getCrossTalk(recalc=recalc)
 
     def init_cluster_voltages(self) -> None:
         self.dataHandler.initClusterVoltages()
 
     def save_nonCrossTalk_to_csv(self, path) -> None:
-        self.dataHandler.save_nonCrossTalk_to_csv(path,self.get_fileName())
+        self.dataHandler.save_nonCrossTalk_to_csv(path, self.get_fileName())
+
 
 class calcDataFileManager:
     def __init__(self, pathToCalcData: str, fileName: str, maxLine: Optional[int] = None):
@@ -72,7 +91,14 @@ class calcDataFileManager:
         self.maxLine = maxLine
         os.makedirs(f"{self.pathToCalcData}", exist_ok=True)
 
-    def generateFileName(self, attribute: str, cut: bool = False, layers: Optional[list[int]] = None, name: str = "", file: str = "") -> str:
+    def generateFileName(
+        self,
+        attribute: str,
+        cut: bool = False,
+        layers: Optional[list[int]] = None,
+        name: str = "",
+        file: str = "",
+    ) -> str:
         pathToFile = (
             f"{self.pathToCalcData}"
             + f"{self.fileName}/"
@@ -86,21 +112,38 @@ class calcDataFileManager:
         )
         return pathToFile
 
-    def fileExists(self, attribute: str = "", cut: bool = False, calcFileName: Optional[str] = None, **kwargs) -> bool:
+    def fileExists(
+        self, attribute: str = "", cut: bool = False, calcFileName: Optional[str] = None, **kwargs
+    ) -> bool:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         if os.path.isfile(calcFileName):
             return True
         return False
 
-    def loadFile(self, attribute: str = "", cut: bool = False, suppressText: bool = False, calcFileName: Optional[str] = None, **kwargs) -> npt.NDArray[Any]:
+    def loadFile(
+        self,
+        attribute: str = "",
+        cut: bool = False,
+        suppressText: bool = False,
+        calcFileName: Optional[str] = None,
+        **kwargs,
+    ) -> npt.NDArray[Any]:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         if not suppressText:
             print(f"Loaded: {calcFileName}")
         return np.load(calcFileName, allow_pickle=True)
 
-    def saveFile(self, array: np.ndarray, attribute: str = "", cut: bool = False, suppressText: bool = False, calcFileName: Optional[str] = None, **kwargs) -> None:
+    def saveFile(
+        self,
+        array: npt.NDArray[Any],
+        attribute: str = "",
+        cut: bool = False,
+        suppressText: bool = False,
+        calcFileName: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         self.makeDirIfNeeded(calcFileName)
@@ -112,6 +155,7 @@ class calcDataFileManager:
         dirName = "/".join(fileName.split("/")[:-1])
         if not os.path.isdir(dirName):
             os.makedirs(dirName)
+
 
 class rawDataFileManager:
     def __init__(self, pathToData: str, columns: list[str], maxLine: Optional[int] = None):
@@ -135,19 +179,30 @@ class rawDataFileManager:
             "ext_TS2": int,
             "FIFO_overflow": bool,
         }
-        return pd.read_csv(self.pathToData, delimiter="\t", names=self.columns, dtype=dtypes, header=0, nrows=self.maxLine)
+        dtypes = defaultdict(None, dtypes)
+        return pd.read_csv(
+            self.pathToData,
+            delimiter="\t",
+            names=self.columns,
+            dtype=dtypes,
+            header=0,
+            nrows=self.maxLine,
+        )
 
-    def saveFile(self, dataFrame : pd.DataFrame, path :str, name :str) -> None:
+    def saveFile(self, dataFrame: pd.DataFrame, path: str, name: str) -> None:
         self.makeDirIfNeeded(path)
-        with open(f"{path}{name}_decode.dat", 'w') as file:
-            file.write('# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n')
+        with open(f"{path}{name}_decode.dat", "w") as file:
+            file.write(
+                "# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n"
+            )
             dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
             print(f"Save to csv: {path}{name}_decode.dat")
 
-    def makeDirIfNeeded(self, fileName :str) -> None:
+    def makeDirIfNeeded(self, fileName: str) -> None:
         dirName = "/".join(fileName.split("/")[:-1])
         if not os.path.isdir(dirName):
             os.makedirs(dirName)
+
 
 class dataHandler:
     def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None):
@@ -166,14 +221,23 @@ class dataHandler:
             "ext_TS2",
             "FIFO_overflow",
         ]
-        self.dataFrameHandler = dataFrameHandler(pathToData, self.baseAttrNames, maxLine=maxLine, telescope=self.telescope)
+        self.dataFrameHandler = dataFrameHandler(
+            pathToData, self.baseAttrNames, maxLine=maxLine, telescope=self.telescope
+        )
         self.calcFileManager = calcDataFileManager(pathToCalcData, self.fileName, maxLine)
         self.clusterHandler = clusterHandler(self.calcFileManager, self.dataFrameHandler)
 
     def getDataFrame(self) -> pd.DataFrame:
         return self.dataFrameHandler.data
 
-    def baseAttr(self, attribute: str, excludeCrossTalk: bool = False, layers: Optional[list] = None, returnIndexes: bool = False, recalc=False) -> npt.NDArray[Any]:
+    def baseAttr(
+        self,
+        attribute: str,
+        excludeCrossTalk: bool = False,
+        layers: Optional[list] = None,
+        returnIndexes: bool = False,
+        recalc=False,
+    ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[Any]]]:
         if attribute in self.baseAttrNames:
             toBeReturned = self.dataFrameHandler.readDataFrameAttr(attribute)
         else:
@@ -190,25 +254,39 @@ class dataHandler:
                     toBeReturned = attr()
                 getattr(self, attribute, toBeReturned)
                 self.calcFileManager.saveFile(toBeReturned, attribute=attribute)
-        toBeReturned = self.layerCrosstalkFilter(toBeReturned, excludeCrossTalk, layers, returnIndexes=returnIndexes)
+        toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, excludeCrossTalk, layers)
         if returnIndexes:
-            (toBeReturned, indexes) = toBeReturned
             return toBeReturned, indexes
         else:
-            return toBeReturned
+            return (toBeReturned, None)
 
     def getClusters(self, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
             self.getCrossTalk()
-        return self.clusterHandler.getClusters(excludeCrossTalk=excludeCrossTalk, **kwargs)
+        return self.clusterHandler.getClusters(**kwargs)
 
-    def getClustersAttr(self, attribute : str, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: Optional[list[int]] = None) -> npt.NDArray[Any]:
+    def getClustersAttr(
+        self,
+        attribute: str,
+        excludeCrossTalk: bool = False,
+        returnIndexes: bool = False,
+        layers: Optional[list[int]] = None,
+    ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[np.int_]]]:
+        toBeReturned: npt.NDArray[Any]
+        indexes: Optional[npt.NDArray[np.int_]]
         if self.calcFileManager.fileExists(attribute, cut=excludeCrossTalk, layers=layers) and (
-            not returnIndexes or self.calcFileManager.fileExists("clusterIndexes", cut=excludeCrossTalk, layers=layers)
+            not returnIndexes
+            or self.calcFileManager.fileExists(
+                "clusterIndexes", cut=excludeCrossTalk, layers=layers
+            )
         ):
-            toBeReturned = self.calcFileManager.loadFile(attribute, cut=excludeCrossTalk, layers=layers, suppressText=True)
+            toBeReturned = self.calcFileManager.loadFile(
+                attribute, cut=excludeCrossTalk, layers=layers, suppressText=True
+            )
             if returnIndexes:
-                indexes = self.calcFileManager.loadFile("clusterIndexes", cut=excludeCrossTalk, layers=layers, suppressText=True)
+                indexes = self.calcFileManager.loadFile(
+                    "clusterIndexes", cut=excludeCrossTalk, layers=layers, suppressText=True
+                )
         else:
             if not self.clusterHandler.haveClusters:
                 self.getClusters()
@@ -216,32 +294,47 @@ class dataHandler:
                 self.getCrossTalk()
             if returnIndexes:
                 toBeReturned, indexes = self.clusterHandler.getClusterAttr(
-                    attribute, excludeCrossTalk=excludeCrossTalk, returnIndexes=returnIndexes, layers=layers
+                    attribute,
+                    excludeCrossTalk=excludeCrossTalk,
+                    returnIndexes=returnIndexes,
+                    layers=layers,
                 )
-                self.calcFileManager.saveFile(toBeReturned, attribute=attribute, cut=excludeCrossTalk, layers=layers)
-                self.calcFileManager.saveFile(indexes, "clusterIndexes", cut=excludeCrossTalk, layers=layers)
+                self.calcFileManager.saveFile(
+                    toBeReturned, attribute=attribute, cut=excludeCrossTalk, layers=layers
+                )
+                if indexes is not None:
+                    self.calcFileManager.saveFile(
+                        indexes, "clusterIndexes", cut=excludeCrossTalk, layers=layers
+                    )
             else:
                 toBeReturned = self.clusterHandler.getClusterAttr(
-                    attribute, excludeCrossTalk=excludeCrossTalk, returnIndexes=returnIndexes, layers=layers
+                    attribute,
+                    excludeCrossTalk=excludeCrossTalk,
+                    returnIndexes=returnIndexes,
+                    layers=layers,
+                )[0]
+                self.calcFileManager.saveFile(
+                    toBeReturned, attribute=attribute, cut=excludeCrossTalk, layers=layers
                 )
-                self.calcFileManager.saveFile(toBeReturned, attribute=attribute, cut=excludeCrossTalk, layers=layers)
         if returnIndexes:
-            return toBeReturned, indexes
+            return (toBeReturned, indexes)
         else:
-            return toBeReturned
+            return (toBeReturned, None)
 
     def initClusterVoltages(self) -> None:
-        self.clusterHandler.initClusterVoltages(self.baseAttr("Hit_Voltage"), self.baseAttr("Hit_VoltageError"))
+        self.clusterHandler.initClusterVoltages(
+            self.baseAttr("Hit_Voltage")[0], self.baseAttr("Hit_VoltageError")[0]
+        )
 
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
         return np.invert(self.getCrossTalk())
 
-    def getCrossTalk(self,recalc:bool=False) -> npt.NDArray[np.bool_]:
+    def getCrossTalk(self, recalc: bool = False) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
             self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         elif self.calcFileManager.fileExists("crossTalk") and not recalc:
-            self.crossTalk = self.calcFileManager.loadFile("crossTalk")
+            self.crossTalk: npt.NDArray[np.bool_] = self.calcFileManager.loadFile("crossTalk")
             if self.telescope == "lancs":
                 row = 248
                 self.dataFrameHandler.cutSensor(row)
@@ -251,7 +344,7 @@ class dataHandler:
             self.crossTalk = self.clusterHandler.calcCrossTalk()
             if self.telescope == "lancs":
                 row = 248
-                self.crossTalk = self.crossTalk[np.where(self.baseAttr("Row") < row)[0]]
+                self.crossTalk = self.crossTalk[np.where(self.baseAttr("Row")[0] < row)[0]]
                 self.dataFrameHandler.cutSensor(row)
                 self.getClusters(recalc=True)
                 self.baseAttr("ToT", recalc=True)
@@ -262,52 +355,70 @@ class dataHandler:
         print_mem_usage()
         return toBeReturned
 
-    def cutArrayCrossTalkFilter(self, array: npt.NDArray[Any], excludeCrossTalk: bool = True) -> npt.NDArray[np.bool_]:
+    def cutArrayCrossTalkFilter(
+        self, array: npt.NDArray[Any], excludeCrossTalk: bool = True
+    ) -> npt.NDArray[np.bool_]:
         if excludeCrossTalk:
             includedIndexes = self.notCrossTalk()
         else:
-            includedIndexes = np.full(len(array), True, dtype=bool)
+            includedIndexes = np.full(len(array), True, dtype=bool).astype(np.bool_)
         return includedIndexes
 
-    def layerFilter(self, array: npt.NDArray[Any], layers: Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
+    def layerFilter(
+        self, array: npt.NDArray[Any], layers: Optional[list[int]] = None
+    ) -> npt.NDArray[np.bool_]:
         if layers is None:
-            includedIndexes = np.full(len(array), True, dtype=bool)
+            includedIndexes = np.full(len(array), True, dtype=bool).astype(np.bool_)
         else:
-            layersArray = self.baseAttr("Layer")
+            layersArray = self.baseAttr("Layer")[0]
             includedIndexes = np.isin(layersArray, layers, assume_unique=True, kind="table")
         return includedIndexes
 
-    def layerCrosstalkFilter(self, array: npt.NDArray[Any], excludeCrossTalk: bool = False, layers: Optional[list[int]] = None , returnIndexes: bool = False) -> npt.NDArray[Any]:
-        if layers is not None or excludeCrossTalk is not None:
-            filter = (self.cutArrayCrossTalkFilter(array, excludeCrossTalk)) & (self.layerFilter(array, layers))
-        else:
-            filter = np.full(len(array), True, dtype=bool)
+    def layerCrosstalkFilter(
+        self,
+        array: npt.NDArray[Any],
+        excludeCrossTalk: bool = False,
+        layers: Optional[list[int]] = None,
+    ) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
+        filter = (self.cutArrayCrossTalkFilter(array, excludeCrossTalk)) & (
+            self.layerFilter(array, layers)
+        )
         array = array[filter]
-        if returnIndexes:
-            indexes = np.arange(len(filter))[filter]
-            array = (array, indexes)
-        return array
+        indexes = np.arange(len(filter))[filter]
+        return array, indexes
 
-    def save_nonCrossTalk_to_csv(self, path,name) -> None:
-        self.dataFrameHandler.saveNonCrossTalkToCSV(self.getCrossTalk(), path,name,self.getClusters())
+    def save_nonCrossTalk_to_csv(self, path, name) -> None:
+        self.dataFrameHandler.saveNonCrossTalkToCSV(
+            self.getCrossTalk(), path, name, self.getClusters()
+        )
 
 
 class dataFrameHandler:
     # Stores the data frame
     # Retrieves calculated data for values on a per hit basis i.e. one value per line in data frame e.g. ToT, Voltage
-    def __init__(self, pathToData: str, baseAttrNames: list[str], maxLine: Optional[int] = None, telescope: str = "kit"):
+    def __init__(
+        self,
+        pathToData: str,
+        baseAttrNames: list[str],
+        maxLine: Optional[int] = None,
+        telescope: str = "kit",
+    ):
         self.dataFileManager = rawDataFileManager(pathToData, baseAttrNames, maxLine=maxLine)
         self.telescope = telescope
+        self.dataLength: int = 0
 
     def loadDataIfNotLoaded(self) -> None:
         if not self.checkLoadedData():
             self.data = self.dataFileManager.readFile()
 
-    def cutSensor(self, row:int) -> pd.DataFrame:
+    def cutSensor(self, row: int) -> pd.DataFrame:
         self.loadDataIfNotLoaded()
-        self.data = self.data.drop(index=np.where(self.data["Row"].values >= row)[0])
-        self.data.index = np.arange(len(self.data))
+        positions = np.where(self.data["Row"].to_numpy() >= row)[0]
+        index_labels = self.data.index[positions]
+        self.data = self.data.drop(index=index_labels)
+        self.data.reset_index(drop=True, inplace=True)
         return self.data
+
     def checkLoadedData(self) -> bool:
         if "data" in self.__dict__.keys():
             return True
@@ -316,62 +427,71 @@ class dataFrameHandler:
 
     def readDataFrameAttr(self, attribute) -> npt.NDArray[np.int_]:
         self.loadDataIfNotLoaded()
-        toBeReturned = self.data[attribute].values
+        toBeReturned = self.data[attribute].to_numpy()
         return toBeReturned
 
     def getToT(self) -> npt.NDArray[np.int_]:
         self.loadDataIfNotLoaded()
-        toBeReturned = calcToT(self.data["TS"].values, self.data["TS2"].values)
+        toBeReturned = calcToT(self.data["TS"].to_numpy(), self.data["TS2"].to_numpy())
         return toBeReturned
 
-    def getHit_Voltage(self, ToTs : Optional[npt.NDArray[np.int_]]=None) -> npt.NDArray[np.float64]:
+    def getHit_Voltage(
+        self, ToTs: Optional[npt.NDArray[np.int_]] = None
+    ) -> npt.NDArray[np.float64]:
         self.loadDataIfNotLoaded()
         if ToTs is None:
             ToTs = self.getToT()
-        rows = self.data["Row"].values
-        columns = self.data["Column"].values
-        Layers = self.data["Layer"].values
+        rows = self.data["Row"].to_numpy()
+        columns = self.data["Column"].to_numpy()
+        Layers = self.data["Layer"].to_numpy()
         toBeReturned = calcHit_Voltage(rows, columns, ToTs, Layers)
         return toBeReturned
 
-    def getHit_VoltageError(self, ToTs:Optional[npt.NDArray[np.int_]]=None) -> npt.NDArray[np.float64]:
+    def getHit_VoltageError(
+        self, ToTs: Optional[npt.NDArray[np.int_]] = None
+    ) -> npt.NDArray[np.float64]:
         self.loadDataIfNotLoaded()
         if ToTs is None:
             ToTs = self.getToT()
-        rows = self.data["Row"].values
-        columns = self.data["Column"].values
-        Layers = self.data["Layer"].values
+        rows = self.data["Row"].to_numpy()
+        columns = self.data["Column"].to_numpy()
+        Layers = self.data["Layer"].to_numpy()
         toBeReturned = calcHit_VoltageError(rows, columns, ToTs, Layers)
         return toBeReturned
 
     def getDataLength(self) -> int:
         self.loadDataIfNotLoaded()
-        if "dataLength" in self.__dict__:
+        if self.dataLength > 0:
             return self.dataLength
         else:
             self.dataLength = len(self.data)
             return self.dataLength
 
-    def saveNonCrossTalkToCSV(self, crosstalk: npt.NDArray[np.bool_], path : str,name : str,clusters : clusterArray) -> None:
+    def saveNonCrossTalkToCSV(
+        self, crosstalk: npt.NDArray[np.bool_], path: str, name: str, clusters: clusterArray
+    ) -> None:
         outputDF = self.data
-        outputDF["ext_TS"] = trueTimeStamps(clusters,outputDF["ext_TS"].values)
-        outputDF = outputDF.drop(index=np.where(crosstalk)[0])
-        self.dataFileManager.saveFile(outputDF, path,name)
+        outputDF["ext_TS"] = trueTimeStamps(clusters, outputDF["ext_TS"].to_numpy())
+        positions = np.where(crosstalk)[0]
+        index_labels = self.data.index[positions]
+        outputDF = outputDF.drop(index=index_labels)
+        self.dataFileManager.saveFile(outputDF, path, name)
 
 
 class clusterHandler:
-    def __init__(self, calcFileManager : calcDataFileManager, dataFrameHandler : dataFrameHandler):
+    def __init__(self, calcFileManager: calcDataFileManager, dataFrameHandler: dataFrameHandler):
         self.haveClusters = False
         self.haveCrossTalk = False
         self.crossTalkFinder = crossTalkFinder()
         self.calcFileManager = calcFileManager
         self.dataFrameHandler = dataFrameHandler
+        self.clusters: clusterArray
 
     def foundClusters(self) -> bool:
         return self.haveClusters
 
-    def getClusters(self, returnIndexes: bool = False, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
-        if "clusters" in self.__dict__ and not recalc:
+    def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
+        if self.clusters is not None and not recalc:
             toBeReturned = self.clusters
         elif self.calcFileManager.fileExists("clusters") and not recalc:
             clusters = self.calcFileManager.loadFile("clusters")
@@ -389,13 +509,17 @@ class clusterHandler:
             toBeReturned = self.clusters
         filter = self.layerFilter(self.clusters, layers=layers)
         print_mem_usage()
-        if returnIndexes:
-            indexes = np.arange(len(self.clusters))
-            return toBeReturned[filter], indexes[filter]
-        else:
-            return toBeReturned[filter]
+        return toBeReturned[filter]
 
-    def initClusters(self, clusters:clusterArray, layers: Optional[list[int]]=None, columns: Optional[npt.NDArray[np.int_]]=None, rows: Optional[npt.NDArray[np.int_]]=None, ToTs: Optional[npt.NDArray[np.int_]]=None, TSs: Optional[npt.NDArray[np.int_]]=None) -> clusterArray:
+    def initClusters(
+        self,
+        clusters: clusterArray,
+        layers: Optional[npt.NDArray[np.int_]] = None,
+        columns: Optional[npt.NDArray[np.int_]] = None,
+        rows: Optional[npt.NDArray[np.int_]] = None,
+        ToTs: Optional[npt.NDArray[np.int_]] = None,
+        TSs: Optional[npt.NDArray[np.int_]] = None,
+    ) -> clusterArray:
         print(f"Initializing Clusters")
         self.clusters = np.empty(len(clusters), dtype=object)
         if layers is None:
@@ -410,15 +534,27 @@ class clusterHandler:
             TSs = self.dataFrameHandler.readDataFrameAttr("ext_TS")
         for i in range(len(clusters)):
             layer = layers[clusters[i][0]]
-            self.clusters[i] = clusterClass(i, clusters[i], layer, columns[clusters[i]], rows[clusters[i]], ToTs[clusters[i]], TSs[clusters[i]])
+            self.clusters[i] = clusterClass(
+                i,
+                clusters[i],
+                layer,
+                columns[clusters[i]],
+                rows[clusters[i]],
+                ToTs[clusters[i]],
+                TSs[clusters[i]],
+            )
         self.haveClusters = True
         return self.clusters
 
-    def initClusterVoltages(self, Hit_Voltages: npt.NDArray[np.float64], Hit_VoltageErrors: npt.NDArray[np.float64]) -> None:
+    def initClusterVoltages(
+        self, Hit_Voltages: npt.NDArray[np.float64], Hit_VoltageErrors: npt.NDArray[np.float64]
+    ) -> None:
         if not self.haveClusters:
             self.getClusters()
         for cluster in self.clusters:
-            cluster.setHit_Voltage(Hit_Voltages[cluster.indexes], Hit_VoltageErrors[cluster.indexes])
+            cluster.setHit_Voltage(
+                Hit_Voltages[cluster.indexes], Hit_VoltageErrors[cluster.indexes]
+            )
 
     def setCalcCrossTalk(self, crosstalk: npt.NDArray[np.bool_]) -> None:
         clusters = self.getClusters()
@@ -439,36 +575,59 @@ class clusterHandler:
         self.haveCrossTalk = True
         return crossTalk
 
-    def getClusterAttr(self, attribute: str, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: Optional[list[int]] = None) -> npt.NDArray[Any]:
+    def getClusterAttr(
+        self,
+        attribute: str,
+        excludeCrossTalk: bool = False,
+        returnIndexes: bool = False,
+        layers: Optional[list[int]] = None,
+    ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[np.int_]]]:
+        toBeReturned: npt.NDArray[Any]
         if attribute == "Sizes":
-            toBeReturned = np.array([cluster.getSize(excludeCrossTalk) for cluster in self.clusters])
+            toBeReturned = np.array(
+                [cluster.getSize(excludeCrossTalk) for cluster in self.clusters]
+            )
             filter = self.layerFilter(self.clusters, layers=layers) & (toBeReturned > 0)
         elif attribute == "ColumnWidths":
-            toBeReturned = np.array([cluster.getColumnWidth(excludeCrossTalk) for cluster in self.clusters])
+            toBeReturned = np.array(
+                [cluster.getColumnWidth(excludeCrossTalk) for cluster in self.clusters]
+            )
             filter = self.layerFilter(self.clusters, layers=layers) & (toBeReturned > 0)
         elif attribute == "RowWidths":
-            toBeReturned = np.array([cluster.getRowWidth(excludeCrossTalk) for cluster in self.clusters])
+            toBeReturned = np.array(
+                [cluster.getRowWidth(excludeCrossTalk) for cluster in self.clusters]
+            )
             filter = self.layerFilter(self.clusters, layers=layers) & (toBeReturned > 0)
         elif attribute == "TSs":
-            toBeReturned = np.array([np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self.clusters])
+            toBeReturned = np.array(
+                [np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self.clusters]
+            )
             filter = self.layerFilter(self.clusters, layers=layers)
         elif attribute == "Times":
-            toBeReturned = np.array([np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self.clusters])
-            toBeReturned = TStoMS(toBeReturned - np.min(toBeReturned))
+            toBeReturned = np.array(
+                [np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self.clusters]
+            )
+            toBeReturned = TStoMS(toBeReturned.astype(int) - int(np.min(toBeReturned)))
             filter = self.layerFilter(self.clusters, layers=layers)
         if returnIndexes:
             indexes = np.arange(len(self.clusters))
-            return toBeReturned[filter], indexes[filter]
+            return (toBeReturned[filter], indexes[filter])
         else:
-            return toBeReturned[filter]
+            return (toBeReturned[filter], None)
 
-    def layerFilter(self, clusters: clusterArray, layers: Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
+    def layerFilter(
+        self, clusters: clusterArray, layers: Optional[list[int]] = None
+    ) -> npt.NDArray[np.bool_]:
         if layers == None:
             return np.full(len(clusters), True, bool)
         else:
             return np.isin([cluster.layer for cluster in clusters], layers)
 
+
 class crossTalkFinder:
+    def __init__(self) -> None:
+        self.crossTalkDict: dict[int, npt.NDArray[np.int_]]
+
     def findCrossTalk_OneCluster(self, cluster: clusterClass) -> npt.NDArray[np.bool_]:
         crossTalk = np.full(len(cluster.getShortIndexes()), False, dtype=bool)
         ToTs = cluster.getToTs()
@@ -479,7 +638,9 @@ class crossTalkFinder:
             if not crossTalk[pixel]:
                 expectedCrossTalk = self.crossTalkFunction()[rows[pixel]]
                 for cross in expectedCrossTalk:
-                    clashPixels = shortIndexes[(columns == columns[pixel]) & (rows == cross[0]) & (np.invert(crossTalk))]
+                    clashPixels = shortIndexes[
+                        (columns == columns[pixel]) & (rows == cross[0]) & (np.invert(crossTalk))
+                    ]
                     for clash in clashPixels:
                         if ToTs[pixel] < 30 and ToTs[clash] < 30:
                             pass
@@ -500,7 +661,10 @@ class crossTalkFinder:
                 for expected in expectedCrossTalk:
                     for j in range(len(expected)):
                         if i in self.crossTalkDict:
-                            if expected[j] not in [i-2,i-1,i,i+1,i+2] and expected[j] != -1:
+                            if (
+                                expected[j] not in [i - 2, i - 1, i, i + 1, i + 2]
+                                and expected[j] != -1
+                            ):
                                 self.crossTalkDict[i] = np.append(
                                     self.crossTalkDict[i],
                                     [
@@ -512,7 +676,10 @@ class crossTalkFinder:
                                     axis=0,
                                 )
                         else:
-                            if expected[j] not in [i-2,i-1,i,i+1,i+2] and expected[j] != -1:
+                            if (
+                                expected[j] not in [i - 2, i - 1, i, i + 1, i + 2]
+                                and expected[j] != -1
+                            ):
                                 self.crossTalkDict[i] = np.array(
                                     [
                                         [
@@ -524,10 +691,11 @@ class crossTalkFinder:
                 if i not in self.crossTalkDict:
                     self.crossTalkDict[i] = np.array([])
             return self.crossTalkDict
+
     def calcCrossTalkArray(self) -> npt.NDArray[np.int_]:
         # These numbers are all manually set based on the RowRow correlation graph
         up_to = 124
-        crossTalkArray = np.full((up_to,9), -1)
+        crossTalkArray = np.full((up_to, 9), -1)
         crossTalkArray[:, 0] = np.arange(0, up_to)
         for row in range(1, up_to):
             expectedCrossTalk = []
@@ -569,8 +737,11 @@ class crossTalkFinder:
                 crossTalkArray[row, i + 1] = expectedCrossTalk[i]
         crossTalkArray[np.where(crossTalkArray[:, :] > 372)] = -1
         crossTalkArray = crossTalkArray.astype(int)
-        crossTalkArray = np.append(crossTalkArray, np.append([[248, 267]],np.full((1,7),-1),axis=1), axis=0)
+        crossTalkArray = np.append(
+            crossTalkArray, np.append([[248, 267]], np.full((1, 7), -1), axis=1), axis=0
+        )
         return crossTalkArray
+
 
 def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}) -> list[dataAnalysis]:
     dataFiles = []
@@ -584,24 +755,29 @@ def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}) -> 
                 boolList.append((attr() == filterDict[f]))
         if np.all(boolList):
             dataFiles.append(dataFile)
-    dataFiles = np.array(dataFiles)[np.argsort([dataFile.get_angle() * 1000 + dataFile.get_voltage() for dataFile in dataFiles])]
-    for dataFile in dataFiles:
+    sortIndex = np.argsort(
+        np.array([dataFile.get_angle() * 1000 + dataFile.get_voltage() for dataFile in dataFiles])
+    )
+    returnDataFiles = np.array(dataFiles)[sortIndex]
+    for dataFile in returnDataFiles:
         if dataFile.get_telescope() == "lancs":
             dataFile.dataHandler.getCrossTalk()
-    return np.flip(dataFiles)
+    return list(np.flip(returnDataFiles))
 
-def initDataFiles(config:dict={})->list[dataAnalysis]:
+
+def initDataFiles(config: dict = {}) -> list[dataAnalysis]:
     if config == {}:
         config = configLoader.defaultConfig()
     files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
-    allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
+    allDataFiles = [
+        dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"])
+        for pathToDataFile in files
+    ]
     dataFiles = filterDataFiles(
         allDataFiles,
         filterDict=config["filterDict"],
     )
     return dataFiles
-
-
 
 
 if __name__ == "__main__":
@@ -610,11 +786,11 @@ if __name__ == "__main__":
     pathToCalcData = "/home/atlas/rballard/AtlasDataAnalysis/calculatedData"
     dataFile = dataAnalysis(pathToData, pathToCalcData, maxLine=100000)
     print(dataFile.get_angle())
-    print(dataFile.get_base_attr("ToT").shape)
-    print(dataFile.get_base_attr("Hit_Voltage", returnIndexes=True, layers=[4]))
-    print(dataFile.get_base_attr("ToT", excludeCrossTalk=True).shape)
-    print(dataFile.get_cluster_attr("Sizes").shape)
-    print(dataFile.get_cluster_attr("RowWidths", excludeCrossTalk=True).shape)
-    print(dataFile.get_cluster_attr("ColumnWidths", excludeCrossTalk=True, layers=[4]).shape)
-    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True).shape)
-    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True, layers=[4]).shape)
+    print(dataFile.get_base_attr("ToT")[0].shape)
+    print(dataFile.get_base_attr("Hit_Voltage", returnIndexes=True, layers=[4])[0])
+    print(dataFile.get_base_attr("ToT", excludeCrossTalk=True)[0].shape)
+    print(dataFile.get_cluster_attr("Sizes")[0].shape)
+    print(dataFile.get_cluster_attr("RowWidths", excludeCrossTalk=True)[0].shape)
+    print(dataFile.get_cluster_attr("ColumnWidths", excludeCrossTalk=True, layers=[4])[0].shape)
+    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True)[0].shape)
+    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True, layers=[4])[0].shape)

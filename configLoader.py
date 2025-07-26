@@ -6,6 +6,8 @@ def setConfigDefaults():
     config = defaultConfig()
     with open(path, "w") as f:
         json.dump(config, f)
+
+
 def defaultConfig():
     config = {
         "maxLine": None,
@@ -16,17 +18,21 @@ def defaultConfig():
         "pathToDataOutput": "/home/atlas/rballard/for_magda/data/pythonOutput/",
         "filterDict": {
             "telescope": "kit",
-            "angle":86.5,
+            "angle": 86.5,
         },
         "maxClusterWidth": 30,
         "layers": [4],
         "excludeCrossTalk": True,
     }
     return config
-def saveConfig(config:dict,path:str="defaultConfig.json"):
+
+
+def saveConfig(config: dict, path: str = "defaultConfig.json"):
     with open(path, "w") as f:
         json.dump(config, f)
-def loadConfig(path:str = "")->dict:
+
+
+def loadConfig(path: str = "") -> dict:
     if path == "":
         return defaultConfig()
     try:

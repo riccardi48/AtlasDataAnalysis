@@ -1,18 +1,19 @@
-from plotAnalysis import depthAnalysis, plotClass, correlationPlotter
+from plotAnalysis import depthAnalysis, plotClass, correlationPlotter, fitAndPlotCCE
 from dataAnalysis import dataAnalysis, crossTalkFinder, initDataFiles
 from lowLevelFunctions import (
     calcDepth,
     adjustPeakVoltage,
-    lowess,
-    fitAndPlotCCE,
     histogramErrors,
     landauFunc,
 )
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from matplotlib.ticker import MultipleLocator
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
+from math import atan
+from typing import Optional
 
 
 def AngleDistribution(
@@ -176,7 +177,7 @@ def RowWidthDistribution(
     axs = plot.axs
     bins = 60
     range = (0, 60)
-    rowsWidths = dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True)
+    rowsWidths, _ = dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True)
     # times = dataFile.get_cluster_attr("Times",layer=layer,excludeCrossTalk = True)
     # print(np.min(times),np.max(times))
     minTime = 100000
@@ -217,11 +218,10 @@ def VoltageDepthScatter(
     d = depth.find_d_value(dataFile)
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
     axs = plot.axs
-    cmap = plt.colormaps["hsv"]
-    allXValues = []
-    allYValues = []
-    allXValuesErrors = []
-    allYValuesErrors = []
+    cmap = cm.get_cmap("hsv")
+    allXValues: list[float] = []
+    allYValues: list[float] = []
+    allYValuesErrors: list[float] = []
     for i in range(2, depth.maxClusterWidth + 1):
         x = calcDepth(
             d,
@@ -233,9 +233,7 @@ def VoltageDepthScatter(
         y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute=measuredAttribute)
         if i < 20:
             y, y_err = adjustPeakVoltage(y, y_err, d, i)
-        if not hideLowWidths or (
-            np.rad2deg(np.atan(i / d)) > 85 and np.rad2deg(np.atan(i / d)) < 87
-        ):
+        if not hideLowWidths or (np.rad2deg(atan(i / d)) > 85 and np.rad2deg(atan(i / d)) < 87):
             axs.scatter(
                 x, y, color=cmap((i - 2) / depth.maxClusterWidth), marker="x", s=15, label=str(i)
             )
@@ -268,16 +266,12 @@ def VoltageDepthScatter(
                 )
 
     rightSide = axs.get_xlim()[1]
-    allXValues = np.array(allXValues)
-    allYValues = np.array(allYValues)
-    allYValuesErrors = np.array(allYValuesErrors)
-    y = allYValues[np.argsort(allXValues)]
-    yerr = allYValuesErrors[np.argsort(allXValues)]
-    x = allXValues[np.argsort(allXValues)]
-    y_sm, y_std = lowess(x[y > 0.1], y[y > 0.1], f=1 / 10)
-    # print(y_std)
-    axs.plot(x[y > 0.1], y_sm, color=plot.colorPalette[3], linestyle="dashed")
-    # axs.fill_between(x, y_sm - y_std,y_sm + y_std, alpha=0.3,color=plot.colorPalette[2])
+    allXValues_np = np.array(allXValues)
+    allYValues_np = np.array(allYValues)
+    allYValuesErrors_np = np.array(allYValuesErrors)
+    y = allYValues_np[np.argsort(allXValues_np)]
+    yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
+    x = allXValues_np[np.argsort(allXValues_np)]
 
     fitAndPlotCCE(axs, plot, x[x < d * 50], y[x < d * 50], yerr[x < d * 50])
     # axs.hlines(0.162, 0, rightSide, colors=plot.colorPalette[1], linestyles="dashed")
@@ -319,9 +313,9 @@ def VoltageDepthScatter(
         axs.yaxis.set_major_formatter("{x:.0f}")
         axs.yaxis.set_minor_locator(MultipleLocator(2))
     if annotate:
-        x = [40, 65]
-        axs.vlines(x, 0.05, 0.3, colors=plot.textColor, linestyles="dashed")
-        for i in x:
+        lineList = [40, 65]
+        axs.vlines(lineList, 0.05, 0.3, colors=plot.textColor, linestyles="dashed")
+        for i in lineList:
             axs.text(
                 i,
                 0.05,
@@ -347,7 +341,7 @@ def Hit_VoltageDistributionByPixel(
     depth: depthAnalysis,
     clusterWidth: int,
     pathToOutput: str,
-    _range: tuple[float] = (0.162, 4),
+    _range: tuple[float, float] = (0.162, 4),
     measuredAttribute: str = "Hit_Voltage",
     saveToPDF: bool = True,
 ):
@@ -359,10 +353,10 @@ def Hit_VoltageDistributionByPixel(
         hspace=0,
     )
     axs = np.flip(plot.axs)
-    hitPositionArray = depth.loadOneLength(
+    hitPositionArray, _ = depth.loadOneLength(
         dataFile, clusterWidth, measuredAttribute=measuredAttribute
     )
-    hitPositionErrorArray = depth.loadOneLength(
+    hitPositionErrorArray, _ = depth.loadOneLength(
         dataFile, clusterWidth, error=True, measuredAttribute=measuredAttribute
     )
     params_histogram = depth.findPeaks_widthRestricted(
@@ -379,7 +373,7 @@ def Hit_VoltageDistributionByPixel(
         errors = errors[np.invert(np.isnan(values))]
         values = values[np.invert(np.isnan(values))]
         hist, binEdges, binCentres = depth.histogramHit_Voltage(values, range=_range)
-        histErrors = histogramErrors(values, errors, binEdges)
+        histErrors = histogramErrors(values, binEdges, errors)
         axs[j].errorbar(binCentres, hist, histErrors, fmt="none", color=plot.colorPalette[6])
         axs[j].step(
             binEdges,
@@ -409,7 +403,10 @@ def Hit_VoltageDistributionByPixel(
         )
         axs[j].get_xaxis().set_visible(False)
         plot.set_config(
-            axs[j], ylim=(0, None), xlim=(np.min(binEdges), np.max(binEdges)), legend=True
+            axs[j],
+            ylim=(0, None),
+            xlim=(float(np.min(binEdges)), float(np.max(binEdges))),
+            legend=True,
         )
         axs[j].yaxis.set_major_locator(MultipleLocator(100))
         axs[j].yaxis.set_major_formatter("{x:.0f}")
@@ -452,10 +449,16 @@ def Hit_VoltageDistributionByPixel(
         return plot.fig
 
 
-def HitDistributionInCluster(dataFile:dataAnalysis, depth:depthAnalysis, clusterWidth:int, pathToOutput:str, saveToPDF:bool=True):
+def HitDistributionInCluster(
+    dataFile: dataAnalysis,
+    depth: depthAnalysis,
+    clusterWidth: int,
+    pathToOutput: str,
+    saveToPDF: bool = True,
+):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
     axs = plot.axs
-    hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth))
+    hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth)[0])
     d = depth.find_d_value(dataFile)
     heights = np.zeros((clusterWidth))
     x = np.linspace(0, 1 - (0.5 / clusterWidth), clusterWidth + 1) * d * 50
@@ -508,14 +511,20 @@ def HitDistributionInCluster(dataFile:dataAnalysis, depth:depthAnalysis, cluster
 
 
 def HitDistributionInClusterAllOnOne(
-    dataFile:dataAnalysis, depth:depthAnalysis, pathToOutput:str, vmin:int=2, vmax:int=40, cutting:bool=False, saveToPDF:bool=True
+    dataFile: dataAnalysis,
+    depth: depthAnalysis,
+    pathToOutput: str,
+    vmin: int = 2,
+    vmax: int = 40,
+    cutting: bool = False,
+    saveToPDF: bool = True,
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
     axs = plot.axs
-    cmap = plt.colormaps["hsv"]
+    cmap = cm.get_cmap("hsv")
     d = depth.find_d_value(dataFile)
     for clusterWidth in range(vmin, vmax + 1):
-        hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth))
+        hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth)[0])
         heights = np.zeros((clusterWidth))
         x = np.linspace(0, 1 - (0.5 / clusterWidth), clusterWidth + 1) * d * 50
         # if clusterWidth > (d*np.tan(np.deg2rad(dataFile.get_angle()))):
@@ -557,9 +566,9 @@ def HitDistributionInClusterAllOnOne(
         columnspacing=0.3,
         legendTitle="Cluster Width",
     )
-    x = [40, 65]
-    axs.vlines(x, 0.6, 1.05, colors=plot.textColor, linestyles="dashed")
-    for i in x:
+    lineList = [40, 65]
+    axs.vlines(lineList, 0.6, 1.05, colors=plot.textColor, linestyles="dashed")
+    for i in lineList:
         axs.text(
             i,
             0.6,
@@ -584,13 +593,13 @@ def HitDistributionInClusterAllOnOne(
 
 
 def CuttingComparison(
-    dataFile: dataAnalysis, pathToOutput:str, layer: int = None, saveToPDF:bool=True
+    dataFile: dataAnalysis, pathToOutput: str, layer: Optional[int] = None, saveToPDF: bool = True
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", shape=(2, 2), sizePerPlot=(5, 4))
     axs = plot.axs
     bins = 128
     range = (0, 256)
-    height, x = np.histogram(dataFile.get_base_attr("ToT", layer=layer), bins=bins, range=range)
+    height, x = np.histogram(dataFile.get_base_attr("ToT", layer=layer)[0], bins=bins, range=range)
     axs[0, 0].step(
         x,
         np.append(height[0], height),
@@ -600,7 +609,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("ToT", layer=layer, excludeCrossTalk=True), bins=bins, range=range
+        dataFile.get_base_attr("ToT", layer=layer, excludeCrossTalk=True)[0], bins=bins, range=range
     )
     axs[0, 0].step(
         x,
@@ -641,7 +650,9 @@ def CuttingComparison(
 
     bins = 132
     range = (0, bins)
-    height, x = np.histogram(dataFile.get_base_attr("Column", layer=layer), bins=bins, range=range)
+    height, x = np.histogram(
+        dataFile.get_base_attr("Column", layer=layer)[0], bins=bins, range=range
+    )
     axs[1, 0].step(
         x,
         np.append(height[0], height),
@@ -651,7 +662,9 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("Column", layer=layer, excludeCrossTalk=True), bins=bins, range=range
+        dataFile.get_base_attr("Column", layer=layer, excludeCrossTalk=True)[0],
+        bins=bins,
+        range=range,
     )
     axs[1, 0].step(
         x,
@@ -682,7 +695,7 @@ def CuttingComparison(
 
     bins = 372
     range = (0, bins)
-    height, x = np.histogram(dataFile.get_base_attr("Row", layer=layer), bins=bins, range=range)
+    height, x = np.histogram(dataFile.get_base_attr("Row", layer=layer)[0], bins=bins, range=range)
     axs[1, 1].step(
         x,
         np.append(height[0], height),
@@ -692,7 +705,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("Row", layer=layer, excludeCrossTalk=True), bins=bins, range=range
+        dataFile.get_base_attr("Row", layer=layer, excludeCrossTalk=True)[0], bins=bins, range=range
     )
     axs[1, 1].step(
         x,
@@ -727,7 +740,7 @@ def CuttingComparison(
     bins = 372
     range = (0, bins)
     height, x = np.histogram(
-        dataFile.get_cluster_attr("RowWidths", layer=layer), bins=bins, range=range
+        dataFile.get_cluster_attr("RowWidths", layer=layer)[0], bins=bins, range=range
     )
     axs[0, 1].step(
         x,
@@ -738,7 +751,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True),
+        dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True)[0],
         bins=bins,
         range=range,
     )
@@ -787,12 +800,15 @@ def CuttingComparison(
 
 
 def ClustersCountOverTime(
-    dataFile: dataAnalysis, pathToOutput:str, layers: list[int] = [1, 2, 3, 4], saveToPDF:bool=True
+    dataFile: dataAnalysis,
+    pathToOutput: str,
+    layers: list[int] = [1, 2, 3, 4],
+    saveToPDF: bool = True,
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
     axs = plot.axs
     for layer in layers:
-        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True) / 1000
+        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True)[0] / 1000
         bins = 60
         maxTime = np.max(times)
         maxTime = 300
@@ -817,14 +833,14 @@ def ClustersCountOverTime(
 
 def RowRowCorrelation(
     dataFile: dataAnalysis,
-    pathToOutput:str,
-    pathToCalcData:str,
+    pathToOutput: str,
+    pathToCalcData: str,
     layers: list[int] = [1, 2, 3, 4],
-    excludeCrossTalk:bool=True,
+    excludeCrossTalk: bool = True,
     recalc: bool = False,
-    log:bool=True,
-    maxLine:int=None,
-    saveToPDF:bool=True,
+    log: bool = True,
+    maxLine: Optional[int] = None,
+    saveToPDF: bool = True,
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", sizePerPlot=(8, 8))
     axs = plot.axs
@@ -857,7 +873,7 @@ def RowRowCorrelation(
     tempCrossTalkFinder = crossTalkFinder()
     x = []
     y = []
-    for _x, _y in tempCrossTalkFinder.crossTalkFunction(None, returnDict=True).items():
+    for _x, _y in tempCrossTalkFinder.crossTalkFunction().items():
         for i, j in _y:
             x.append(i)
             y.append(j)

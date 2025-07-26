@@ -1,9 +1,7 @@
 from plotConfigs import AngleDistribution,WidthDistribution,AngleDistribution_2,ColumnWidthDistribution,RowWidthDistribution,VoltageDepthScatter,HitDistributionInClusterAllOnOne,CuttingComparison,RowRowCorrelation
 from dataAnalysis import initDataFiles
 from plotAnalysis import depthAnalysis
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-
 
 if __name__ == "__main__":
     import configLoader

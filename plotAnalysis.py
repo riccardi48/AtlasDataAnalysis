@@ -1,29 +1,45 @@
 from dataAnalysis import dataAnalysis, calcDataFileManager, crossTalkFinder, clusterClass
-from lowLevelFunctions import *
+from lowLevelFunctions import (
+    calcHit_VoltageByPixel,
+    histogramErrors,
+    neg_log_likelihood_truncated,
+    landauFunc,
+    print_mem_usage,
+    TStoMS,
+    fitVoltageDepth,
+    chargeCollectionEfficiencyFunc,
+)
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from matplotlib import patheffects
 import os
 import scipy
-from typing import Optional,Any,TypeAlias
+from typing import Optional, Any, TypeAlias
+import numpy as np
 import numpy.typing as npt
+from landau import landau
+from math import atan
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
+
 
 class depthAnalysis:
     def __init__(
         self,
-        pathToCalcData:str,
-        maxLine:Optional[int]=None,
-        maxClusterWidth:int=40,
+        pathToCalcData: str,
+        maxLine: Optional[int] = None,
+        maxClusterWidth: int = 40,
         layers: Optional[list[int]] = None,
-        excludeCrossTalk:bool=False,
+        excludeCrossTalk: bool = False,
     ):
         self.calcFileManager = calcDataFileManager(pathToCalcData, "Stats", maxLine)
         self.maxClusterWidth = maxClusterWidth
         self.layers = layers
         self.excludeCrossTalk = excludeCrossTalk
 
-    def Hit_VoltageByPixel(self, dataFile: dataAnalysis, measuredAttribute:str="Hit_Voltage") -> None:
+    def Hit_VoltageByPixel(
+        self, dataFile: dataAnalysis, measuredAttribute: str = "Hit_Voltage"
+    ) -> None:
         fileCheck = True
         attribute = f"{measuredAttribute}ByPixel"
         file = f"{dataFile.get_fileName()}/depthAnalysis/hist/"
@@ -46,7 +62,7 @@ class depthAnalysis:
             dataFile.get_clusters(layers=self.layers, excludeCrossTalk=self.excludeCrossTalk),
             dataFile.get_cluster_attr(
                 "RowWidths", layers=self.layers, excludeCrossTalk=self.excludeCrossTalk
-            ),
+            )[0],
             maxClusterWidth=self.maxClusterWidth,
             excludeCrossTalk=self.excludeCrossTalk,
             returnIndexes=True,
@@ -60,21 +76,26 @@ class depthAnalysis:
                 file=file,
                 layers=self.layers,
             )
-            array = np.append(
-                hitPositionArray[i, : i + 2, : counts[i]], [indexes[i, : counts[i]]], axis=0
-            )
-            self.calcFileManager.saveFile(array, calcFileName=calcFileName, suppressText=True)
-            calcFileName = self.calcFileManager.generateFileName(
-                attribute=f"{attribute}Error",
-                cut=self.excludeCrossTalk,
-                name=f"_{i+2}",
-                file=file,
-                layers=self.layers,
-            )
-            array = np.append(
-                hitPositionErrorArray[i, : i + 2, : counts[i]], [indexes[i, : counts[i]]], axis=0
-            )
-            self.calcFileManager.saveFile(array, calcFileName=calcFileName, suppressText=True)
+            if indexes is not None:
+                array = np.append(
+                    hitPositionArray[i, : i + 2, : counts[i]], [indexes[i, : counts[i]]], axis=0
+                )
+                self.calcFileManager.saveFile(array, calcFileName=calcFileName, suppressText=True)
+                calcFileName = self.calcFileManager.generateFileName(
+                    attribute=f"{attribute}Error",
+                    cut=self.excludeCrossTalk,
+                    name=f"_{i+2}",
+                    file=file,
+                    layers=self.layers,
+                )
+                array = np.append(
+                    hitPositionErrorArray[i, : i + 2, : counts[i]],
+                    [indexes[i, : counts[i]]],
+                    axis=0,
+                )
+                self.calcFileManager.saveFile(array, calcFileName=calcFileName, suppressText=True)
+            else:
+                ValueError
 
     def loadOneLength(
         self,
@@ -82,8 +103,8 @@ class depthAnalysis:
         clusterWidth: int,
         returnIndexes: bool = False,
         error: bool = False,
-        measuredAttribute:str="Hit_Voltage",
-    ) -> npt.NDArray[np.float64]:
+        measuredAttribute: str = "Hit_Voltage",
+    ) -> tuple[npt.NDArray[np.float64], Optional[npt.NDArray[np.int_]]]:
         attribute = f"{measuredAttribute}ByPixel"
         if error:
             attribute = f"{attribute}Error"
@@ -103,14 +124,14 @@ class depthAnalysis:
             )
         if returnIndexes:
             return toBeReturned[:-1], toBeReturned[-1]
-        return toBeReturned[:-1]
+        return (toBeReturned[:-1], None)
 
     def findPeak(
         self,
         dataFile: dataAnalysis,
         clusterWidth: int,
         fitting: str = "histogram",
-        measuredAttribute:str="Hit_Voltage",
+        measuredAttribute: str = "Hit_Voltage",
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         if fitting == "histogram":
             attribute = f"{measuredAttribute}Peaks"
@@ -133,10 +154,10 @@ class depthAnalysis:
             errors = self.calcFileManager.loadFile(calcFileName=calcFileName, suppressText=True)
             toBeReturned = (peaks, errors)
         else:
-            hitPositionArray = self.loadOneLength(
+            hitPositionArray, _ = self.loadOneLength(
                 dataFile, clusterWidth, measuredAttribute=measuredAttribute
             )
-            hitPositionErrorArray = self.loadOneLength(
+            hitPositionErrorArray, _ = self.loadOneLength(
                 dataFile, clusterWidth, error=True, measuredAttribute=measuredAttribute
             )
             if measuredAttribute == "Hit_Voltage":
@@ -169,11 +190,11 @@ class depthAnalysis:
 
     def findPeaks_standard(
         self,
-        hitPositionArray:npt.NDArray[np.float64],
+        hitPositionArray: npt.NDArray[np.float64],
         hitPositionErrorArray: npt.NDArray[np.float64],
-        fitting:str="histogram",
-        _range:tuple[float,float]=(0.162, 2),
-        params:list[int]=[0],
+        fitting: str = "histogram",
+        _range: tuple[float, float] = (0.162, 2),
+        params: list[int] = [0],
     ) -> npt.NDArray[np.float64]:
         clusterWidth = len(hitPositionArray)
         if len(params) > 1:
@@ -198,7 +219,7 @@ class depthAnalysis:
         hitPositionArray: npt.NDArray[np.float64],
         hitPositionErrorArray: npt.NDArray[np.float64],
         fitting: str = "histogram",
-        _range: tuple[float,float] = (0.162, 2),
+        _range: tuple[float, float] = (0.162, 2),
         params: list[int] = [0],
     ) -> npt.NDArray[np.float64]:
         clusterWidth = len(hitPositionArray)
@@ -255,21 +276,27 @@ class depthAnalysis:
                     )
         return np.array(peaks)
 
-    def fitPeak_nnlf(self, values:npt.NDArray[np.float64], errors: Optional[npt.NDArray[np.float64]] = None, returnParams:list[int]=[0], **kwargs) -> npt.NDArray[np.float64]:
+    def fitPeak_nnlf(
+        self,
+        values: npt.NDArray[np.float64],
+        errors: Optional[npt.NDArray[np.float64]] = None,
+        returnParams: list[int] = [0],
+        **kwargs,
+    ) -> npt.NDArray[np.float64]:
         return self.fitHit_VoltageLandau_nnlf(
             values, errors=errors, returnParams=returnParams, **kwargs
         )
 
     def fitHit_VoltageLandau_nnlf(
         self,
-        values:npt.NDArray[np.float64],
+        values: npt.NDArray[np.float64],
         errors: Optional[npt.NDArray[np.float64]] = None,
-        returnParams:list[int]=[0],
-        _range: tuple[float,float] = (0.162, 2),
-        x_mpv_bounds: tuple[float,float]=(0.05, 0.4),
-        xi_bounds: tuple[float,float]=(0.01, 0.2),
+        returnParams: list[int] = [0],
+        _range: tuple[float, float] = (0.162, 2),
+        x_mpv_bounds: tuple[float, float] = (0.05, 0.4),
+        xi_bounds: tuple[float, float] = (0.01, 0.2),
     ) -> npt.NDArray[np.float64]:
-        bounds = [x_mpv_bounds, xi_bounds]
+        bounds = (x_mpv_bounds, xi_bounds)
         values = values[(values >= _range[0]) & (values <= _range[1])]
         result = scipy.optimize.differential_evolution(
             neg_log_likelihood_truncated,
@@ -279,33 +306,43 @@ class depthAnalysis:
             updating="deferred",
             workers=-1,
         )
-        returnErrors = [
-            np.full(len(result.x), np.average(errors)),
-            np.full(len(result.x), np.average(errors)),
-        ]
+        if errors is not None:
+            returnErrors = [
+                np.full(len(result.x), np.average(errors)),
+                np.full(len(result.x), np.average(errors)),
+            ]
+        else:
+            returnErrors = [np.full(len(result.x), 0), np.full(len(result.x), 0)]
         toBeReturned = np.append(result.x, returnErrors)
         return toBeReturned[returnParams]
 
-    def fitPeak(self, values:npt.NDArray[np.float64], errors: Optional[npt.NDArray[np.float64]] = None, returnParams:list[int]=[0], **kwargs) -> npt.NDArray[np.float64]:
+    def fitPeak(
+        self,
+        values: npt.NDArray[np.float64],
+        errors: Optional[npt.NDArray[np.float64]] = None,
+        returnParams: list[int] = [0],
+        **kwargs,
+    ) -> npt.NDArray[np.float64]:
         return self.fitHit_VoltageLandau(values, errors=errors, returnParams=returnParams, **kwargs)
 
     def fitHit_VoltageLandau(
         self,
-        values:npt.NDArray[np.float64],
+        values: npt.NDArray[np.float64],
         errors: Optional[npt.NDArray[np.float64]] = None,
-        returnParams:list[int]=[0],
-        _range: tuple[float,float] = (0.162, 2),
-        x_mpv_bounds: Optional[tuple[float,float]]=None,
-        xi_bounds:tuple[float,float]=(0.01, 50),
-    ) -> npt.NDArray[np.float64]:  
+        returnParams: list[int] = [0],
+        _range: tuple[float, float] = (0.162, 2),
+        x_mpv_bounds: Optional[tuple[float, float]] = None,
+        xi_bounds: tuple[float, float] = (0.01, 50),
+    ) -> npt.NDArray[np.float64]:
         # x_mpv_bounds=(0.2, 1.4), xi_bounds=(0.01, 1)):
         if x_mpv_bounds is None:
             x_mpv_bounds = _range
         hist, binEdges, binCentres = self.histogramHit_Voltage(values, range=_range)
-        histErrors = histogramErrors(values, errors, binEdges)
+        histErrors = histogramErrors(values, binEdges, errors)
         Z = (1 - landau.cdf(_range[0], x_mpv_bounds[0], xi_bounds[0])) * (binEdges[1] - binEdges[0])
-        bounds = [x_mpv_bounds, xi_bounds, (Z * len(values), np.inf)]
-        bounds = tuple(zip(*bounds))
+        unzippedBounds = [x_mpv_bounds, xi_bounds, (Z * len(values), np.inf)]
+        lower_bounds, upper_bounds = zip(*unzippedBounds)
+        bounds = (list(lower_bounds), list(upper_bounds))
         initial_guess = [
             binCentres[3:][np.argmax(hist[3:])],
             np.mean(xi_bounds),
@@ -327,7 +364,9 @@ class depthAnalysis:
         #    toBeReturned[3] = (binCentres[1]-binCentres[0])/5
         return toBeReturned[returnParams]
 
-    def histogramHit_Voltage(self, values:npt.NDArray[np.float64], range: tuple[float,float]=(0.162, 1)) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def histogramHit_Voltage(
+        self, values: npt.NDArray[np.float64], range: tuple[float, float] = (0.162, 1)
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         number = np.sum(values > range[0])
         if number > 5000:
             bins = 84
@@ -339,7 +378,9 @@ class depthAnalysis:
         binCentres = (binEdges[:-1] + binEdges[1:]) / 2
         return hist, binEdges, binCentres
 
-    def findClusterWidthDistribution(self, dataFile: dataAnalysis) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def findClusterWidthDistribution(
+        self, dataFile: dataAnalysis
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         x = np.zeros(self.maxClusterWidth - 1)
         y = np.zeros(self.maxClusterWidth - 1)
         for i in range(2, self.maxClusterWidth + 1):
@@ -347,20 +388,22 @@ class depthAnalysis:
             y[i - 2] = len(self.loadOneLength(dataFile, i)[0])
         return x, y
 
-    def findClusterAngleDistribution(self, dataFile: dataAnalysis, d : float, maxColumnWidth : int=1) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        rowWidths = dataFile.get_cluster_attr(
+    def findClusterAngleDistribution(
+        self, dataFile: dataAnalysis, d: float, maxColumnWidth: int = 1
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        rowWidths, _ = dataFile.get_cluster_attr(
             "RowWidths", layers=self.layers, excludeCrossTalk=self.excludeCrossTalk
         )
-        columnWidths = dataFile.get_cluster_attr(
+        columnWidths, _ = dataFile.get_cluster_attr(
             "ColumnWidths", layers=self.layers, excludeCrossTalk=self.excludeCrossTalk
         )
         rowWidths = rowWidths[(columnWidths <= maxColumnWidth)]
         x, heights = np.unique(rowWidths[rowWidths < self.maxClusterWidth], return_counts=True)
-        bins = np.append(np.atan((x[0] - 0.5) / d), np.atan((x + 0.5) / d))
+        bins = np.append(atan((x[0] - 0.5) / d), atan((x + 0.5) / d))
         heights = heights / np.rad2deg(np.diff(bins))
         return bins, heights
 
-    def residual(self, dataFile: dataAnalysis, d : float) -> float:
+    def residual(self, dataFile: dataAnalysis, d: float) -> float:
         bins, values = self.findClusterAngleDistribution(dataFile, d)
         ignoreFirst = 10
         maxValueIndex = np.argmax(values[ignoreFirst:])
@@ -411,12 +454,12 @@ class depthAnalysis:
 class plotClass:
     def __init__(
         self,
-        pathToOutput:str,
-        sizePerPlot:tuple[float,float]=(6.4, 4.8),
-        shape:tuple[int,int]=(1, 1),
-        sharex:bool=False,
-        sharey:bool=False,
-        hspace:Optional[float]=None,
+        pathToOutput: str,
+        sizePerPlot: tuple[float, float] = (6.4, 4.8),
+        shape: tuple[int, int] = (1, 1),
+        sharex: bool = False,
+        sharey: bool = False,
+        hspace: Optional[float] = None,
     ):
         self.sizePerPlot = sizePerPlot
         self.shape = shape
@@ -439,18 +482,18 @@ class plotClass:
     def set_config(
         self,
         ax: Any,
-        ylim:Optional[tuple[float,float]]=None,
-        xlim:Optional[tuple[float,float]]=None,
-        title:Optional[str]=None,
-        legend:bool=False,
-        xlabel:Optional[str]=None,
-        ylabel:Optional[str]=None,
-        ncols:int=1,
-        labelspacing:float=0.5,
-        loc:str="best",
-        handletextpad:float=0.8,
-        columnspacing:float=2,
-        legendTitle:str="",
+        ylim: Optional[tuple[Optional[float], Optional[float]]] = None,
+        xlim: Optional[tuple[Optional[float], Optional[float]]] = None,
+        title: Optional[str] = None,
+        legend: bool = False,
+        xlabel: Optional[str] = None,
+        ylabel: Optional[str] = None,
+        ncols: int = 1,
+        labelspacing: float = 0.5,
+        loc: str = "best",
+        handletextpad: float = 0.8,
+        columnspacing: float = 2,
+        legendTitle: str = "",
     ) -> None:
         if ylim is not None:
             ax.set_ylim(ylim[0], ylim[1])
@@ -477,7 +520,7 @@ class plotClass:
         self.fig.set_figwidth((self.sizePerPlot[0] * self.shape[0]))
         self.fig.set_figheight((self.sizePerPlot[1] * self.shape[1]))
 
-    def saveToPDF(self, name:str) -> None:
+    def saveToPDF(self, name: str) -> None:
         self.finalizePlot()
         out_put_file_name = f"{self.pathToOutput}" + f"{name}" + f".pdf"
         os.makedirs("/".join(out_put_file_name.split("/")[:-1]), exist_ok=True)
@@ -488,22 +531,22 @@ class plotClass:
 
 
 class clusterPlotter:
-    def __init__(self, dataFile: dataAnalysis, buffer:int=3, excludeCrossTalk:bool=True):
+    def __init__(self, dataFile: dataAnalysis, buffer: int = 3, excludeCrossTalk: bool = True):
         self.dataFile = dataFile
         self.buffer = buffer
         self.excludeCrossTalk = excludeCrossTalk
         self.cmap = "plasma"
         self.crossTalkFinder = crossTalkFinder()
 
-    def plotClusters(self, ax:Any, clusters: clusterArray, z:str="Hit_Voltages") -> Any:
-        numberOfPoints = np.sum(
+    def plotClusters(self, ax: Any, clusters: clusterArray, z: str = "Hit_Voltages") -> Any:
+        numberOfPoints = sum(
             cluster.getSize(excludeCrossTalk=self.excludeCrossTalk) for cluster in clusters
         )
         x = np.zeros(numberOfPoints, dtype=int)
         y = np.zeros(numberOfPoints, dtype=int)
         Hit_Voltage = np.zeros(numberOfPoints, dtype=float)
         count = 0
-        cmap = plt.colormaps[self.cmap]
+        cmap = cm.get_cmap(self.cmap)
         for cluster in clusters:
             x[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
                 cluster.getRows(excludeCrossTalk=self.excludeCrossTalk)
@@ -524,7 +567,7 @@ class clusterPlotter:
             display - np.nanmin(display),
             extent,
             vmin=0,
-            vmax=np.nanmax(display) - np.nanmin(display) + 1,
+            vmax=float(np.nanmax(display) - np.nanmin(display) + 1),
         )
         minTS = np.average(clusters[0].getTSs(excludeCrossTalk=self.excludeCrossTalk))
         for cluster in clusters:
@@ -560,11 +603,13 @@ class clusterPlotter:
             # self.addCrossTalk(ax,cluster)
         return im
 
-    def constructDisplay(self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        x_range = np.max(x) - np.min(x)
-        y_range = np.max(y) - np.min(y)
+    def constructDisplay(
+        self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        x_range = int(np.max(x) - np.min(x))
+        y_range = int(np.max(y) - np.min(y))
         display = np.zeros((y_range + self.buffer, x_range + self.buffer))
-        display[display == 0] = None
+        display[display == 0] = np.nan
         # For each hit the ToT is added, this makes the colour of the pixel show the ToT
         # Sets the correct axis values
         extent = np.array(
@@ -577,7 +622,13 @@ class clusterPlotter:
         )
         return display, extent
 
-    def addToDisplay(self, display: npt.NDArray[np.float64], x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], value: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def addToDisplay(
+        self,
+        display: npt.NDArray[np.float64],
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        value: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
         for i in range(len(x)):
             display[
                 y[i] - np.min(y) + int((self.buffer - 1) / 2),
@@ -585,13 +636,20 @@ class clusterPlotter:
             ] = value[i]
         return display
 
-    def showDisplay(self, ax: Any, display: npt.NDArray[np.float64], extent:npt.NDArray[np.float64], vmin:float=0, vmax:float=1) -> Any:
+    def showDisplay(
+        self,
+        ax: Any,
+        display: npt.NDArray[np.float64],
+        extent: npt.NDArray[np.float64],
+        vmin: float = 0,
+        vmax: float = 1,
+    ) -> Any:
         im = ax.imshow(
             display, cmap=self.cmap, extent=extent, aspect=3, origin="lower", vmin=vmin, vmax=vmax
         )
         return im
 
-    def addCrossTalk(self, ax: Any, cluster: clusterClass, color:Any="r"):
+    def addCrossTalk(self, ax: Any, cluster: clusterClass, color: Any = "r"):
         rows = cluster.getRows(excludeCrossTalk=False)
         rows = rows[cluster.crossTalk]
         columns = cluster.getColumns(excludeCrossTalk=False)
@@ -600,12 +658,21 @@ class clusterPlotter:
 
 
 class correlationPlotter:
-    def __init__(self, pathToCalcData:str, layers:Optional[list[int]]=None, excludeCrossTalk:bool=True, maxLine:Optional[int]=None):
+    def __init__(
+        self,
+        pathToCalcData: str,
+        layers: Optional[list[int]] = None,
+        excludeCrossTalk: bool = True,
+        maxLine: Optional[int] = None,
+    ):
         self.calcFileManager = calcDataFileManager(pathToCalcData, "Correlation", maxLine)
         self.layers = layers
         self.excludeCrossTalk = excludeCrossTalk
+        self.RowRow: npt.NDArray[np.float64]
 
-    def RowRowCorrelation(self, dataFile: dataAnalysis, recalc: bool = False) -> npt.NDArray[np.float64]:
+    def RowRowCorrelation(
+        self, dataFile: dataAnalysis, recalc: bool = False
+    ) -> npt.NDArray[np.float64]:
         attribute = f"RowRowCorrelation"
         file = f"{dataFile.get_fileName()}/"
         calcFileName = self.calcFileManager.generateFileName(
@@ -621,7 +688,7 @@ class correlationPlotter:
                 dataFile.get_crossTalk(recalc=recalc)
             self.RowRow = np.zeros((371, 371))
             print(f"Finding RowRow correlation")
-            rows = dataFile.get_base_attr("Row")
+            rows, _ = dataFile.get_base_attr("Row")
             indexes = rows - np.min(rows)
             for cluster in clusters:
                 # print(cluster.notCrossTalk)
@@ -638,15 +705,45 @@ class correlationPlotter:
         return toBeReturned
 
 
+def fitAndPlotCCE(
+    ax: Any, plot: plotClass, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr
+) -> None:
+    popt, pcov = fitVoltageDepth(x, y, yerr)
+    # pcov = pcov / scipy.stats.chisquare(popt).statistic/(np.sum(cut)-3)
+    (V_0, t_epi, edl) = popt
+    (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
+    x = np.linspace(0, 120, 1000)
+    y = chargeCollectionEfficiencyFunc(x, *popt)
+    ax.plot(
+        x,
+        y,
+        color=plot.colorPalette[0],
+        linestyle="dashed",
+        label=f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
+        + f"edl    :{edl:.3f} ± {edl_e:.3f}",
+    )
+    possibleLines = np.random.default_rng().multivariate_normal(popt, pcov, 1000)
+    ylist = [
+        chargeCollectionEfficiencyFunc(x, param[0], param[1], param[2]) for param in possibleLines
+    ]
+    ylist = [
+        chargeCollectionEfficiencyFunc(x, _V_0, _t_epi, _edl)
+        for _V_0 in [V_0 - V_0_e, V_0 + V_0_e]
+        for _t_epi in [t_epi - t_epi_e, t_epi + t_epi_e]
+        for _edl in [edl - edl_e, edl + edl_e]
+    ]
+    ax.fill_between(
+        x, np.min(ylist, axis=0), np.max(ylist, axis=0), color=plot.colorPalette[6], zorder=-1
+    )
+
+
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071512_udp_beamonall_angle6_4Gev_kit_2_decode.dat"
     pathToOutput = "/home/atlas/rballard/Code_v2/output/"
     pathToCalcData = "/home/atlas/rballard/Code_v2/calculatedData/"
-    dataFile = dataAnalysis(pathToData, pathToCalcData, maxLine=None)
+    dataFile = dataAnalysis(pathToData, pathToCalcData)
     depth = depthAnalysis(
-        pathToData,
-        pathToOutput,
         pathToCalcData,
         maxLine=None,
         maxClusterWidth=40,

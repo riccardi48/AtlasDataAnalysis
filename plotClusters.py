@@ -1,12 +1,19 @@
 from plotAnalysis import plotClass, clusterPlotter
-from dataAnalysis import dataAnalysis,initDataFiles
+from dataAnalysis import dataAnalysis, initDataFiles
 from matplotlib.ticker import MultipleLocator
 import numpy as np
 import matplotlib.pyplot as plt
 import configLoader
 
 
-def Clusters(dataFile: dataAnalysis, pathToOutput, excludeCrossTalk=True, z="Hit_Voltages", layer=4,saveToPDF=True):
+def Clusters(
+    dataFile: dataAnalysis,
+    pathToOutput,
+    excludeCrossTalk=True,
+    z="Hit_Voltages",
+    layer=4,
+    saveToPDF=True,
+):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", sizePerPlot=(20, 20))
     axs = plot.axs
     plotter = clusterPlotter(dataFile, excludeCrossTalk=excludeCrossTalk)
@@ -30,9 +37,13 @@ def Clusters(dataFile: dataAnalysis, pathToOutput, excludeCrossTalk=True, z="Hit
     cbar.ax.get_yaxis().labelpad = 15
     cbar.ax.set_ylabel(f"{z}", rotation=270, fontsize="large")
     if saveToPDF:
-        plot.saveToPDF("Clusters/Clusters" + f"{f"_{layer}" if layer is not None else ""}{"_cut" if excludeCrossTalk else ""}")
+        plot.saveToPDF(
+            "Clusters/Clusters"
+            + f"{f"_{layer}" if layer is not None else ""}{"_cut" if excludeCrossTalk else ""}"
+        )
     else:
         return plot.fig
+
 
 config = configLoader.loadConfig()
 

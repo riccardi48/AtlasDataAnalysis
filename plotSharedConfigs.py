@@ -9,22 +9,25 @@ from lowLevelFunctions import (
 )
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 import scipy
-
+from typing import Optional, Union
+import numpy.typing as npt
+from math import atan
 
 
 def Comparison_RowWidthDistribution(
     dataFiles: list[dataAnalysis],
-    pathToOutput,
-    layer=4,
-    name="",
-    minTimes=None,
-    maxTimes=None,
-    minTime=400000,
-    maxTime=600000,
-    excludeCrossTalk=True,
-    saveToPDF=True,
+    pathToOutput: str,
+    layer: int = 4,
+    name: str = "",
+    minTimes: Optional[npt.NDArray[np.float64]] = None,
+    maxTimes: Optional[npt.NDArray[np.float64]] = None,
+    minTime: float = 400000,
+    maxTime: float = 600000,
+    excludeCrossTalk: bool = True,
+    saveToPDF: bool = True,
 ):
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
@@ -33,10 +36,12 @@ def Comparison_RowWidthDistribution(
     minTime = 400000
     maxTime = 600000
     for i, dataFile in enumerate(dataFiles):
-        rowsWidths = dataFile.get_cluster_attr(
+        rowsWidths, _ = dataFile.get_cluster_attr(
             "RowWidths", layer=layer, excludeCrossTalk=excludeCrossTalk
         )
-        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)
+        times, _ = dataFile.get_cluster_attr(
+            "Times", layer=layer, excludeCrossTalk=excludeCrossTalk
+        )
         # print(f"{np.min(times):.0f}")
         # print(f"{np.max(times):.0f}")
         if minTimes is not None and maxTimes is not None:
@@ -77,17 +82,17 @@ def Comparison_RowWidthDistribution(
 
 def Comparison_ClustersCountOverTime(
     dataFiles: list[dataAnalysis],
-    pathToOutput,
-    layer: int = None,
-    name="",
-    saveToPDF=True,
-    returnFirstPeaks=False,
-):
+    pathToOutput: str,
+    layer: Optional[int] = None,
+    name: str = "",
+    saveToPDF: bool = True,
+    returnFirstPeaks: bool = False,
+) -> tuple[npt.NDArray[np.int_], object]:
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
     firstPeaks = []
     for i, dataFile in enumerate(dataFiles):
-        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True) / 1000
+        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True)[0] / 1000
         maxTime = np.max(times)
         maxTime = 600
         minTime = 0
@@ -109,9 +114,7 @@ def Comparison_ClustersCountOverTime(
     )
     if saveToPDF:
         plot.saveToPDF(f"Comparison_ClustersCountOverTime_{layer}{name}")
-    if returnFirstPeaks:
-        return np.array(firstPeaks, dtype=int)
-    return plot.fig
+    return np.array(firstPeaks, dtype=int), plot.fig
 
 
 def Comparison_AngleDistribution(
@@ -139,19 +142,21 @@ def Comparison_AngleDistribution(
     )
     for i, dataFile in enumerate(dataFiles):
         d = depth.find_d_value(dataFile)
-        rowWidths = dataFile.get_cluster_attr(
+        rowWidths, _ = dataFile.get_cluster_attr(
             "RowWidths", layer=layer, excludeCrossTalk=excludeCrossTalk
         )
-        columnWidths = dataFile.get_cluster_attr(
+        columnWidths, _ = dataFile.get_cluster_attr(
             "ColumnWidths", layer=layer, excludeCrossTalk=excludeCrossTalk
         )
-        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)
+        times, _ = dataFile.get_cluster_attr(
+            "Times", layer=layer, excludeCrossTalk=excludeCrossTalk
+        )
         if minTimes is not None and maxTimes is not None:
             minTime = minTimes[i]
             maxTime = maxTimes[i]
         rowWidths = rowWidths[(times > minTime) & (times < maxTime) & (columnWidths <= 2)]
         x, heights = np.unique(rowWidths[rowWidths < maxClusterWidth], return_counts=True)
-        bins = np.append(np.atan((x[0] - 0.5) / d), np.atan((x + 0.5) / d))
+        bins = np.append(atan((x[0] - 0.5) / d), atan((x + 0.5) / d))
         heights = heights / np.rad2deg(np.diff(bins))
         axs.stairs(
             heights,
@@ -187,15 +192,15 @@ def Comparison_AngleDistribution(
 def fit_dataFile(
     dataFile: dataAnalysis,
     depth: depthAnalysis,
-    depthCorrection=True,
-    hideLowWidths=True,
-    fitting="histogram",
-    measuredAttribute="Hit_Voltage",
+    depthCorrection: bool = True,
+    hideLowWidths: bool = True,
+    fitting: str = "histogram",
+    measuredAttribute: str = "Hit_Voltage",
 ):
     d = depth.find_d_value(dataFile)
-    allXValues = []
-    allYValues = []
-    allYValuesErrors = []
+    allXValues: list[float] = []
+    allYValues: list[float] = []
+    allYValuesErrors: list[float] = []
     for i in range(2, depth.maxClusterWidth + 1):
         x = calcDepth(
             d,
@@ -207,18 +212,16 @@ def fit_dataFile(
         y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute=measuredAttribute)
         if i < 10:
             y, y_err = adjustPeakVoltage(y, y_err, d, i)
-        if not hideLowWidths or (
-            np.rad2deg(np.atan(i / d)) > 85 and np.rad2deg(np.atan(i / d)) < 87
-        ):
+        if not hideLowWidths or (np.rad2deg(atan(i / d)) > 85 and np.rad2deg(atan(i / d)) < 87):
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
             allYValuesErrors = allYValues + list(y_err[1:-1])
-    allXValues = np.array(allXValues)
-    allYValues = np.array(allYValues)
-    allYValuesErrors = np.array(allYValuesErrors)
-    y = allYValues[np.argsort(allXValues)]
-    yerr = allYValuesErrors[np.argsort(allXValues)]
-    x = allXValues[np.argsort(allXValues)]
+    allXValues_np = np.array(allXValues)
+    allYValues_np = np.array(allYValues)
+    allYValuesErrors_np = np.array(allYValuesErrors)
+    y = allYValues_np[np.argsort(allXValues_np)]
+    yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
+    x = allXValues_np[np.argsort(allXValues_np)]
     popt, pcov = fitVoltageDepth(x[x < d * 50], y[x < d * 50], yerr[x < d * 50])
     return popt, pcov, x[x < d * 50], y[x < d * 50], yerr[x < d * 50]
 
@@ -239,7 +242,7 @@ def Comparison_CCE_Vs_Depth(
 ):
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
-    cmap = plt.colormaps["plasma"]
+    cmap = cm.get_cmap("plasma")
     depth = depthAnalysis(
         pathToCalcData,
         maxLine=None,
@@ -276,7 +279,9 @@ def Comparison_CCE_Vs_Depth(
             else:
                 label = f"{label} 6Gev"
         cellRows.append(label)
-        color = cmap((1 / 48 * dataFile.get_voltage()))
+        color: Union[tuple[float, ...], str] = tuple(
+            map(float, cmap((1 / 48 * dataFile.get_voltage())))
+        )
         if dataFile.get_fileName() == "angle6_4Gev_kit_2":
             color = "r"
         axs.plot(x, y, linestyle="dashed", label=label, color=color)
@@ -340,7 +345,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
 ):
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
-    cmap = plt.colormaps["plasma"]
+    cmap = cm.get_cmap("plasma")
     depth = depthAnalysis(
         pathToCalcData,
         maxLine=None,
@@ -348,9 +353,9 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         layers=[layer],
         excludeCrossTalk=excludeCrossTalk,
     )
-    t_epi_list = []
-    t_epi_e_list = []
-    V_list = []
+    t_epi_list: list[float] = []
+    t_epi_e_list: list[float] = []
+    V_list: list[float] = []
     for dataFile in dataFiles:
         popt, pcov, x, y, yerr = fit_dataFile(
             dataFile,
@@ -364,7 +369,9 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         y = chargeCollectionEfficiencyFunc(x, *popt)
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
-        color = cmap((1 / 48 * dataFile.get_voltage()))
+        color: Union[tuple[float, ...], str] = tuple(
+            map(float, cmap((1 / 48 * dataFile.get_voltage())))
+        )
         if dataFile.get_fileName() == "angle6_4Gev_kit_2":
             color = "r"
         axs.scatter(dataFile.get_voltage(), t_epi, color=color, marker="x", s=15)
@@ -379,20 +386,21 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         )
         t_epi_list.append(t_epi)
         t_epi_e_list.append(t_epi_e)
-        V_list.append(dataFile.get_voltage())
-    t_epi_list = np.array(t_epi_list)
-    t_epi_e_list = np.array(t_epi_e_list)
-    V_list = np.array(V_list)
+        V_list.append(float(dataFile.get_voltage()))
+    t_epi_np = np.array(t_epi_list, dtype=float)
+    t_epi_e_np = np.array(t_epi_e_list, dtype=float)
+    V_np = np.array(V_list, dtype=float)
     initial_guess = [30, 1]
-    bounds = [(0, np.inf), (0, np.inf)]
-    bounds = tuple(zip(*bounds))
+    unzippedBounds = [(0, np.inf), (0, np.inf)]
+    lower_bounds, upper_bounds = zip(*unzippedBounds)
+    bounds = (list(lower_bounds), list(upper_bounds))
     popt, pcov = scipy.optimize.curve_fit(
         depletionWidthFunc,
-        V_list,
-        t_epi_list,
+        V_np,
+        t_epi_np,
         p0=initial_guess,
         bounds=bounds,
-        sigma=t_epi_e_list / t_epi_list,
+        sigma=t_epi_e_np / t_epi_np,
         absolute_sigma=False,
         maxfev=10000000,
     )
@@ -432,10 +440,11 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
 
 if __name__ == "__main__":
     import configLoader
+
     config = configLoader.loadConfig()
 
     dataFiles = initDataFiles(config)
-    firstPeaks = Comparison_ClustersCountOverTime(
+    firstPeaks, _ = Comparison_ClustersCountOverTime(
         dataFiles[:8], config["pathToOutput"], layer=4, name="_kit", returnFirstPeaks=True
     )
     Comparison_RowWidthDistribution(
@@ -443,8 +452,8 @@ if __name__ == "__main__":
         config["pathToOutput"],
         layer=4,
         name="_kit",
-        minTimes=firstPeaks,
-        maxTimes=firstPeaks + 200000,
+        minTimes=firstPeaks.astype(float),
+        maxTimes=firstPeaks.astype(float) + 200000.0,
         excludeCrossTalk=True,
     )
     Comparison_AngleDistribution(
