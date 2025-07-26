@@ -1,39 +1,46 @@
 from lowLevelFunctions import isFiltered,readFileName,print_mem_usage,calcToT,calcHit_VoltageError,calcHit_Voltage,TStoMS,calcClusters,trueTimeStamps
+from clusterClass import clusterClass
 import os
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from glob import glob
+from typing import Optional,Any, TypeAlias
 import configLoader
+
+clusterArray: TypeAlias = npt.NDArray[np.object_]
+
+
 class dataAnalysis:
-    def __init__(self, pathToData: str, pathToCalcData: str, maxLine: int = None):
+    def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None) -> None:
         self.dataHandler = dataHandler(pathToData, pathToCalcData, maxLine=maxLine)
         self.pathToData = pathToData
 
-    def get_voltage(self):
+    def get_voltage(self) -> int:
         return self.dataHandler.voltage
 
-    def get_angle(self):
+    def get_angle(self) -> float:
         return self.dataHandler.angle
 
-    def get_fileName(self):
+    def get_fileName(self) -> str:
         return self.dataHandler.fileName
 
-    def get_telescope(self):
+    def get_telescope(self) -> str:
         return self.dataHandler.telescope
 
-    def check_if_filtered(self, filterDict):
+    def check_if_filtered(self, filterDict) -> bool:
         return isFiltered(self, filter_dict=filterDict)
 
-    def get_dataFrame(self):
+    def get_dataFrame(self) -> pd.DataFrame:
         return self.dataHandler.getDataFrame()
 
-    def get_base_attr(self, attribute: str, **kwargs) -> np.ndarray:
+    def get_base_attr(self, attribute: str, **kwargs) -> npt.NDArray[np.int_]:
         if "layer" in kwargs:
             kwargs["layers"] = [kwargs["layer"]]
             kwargs.pop("layer")
         return self.dataHandler.baseAttr(attribute, **kwargs)
 
-    def get_clusters(self, **kwargs) -> np.ndarray:
+    def get_clusters(self, **kwargs) -> clusterArray:
         if "layer" in kwargs:
             if kwargs["layer"] is None:
                 kwargs["layers"] = None
@@ -43,29 +50,29 @@ class dataAnalysis:
                 kwargs.pop("layer")
         return self.dataHandler.getClusters(**kwargs)
 
-    def get_cluster_attr(self, attribute, excludeCrossTalk: bool = False, **kwargs) -> np.ndarray:
+    def get_cluster_attr(self, attribute, excludeCrossTalk: bool = False, **kwargs) -> npt.NDArray[np.float64]:
         if "layer" in kwargs:
             kwargs["layers"] = [kwargs["layer"]]
             kwargs.pop("layer")
         return self.dataHandler.getClustersAttr(attribute, excludeCrossTalk=excludeCrossTalk, **kwargs)
 
-    def get_crossTalk(self,recalc:bool=False):
+    def get_crossTalk(self,recalc:bool=False)  -> npt.NDArray[np.bool_]:
         return self.dataHandler.getCrossTalk(recalc=recalc)
 
-    def init_cluster_voltages(self):
+    def init_cluster_voltages(self) -> None:
         self.dataHandler.initClusterVoltages()
 
-    def save_nonCrossTalk_to_csv(self, path):
+    def save_nonCrossTalk_to_csv(self, path) -> None:
         self.dataHandler.save_nonCrossTalk_to_csv(path,self.get_fileName())
 
 class calcDataFileManager:
-    def __init__(self, pathToCalcData: str, fileName: str, maxLine: int = None):
+    def __init__(self, pathToCalcData: str, fileName: str, maxLine: Optional[int] = None):
         self.pathToCalcData = pathToCalcData
         self.fileName = fileName
         self.maxLine = maxLine
         os.makedirs(f"{self.pathToCalcData}", exist_ok=True)
 
-    def generateFileName(self, attribute: str, cut: bool = False, layers: list[int] = None, name: str = "", file: str = ""):
+    def generateFileName(self, attribute: str, cut: bool = False, layers: Optional[list[int]] = None, name: str = "", file: str = "") -> str:
         pathToFile = (
             f"{self.pathToCalcData}"
             + f"{self.fileName}/"
@@ -79,21 +86,21 @@ class calcDataFileManager:
         )
         return pathToFile
 
-    def fileExists(self, attribute: str = None, cut: bool = False, calcFileName: str = None, **kwargs):
+    def fileExists(self, attribute: str = "", cut: bool = False, calcFileName: Optional[str] = None, **kwargs) -> bool:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         if os.path.isfile(calcFileName):
             return True
         return False
 
-    def loadFile(self, attribute: str = None, cut: bool = False, suppressText: bool = False, calcFileName: str = None, **kwargs):
+    def loadFile(self, attribute: str = "", cut: bool = False, suppressText: bool = False, calcFileName: Optional[str] = None, **kwargs) -> npt.NDArray[Any]:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         if not suppressText:
             print(f"Loaded: {calcFileName}")
         return np.load(calcFileName, allow_pickle=True)
 
-    def saveFile(self, array: np.ndarray, attribute: str = None, cut: bool = False, suppressText: bool = False, calcFileName: str = None, **kwargs):
+    def saveFile(self, array: np.ndarray, attribute: str = "", cut: bool = False, suppressText: bool = False, calcFileName: Optional[str] = None, **kwargs) -> None:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         self.makeDirIfNeeded(calcFileName)
@@ -101,13 +108,49 @@ class calcDataFileManager:
         if not suppressText:
             print(f"Saved: {calcFileName}")
 
-    def makeDirIfNeeded(self, fileName):
+    def makeDirIfNeeded(self, fileName) -> None:
+        dirName = "/".join(fileName.split("/")[:-1])
+        if not os.path.isdir(dirName):
+            os.makedirs(dirName)
+
+class rawDataFileManager:
+    def __init__(self, pathToData: str, columns: list[str], maxLine: Optional[int] = None):
+        self.pathToData = pathToData
+        self.columns = columns
+        self.maxLine = maxLine
+
+    def readFile(self) -> pd.DataFrame:
+        print(f"Opening: {self.pathToData}")
+        dtypes = {
+            "PackageID": int,
+            "Layer": int,
+            "Column": int,
+            "Row": int,
+            "TS": int,
+            "TS1": int,
+            "TS2": int,
+            "TriggerTS": int,
+            "TriggerID": int,
+            "ext_TS": int,
+            "ext_TS2": int,
+            "FIFO_overflow": bool,
+        }
+        return pd.read_csv(self.pathToData, delimiter="\t", names=self.columns, dtype=dtypes, header=0, nrows=self.maxLine)
+
+    def saveFile(self, dataFrame : pd.DataFrame, path :str, name :str) -> None:
+        self.makeDirIfNeeded(path)
+        with open(f"{path}{name}_decode.dat", 'w') as file:
+            file.write('# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n')
+            dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
+            print(f"Save to csv: {path}{name}_decode.dat")
+
+    def makeDirIfNeeded(self, fileName :str) -> None:
         dirName = "/".join(fileName.split("/")[:-1])
         if not os.path.isdir(dirName):
             os.makedirs(dirName)
 
 class dataHandler:
-    def __init__(self, pathToData: str, pathToCalcData: str, maxLine: int = None):
+    def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None):
         self.fileName, self.voltage, self.angle, self.telescope = readFileName(pathToData)
         self.baseAttrNames = [
             "PackageID",
@@ -127,10 +170,10 @@ class dataHandler:
         self.calcFileManager = calcDataFileManager(pathToCalcData, self.fileName, maxLine)
         self.clusterHandler = clusterHandler(self.calcFileManager, self.dataFrameHandler)
 
-    def getDataFrame(self):
+    def getDataFrame(self) -> pd.DataFrame:
         return self.dataFrameHandler.data
 
-    def baseAttr(self, attribute: str, excludeCrossTalk: bool = False, layers: list = None, returnIndexes: bool = False, recalc=False) -> "np.array":
+    def baseAttr(self, attribute: str, excludeCrossTalk: bool = False, layers: Optional[list] = None, returnIndexes: bool = False, recalc=False) -> npt.NDArray[Any]:
         if attribute in self.baseAttrNames:
             toBeReturned = self.dataFrameHandler.readDataFrameAttr(attribute)
         else:
@@ -154,12 +197,12 @@ class dataHandler:
         else:
             return toBeReturned
 
-    def getClusters(self, excludeCrossTalk: bool = False, **kwargs):
+    def getClusters(self, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
             self.getCrossTalk()
         return self.clusterHandler.getClusters(excludeCrossTalk=excludeCrossTalk, **kwargs)
 
-    def getClustersAttr(self, attribute, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: list[int] = None):
+    def getClustersAttr(self, attribute : str, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: Optional[list[int]] = None) -> npt.NDArray[Any]:
         if self.calcFileManager.fileExists(attribute, cut=excludeCrossTalk, layers=layers) and (
             not returnIndexes or self.calcFileManager.fileExists("clusterIndexes", cut=excludeCrossTalk, layers=layers)
         ):
@@ -187,13 +230,13 @@ class dataHandler:
         else:
             return toBeReturned
 
-    def initClusterVoltages(self):
+    def initClusterVoltages(self) -> None:
         self.clusterHandler.initClusterVoltages(self.baseAttr("Hit_Voltage"), self.baseAttr("Hit_VoltageError"))
 
-    def notCrossTalk(self):
+    def notCrossTalk(self) -> npt.NDArray[np.bool_]:
         return np.invert(self.getCrossTalk())
 
-    def getCrossTalk(self,recalc:bool=False):
+    def getCrossTalk(self,recalc:bool=False) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
             self.clusterHandler.setCalcCrossTalk(self.crossTalk)
@@ -219,14 +262,14 @@ class dataHandler:
         print_mem_usage()
         return toBeReturned
 
-    def cutArrayCrossTalkFilter(self, array: list, excludeCrossTalk: bool = True):
+    def cutArrayCrossTalkFilter(self, array: npt.NDArray[Any], excludeCrossTalk: bool = True) -> npt.NDArray[np.bool_]:
         if excludeCrossTalk:
             includedIndexes = self.notCrossTalk()
         else:
             includedIndexes = np.full(len(array), True, dtype=bool)
         return includedIndexes
 
-    def layerFilter(self, array: list, layers: list = None):
+    def layerFilter(self, array: npt.NDArray[Any], layers: Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
         if layers is None:
             includedIndexes = np.full(len(array), True, dtype=bool)
         else:
@@ -234,7 +277,7 @@ class dataHandler:
             includedIndexes = np.isin(layersArray, layers, assume_unique=True, kind="table")
         return includedIndexes
 
-    def layerCrosstalkFilter(self, array: list, excludeCrossTalk: bool = False, layers: list = None, returnIndexes: bool = False):
+    def layerCrosstalkFilter(self, array: npt.NDArray[Any], excludeCrossTalk: bool = False, layers: Optional[list[int]] = None , returnIndexes: bool = False) -> npt.NDArray[Any]:
         if layers is not None or excludeCrossTalk is not None:
             filter = (self.cutArrayCrossTalkFilter(array, excludeCrossTalk)) & (self.layerFilter(array, layers))
         else:
@@ -245,43 +288,43 @@ class dataHandler:
             array = (array, indexes)
         return array
 
-    def save_nonCrossTalk_to_csv(self, path,name):
+    def save_nonCrossTalk_to_csv(self, path,name) -> None:
         self.dataFrameHandler.saveNonCrossTalkToCSV(self.getCrossTalk(), path,name,self.getClusters())
 
 
 class dataFrameHandler:
     # Stores the data frame
     # Retrieves calculated data for values on a per hit basis i.e. one value per line in data frame e.g. ToT, Voltage
-    def __init__(self, pathToData: str, baseAttrNames: list, maxLine: int = None, telescope: str = "kit"):
+    def __init__(self, pathToData: str, baseAttrNames: list[str], maxLine: Optional[int] = None, telescope: str = "kit"):
         self.dataFileManager = rawDataFileManager(pathToData, baseAttrNames, maxLine=maxLine)
         self.telescope = telescope
 
-    def loadDataIfNotLoaded(self):
+    def loadDataIfNotLoaded(self) -> None:
         if not self.checkLoadedData():
             self.data = self.dataFileManager.readFile()
 
-    def cutSensor(self, row):
+    def cutSensor(self, row:int) -> pd.DataFrame:
         self.loadDataIfNotLoaded()
         self.data = self.data.drop(index=np.where(self.data["Row"].values >= row)[0])
         self.data.index = np.arange(len(self.data))
-
-    def checkLoadedData(self):
+        return self.data
+    def checkLoadedData(self) -> bool:
         if "data" in self.__dict__.keys():
             return True
         else:
             return False
 
-    def readDataFrameAttr(self, attribute):
+    def readDataFrameAttr(self, attribute) -> npt.NDArray[np.int_]:
         self.loadDataIfNotLoaded()
         toBeReturned = self.data[attribute].values
         return toBeReturned
 
-    def getToT(self):
+    def getToT(self) -> npt.NDArray[np.int_]:
         self.loadDataIfNotLoaded()
         toBeReturned = calcToT(self.data["TS"].values, self.data["TS2"].values)
         return toBeReturned
 
-    def getHit_Voltage(self, ToTs=None):
+    def getHit_Voltage(self, ToTs : Optional[npt.NDArray[np.int_]]=None) -> npt.NDArray[np.float64]:
         self.loadDataIfNotLoaded()
         if ToTs is None:
             ToTs = self.getToT()
@@ -291,7 +334,7 @@ class dataFrameHandler:
         toBeReturned = calcHit_Voltage(rows, columns, ToTs, Layers)
         return toBeReturned
 
-    def getHit_VoltageError(self, ToTs=None):
+    def getHit_VoltageError(self, ToTs:Optional[npt.NDArray[np.int_]]=None) -> npt.NDArray[np.float64]:
         self.loadDataIfNotLoaded()
         if ToTs is None:
             ToTs = self.getToT()
@@ -301,7 +344,7 @@ class dataFrameHandler:
         toBeReturned = calcHit_VoltageError(rows, columns, ToTs, Layers)
         return toBeReturned
 
-    def getDataLength(self):
+    def getDataLength(self) -> int:
         self.loadDataIfNotLoaded()
         if "dataLength" in self.__dict__:
             return self.dataLength
@@ -309,7 +352,7 @@ class dataFrameHandler:
             self.dataLength = len(self.data)
             return self.dataLength
 
-    def saveNonCrossTalkToCSV(self, crosstalk, path,name,clusters):
+    def saveNonCrossTalkToCSV(self, crosstalk: npt.NDArray[np.bool_], path : str,name : str,clusters : clusterArray) -> None:
         outputDF = self.data
         outputDF["ext_TS"] = trueTimeStamps(clusters,outputDF["ext_TS"].values)
         outputDF = outputDF.drop(index=np.where(crosstalk)[0])
@@ -324,10 +367,10 @@ class clusterHandler:
         self.calcFileManager = calcFileManager
         self.dataFrameHandler = dataFrameHandler
 
-    def foundClusters(self):
+    def foundClusters(self) -> bool:
         return self.haveClusters
 
-    def getClusters(self, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: list[int] = None, recalc: bool = False):
+    def getClusters(self, returnIndexes: bool = False, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
         if "clusters" in self.__dict__ and not recalc:
             toBeReturned = self.clusters
         elif self.calcFileManager.fileExists("clusters") and not recalc:
@@ -352,7 +395,7 @@ class clusterHandler:
         else:
             return toBeReturned[filter]
 
-    def initClusters(self, clusters, layers=None, columns=None, rows=None, ToTs=None, TSs=None):
+    def initClusters(self, clusters:clusterArray, layers: Optional[list[int]]=None, columns: Optional[npt.NDArray[np.int_]]=None, rows: Optional[npt.NDArray[np.int_]]=None, ToTs: Optional[npt.NDArray[np.int_]]=None, TSs: Optional[npt.NDArray[np.int_]]=None) -> clusterArray:
         print(f"Initializing Clusters")
         self.clusters = np.empty(len(clusters), dtype=object)
         if layers is None:
@@ -371,19 +414,19 @@ class clusterHandler:
         self.haveClusters = True
         return self.clusters
 
-    def initClusterVoltages(self, Hit_Voltages, Hit_VoltageErrors):
+    def initClusterVoltages(self, Hit_Voltages: npt.NDArray[np.float64], Hit_VoltageErrors: npt.NDArray[np.float64]) -> None:
         if not self.haveClusters:
             self.getClusters()
         for cluster in self.clusters:
             cluster.setHit_Voltage(Hit_Voltages[cluster.indexes], Hit_VoltageErrors[cluster.indexes])
 
-    def setCalcCrossTalk(self, crosstalk):
+    def setCalcCrossTalk(self, crosstalk: npt.NDArray[np.bool_]) -> None:
         clusters = self.getClusters()
         for cluster in clusters:
             cluster.setCrossTalk(crosstalk[cluster.indexes])
         self.haveCrossTalk = True
 
-    def calcCrossTalk(self):
+    def calcCrossTalk(self) -> npt.NDArray[np.bool_]:
         clusters = self.getClusters()
         print(f"Finding Cross Talk")
         crossTalk = np.full(self.dataFrameHandler.getDataLength(), False, dtype=bool)
@@ -396,7 +439,7 @@ class clusterHandler:
         self.haveCrossTalk = True
         return crossTalk
 
-    def getClusterAttr(self, attribute, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: list[int] = None):
+    def getClusterAttr(self, attribute: str, excludeCrossTalk: bool = False, returnIndexes: bool = False, layers: Optional[list[int]] = None) -> npt.NDArray[Any]:
         if attribute == "Sizes":
             toBeReturned = np.array([cluster.getSize(excludeCrossTalk) for cluster in self.clusters])
             filter = self.layerFilter(self.clusters, layers=layers) & (toBeReturned > 0)
@@ -419,161 +462,14 @@ class clusterHandler:
         else:
             return toBeReturned[filter]
 
-    def layerFilter(self, clusters, layers: list[int] = None):
+    def layerFilter(self, clusters: clusterArray, layers: Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
         if layers == None:
             return np.full(len(clusters), True, bool)
         else:
             return np.isin([cluster.layer for cluster in clusters], layers)
 
-
-class clusterClass:
-    def __init__(self, index: int, indexes: list[int], layer: int, columns: list[int], rows: list[int], ToTs: list[int], TSs: list[int]):
-        self.indexes = indexes
-        self.layer = layer
-        self.columns = columns
-        self.rows = rows
-        self.ToTs = ToTs
-        self.TSs = TSs
-        self.index = index
-
-    def setHit_Voltage(self, Hit_Voltages: list[float], Hit_VoltageErrors: list[float]):
-        self.Hit_Voltages = Hit_Voltages
-        self.Hit_VoltageErrors = Hit_VoltageErrors
-
-    def setCrossTalk(self, crossTalk: list[bool]):
-        self.crossTalk = crossTalk
-        self.notCrossTalk = np.invert(crossTalk)
-
-    def getIndex(self, excludeCrossTalk: bool = False) -> int:
-        return self.index
-
-    def getIndexes(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return self.indexes[self.notCrossTalk]
-        else:
-            return self.indexes
-
-    def getLayer(self, excludeCrossTalk: bool = False) -> int:
-        return self.layer
-
-    def getShortIndexes(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return np.arange(self.getSize())[self.notCrossTalk]
-        else:
-            return np.arange(self.getSize())
-    def getSize(self, excludeCrossTalk: bool = False) -> int:
-        if excludeCrossTalk:
-            return np.sum(self.notCrossTalk)
-        else:
-            return len(self.indexes)
-
-    def getRowWidth(self, excludeCrossTalk: bool = False) -> int:
-        if excludeCrossTalk:
-            if self.rows[self.notCrossTalk].size == 0:
-                return 0
-            else:
-                return np.ptp(self.rows[self.notCrossTalk]) + 1
-        else:
-            if self.rows.size == 0:
-                return 0
-            else:
-                return np.ptp(self.rows) + 1
-
-    def getColumnWidth(self, excludeCrossTalk: bool = False) -> int:
-        if excludeCrossTalk:
-            if self.columns[self.notCrossTalk].size == 0:
-                return 0
-            else:
-                return np.ptp(self.columns[self.notCrossTalk]) + 1
-        else:
-            if self.columns.size == 0:
-                return 0
-            else:
-                return np.ptp(self.columns) + 1
-
-    def getColumns(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return self.columns[self.notCrossTalk]
-        else:
-            return self.columns
-
-    def getRows(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return self.rows[self.notCrossTalk]
-        else:
-            return self.rows
-
-    def getHit_Voltages(self, excludeCrossTalk: bool = False) -> list[float]:
-        if excludeCrossTalk:
-            return self.Hit_Voltages[self.notCrossTalk]
-        else:
-            return self.Hit_Voltages
-
-    def getHit_VoltageErrors(self, excludeCrossTalk: bool = False) -> list[float]:
-        if excludeCrossTalk:
-            return self.Hit_VoltageErrors[self.notCrossTalk]
-        else:
-            return self.Hit_VoltageErrors
-
-    def getToTs(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return self.ToTs[self.notCrossTalk]
-        else:
-            return self.ToTs
-
-    def getToTErrors(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return np.full(self.ToTs.shape, 2)[self.notCrossTalk]
-        else:
-            return np.full(self.ToTs.shape, 2)
-
-    def getTSs(self, excludeCrossTalk: bool = False) -> list[int]:
-        if excludeCrossTalk:
-            return self.TSs[self.notCrossTalk]
-        else:
-            return self.TSs
-
-
-class rawDataFileManager:
-    def __init__(self, pathToData: str, columns: list, maxLine: int = None):
-        self.pathToData = pathToData
-        self.columns = columns
-        self.maxLine = maxLine
-
-    def readFile(self):
-        print(f"Opening: {self.pathToData}")
-        dtypes = {
-            "PackageID": int,
-            "Layer": int,
-            "Column": int,
-            "Row": int,
-            "TS": int,
-            "TS1": int,
-            "TS2": int,
-            "TriggerTS": int,
-            "TriggerID": int,
-            "ext_TS": int,
-            "ext_TS2": int,
-            "FIFO_overflow": bool,
-        }
-        return pd.read_csv(self.pathToData, delimiter="\t", names=self.columns, dtype=dtypes, header=0, nrows=self.maxLine)
-
-    def saveFile(self, dataFrame, path, name):
-        self.makeDirIfNeeded(path)
-        with open(f"{path}{name}_decode.dat", 'w') as file:
-            file.write('# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n')
-            dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
-            print(f"Save to csv: {path}{name}_decode.dat")
-
-    def makeDirIfNeeded(self, fileName):
-        dirName = "/".join(fileName.split("/")[:-1])
-        if not os.path.isdir(dirName):
-            os.makedirs(dirName)
-
-
-
 class crossTalkFinder:
-    def findCrossTalk_OneCluster(self, cluster: clusterClass) -> list[bool]:
+    def findCrossTalk_OneCluster(self, cluster: clusterClass) -> npt.NDArray[np.bool_]:
         crossTalk = np.full(len(cluster.getShortIndexes()), False, dtype=bool)
         ToTs = cluster.getToTs()
         shortIndexes = cluster.getShortIndexes()
@@ -581,7 +477,7 @@ class crossTalkFinder:
         rows = cluster.getRows()
         for pixel in shortIndexes:
             if not crossTalk[pixel]:
-                expectedCrossTalk = self.crossTalkFunction(rows[pixel])
+                expectedCrossTalk = self.crossTalkFunction()[rows[pixel]]
                 for cross in expectedCrossTalk:
                     clashPixels = shortIndexes[(columns == columns[pixel]) & (rows == cross[0]) & (np.invert(crossTalk))]
                     for clash in clashPixels:
@@ -593,11 +489,9 @@ class crossTalkFinder:
                             crossTalk[clash] = True
         return crossTalk
 
-    def crossTalkFunction(self, row: int, returnDict=False) -> list[int]:
+    def crossTalkFunction(self) -> dict[int, npt.NDArray[np.int_]]:
         if "crossTalkDict" in self.__dict__:
-            if returnDict:
-                return self.crossTalkDict
-            return self.crossTalkDict[int(row)]
+            return self.crossTalkDict
         else:
             crossTalkArray = self.calcCrossTalkArray()
             self.crossTalkDict = {}
@@ -629,10 +523,8 @@ class crossTalkFinder:
                                 )
                 if i not in self.crossTalkDict:
                     self.crossTalkDict[i] = np.array([])
-            if returnDict:
-                return self.crossTalkDict
-            return self.crossTalkDict[int(row)]
-    def calcCrossTalkArray(self) -> list[list[int]]:
+            return self.crossTalkDict
+    def calcCrossTalkArray(self) -> npt.NDArray[np.int_]:
         # These numbers are all manually set based on the RowRow correlation graph
         up_to = 124
         crossTalkArray = np.full((up_to,9), -1)
@@ -680,7 +572,7 @@ class crossTalkFinder:
         crossTalkArray = np.append(crossTalkArray, np.append([[248, 267]],np.full((1,7),-1),axis=1), axis=0)
         return crossTalkArray
 
-def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}):
+def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}) -> list[dataAnalysis]:
     dataFiles = []
     for dataFile in allDataFiles:
         boolList = []
@@ -708,6 +600,9 @@ def initDataFiles(config:dict={})->list[dataAnalysis]:
         filterDict=config["filterDict"],
     )
     return dataFiles
+
+
+
 
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"

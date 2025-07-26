@@ -17,7 +17,10 @@ def defaultConfig():
         "filterDict": {
             "telescope": "kit",
             "angle":86.5,
-        }
+        },
+        "maxClusterWidth": 30,
+        "layers": [4],
+        "excludeCrossTalk": True,
     }
     return config
 def saveConfig(config:dict,path:str="defaultConfig.json"):
