@@ -94,7 +94,7 @@ def calcHit_Voltage(
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
         hit_voltage[Layers == k] = np.real(
-            lambert_W_ToT_to_u(ToTs[Layers == k] * 1.5, u_0, a, b, c)
+            lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c)
         )
     return hit_voltage
 
@@ -115,10 +115,10 @@ def calcHit_VoltageError(
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
         hit_voltage[Layers == k] = np.real(
-            lambert_W_ToT_to_u(ToTs[Layers == k] * 1.5, u_0, a, b, c)
+            lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c)
         )
-        upper = np.real(lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0, a, b, c))
-        lower = np.real(lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0, a, b, c))
+        upper = lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0, a, b, c)
+        lower = lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0, a, b, c)
         upperError = upper - hit_voltage[Layers == k]
         lowerError = hit_voltage[Layers == k] - lower
         hit_voltageError[Layers == k] = np.max([upperError, lowerError], axis=0)
@@ -126,14 +126,14 @@ def calcHit_VoltageError(
 
 
 def lambert_W_ToT_to_u(
-    ToT: npt.NDArray[np.int_],
-    u_0: npt.NDArray[np.float64],
-    a: npt.NDArray[np.float64],
-    b: npt.NDArray[np.float64],
-    c: npt.NDArray[np.float64],
-) -> npt.NDArray[np.float64]:
+    ToT: Union[npt.NDArray[np.int_]|npt.NDArray[np.float64]| float| int],
+    u_0: Union[npt.NDArray[np.float64]| float],
+    a: Union[npt.NDArray[np.float64]| float],
+    b: Union[npt.NDArray[np.float64]| float],
+    c: Union[npt.NDArray[np.float64]| float],
+) -> Union[npt.NDArray[np.float64]| float]:
     u = u_0 + (a / b) * scipy.special.lambertw((b / a) * u_0 * np.exp((ToT - c - (b * u_0)) / a))
-    return u
+    return np.real(u)
 
 
 def lambert_W_u_to_ToT(
@@ -360,7 +360,7 @@ def calcDepth(
     shift = 0
     if upTwo:
         shift = 2
-    x = np.linspace(1 - 1 / ((clusterWidth + 1)), 0, clusterWidth) * d * 50
+    x = np.linspace(d * 50, 0, clusterWidth)
     if depthCorrection and clusterWidth + shift > (d * np.tan(np.deg2rad(angle))):
         x = x * ((clusterWidth + shift) / (d * np.tan(np.deg2rad(angle))))
     return x
@@ -409,12 +409,12 @@ def chargeCollectionEfficiencyFunc(
     V_0: npt.NDArray[np.float64],
     t_epi: npt.NDArray[np.float64],
     edl: npt.NDArray[np.float64],
-    base: float = 0.16,
+    base: float = 0,
 ) -> npt.NDArray[np.float64]:
     voltage = np.zeros(depth.shape)
     voltage[depth < t_epi] = V_0
-    voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * V_0
-    voltage[voltage < base] = base
+    voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0-base) + base
+    #voltage[voltage < base] = base
     return voltage
 
 
@@ -439,8 +439,8 @@ def fitVoltageDepth(
     return popt, pcov
 
 
-def depletionWidthFunc(V: npt.NDArray[np.float64], a: float, b: float) -> npt.NDArray[np.float64]:
-    return np.sqrt(a * (V + b))
+def depletionWidthFunc(V: npt.NDArray[np.float64], a: float, b: float,c:float = 0) -> npt.NDArray[np.float64]:
+    return np.sqrt(a * (V + b)) + c
 
 
 def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:

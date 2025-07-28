@@ -8,9 +8,12 @@ from lowLevelFunctions import (
     TStoMS,
     fitVoltageDepth,
     chargeCollectionEfficiencyFunc,
+    calcDepth,
+    lambert_W_ToT_to_u,
+    adjustPeakVoltage,
+
 )
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib import patheffects
 import os
 import scipy
@@ -18,7 +21,6 @@ from typing import Optional, Any, TypeAlias
 import numpy as np
 import numpy.typing as npt
 from landau import landau
-from math import atan
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
 
@@ -185,7 +187,7 @@ class depthAnalysis:
                 layers=self.layers,
             )
             self.calcFileManager.saveFile(errors, calcFileName=calcFileName, suppressText=True)
-            toBeReturned = (peaks, errors * 5)
+            toBeReturned = (peaks, errors)
         return toBeReturned
 
     def findPeaks_standard(
@@ -356,10 +358,15 @@ class depthAnalysis:
             hist[hist > 0],
             p0=initial_guess,
             bounds=bounds,
-            absolute_sigma=True,
+            sigma = histErrors[hist > 0]/hist[hist > 0],
+            absolute_sigma=False,
             maxfev=500 * (hist.size + 10),
         )
-        toBeReturned = np.append(popt, np.sqrt(np.diag(pcov)))
+        outputErrors = np.sqrt(np.diag(pcov))
+        #cut = (values > popt[0]*0.8) & (values < popt[0]*1.2)
+        #if outputErrors[0] < (np.sum(errors[cut]))/(np.sum(cut)**1.25):
+        #    outputErrors[0] = (np.sum(errors[cut]))/(np.sum(cut)**1.25)
+        toBeReturned = np.append(popt, outputErrors)
         # if toBeReturned[3] < (binCentres[1]-binCentres[0])/5:
         #    toBeReturned[3] = (binCentres[1]-binCentres[0])/5
         return toBeReturned[returnParams]
@@ -385,7 +392,7 @@ class depthAnalysis:
         y = np.zeros(self.maxClusterWidth - 1)
         for i in range(2, self.maxClusterWidth + 1):
             x[i - 2] = i
-            y[i - 2] = len(self.loadOneLength(dataFile, i)[0])
+            y[i - 2] = len(self.loadOneLength(dataFile, i)[0][0])
         return x, y
 
     def findClusterAngleDistribution(
@@ -399,7 +406,7 @@ class depthAnalysis:
         )
         rowWidths = rowWidths[(columnWidths <= maxColumnWidth)]
         x, heights = np.unique(rowWidths[rowWidths < self.maxClusterWidth], return_counts=True)
-        bins = np.append(atan((x[0] - 0.5) / d), atan((x + 0.5) / d))
+        bins = np.append(np.arctan((x[0] - 0.5 - 1) / d), np.arctan((x + 0.5 - 1) / d))
         heights = heights / np.rad2deg(np.diff(bins))
         return bins, heights
 
@@ -546,7 +553,7 @@ class clusterPlotter:
         y = np.zeros(numberOfPoints, dtype=int)
         Hit_Voltage = np.zeros(numberOfPoints, dtype=float)
         count = 0
-        cmap = cm.get_cmap(self.cmap)
+        cmap = plt.get_cmap(self.cmap)
         for cluster in clusters:
             x[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
                 cluster.getRows(excludeCrossTalk=self.excludeCrossTalk)
@@ -719,8 +726,6 @@ def fitAndPlotCCE(
         y,
         color=plot.colorPalette[0],
         linestyle="dashed",
-        label=f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
-        + f"edl    :{edl:.3f} ± {edl_e:.3f}",
     )
     possibleLines = np.random.default_rng().multivariate_normal(popt, pcov, 1000)
     ylist = [
@@ -735,7 +740,58 @@ def fitAndPlotCCE(
     ax.fill_between(
         x, np.min(ylist, axis=0), np.max(ylist, axis=0), color=plot.colorPalette[6], zorder=-1
     )
+    ax.text(0.98, 0.98, f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
+        + f"edl    :{edl:.3f} ± {edl_e:.3f}",
+     horizontalalignment='right',
+     verticalalignment='top',
+     transform = ax.transAxes)
 
+def fit_dataFile(
+    dataFile: dataAnalysis,
+    depth: depthAnalysis,
+    depthCorrection: bool = True,
+    hideLowWidths: bool = True,
+    fitting: str = "histogram",
+    measuredAttribute: str = "Hit_Voltage",
+):
+    d = depth.find_d_value(dataFile)
+    allXValues: list[float] = []
+    allYValues: list[float] = []
+    allYValuesErrors: list[float] = []
+    for i in range(2, depth.maxClusterWidth + 1):
+        x = calcDepth(
+            d,
+            i,
+            dataFile.get_angle(),
+            depthCorrection=depthCorrection,
+            upTwo=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+        )
+        x = calcDepth(
+            d,
+            i,
+            dataFile.get_angle(),
+            depthCorrection=depthCorrection,
+            upTwo=False,
+        )
+        y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute=measuredAttribute)
+        if measuredAttribute == "Hit_Voltage":
+            y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute="ToT")
+            y_err = y_err * (lambert_W_ToT_to_u(y, 0.161, 8, 110, 70) / y)
+            y = lambert_W_ToT_to_u(y, 0.161, 8, 110, 70)
+        #if i < 20:
+        #    y, y_err = adjustPeakVoltage(y, y_err, d, i)
+        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 85 and np.rad2deg(np.arctan(i / d)) < 87):
+            allXValues = allXValues + list(x[1:-1])
+            allYValues = allYValues + list(y[1:-1])
+            allYValuesErrors = allYValues + list(y_err[1:-1])
+    allXValues_np = np.array(allXValues)
+    allYValues_np = np.array(allYValues)
+    allYValuesErrors_np = np.array(allYValuesErrors)
+    y = allYValues_np[np.argsort(allXValues_np)]
+    yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
+    x = allXValues_np[np.argsort(allXValues_np)]
+    popt, pcov = fitVoltageDepth(x[x < d * 50 * 0.8], y[x < d * 50 * 0.8], yerr[x < d * 50 * 0.8])
+    return popt, pcov, x[x < d * 50 * 0.8], y[x < d * 50 * 0.8], yerr[x < d * 50 * 0.8]
 
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
@@ -751,3 +807,4 @@ if __name__ == "__main__":
         excludeCrossTalk=True,
     )
     depth.findPeak(dataFile, 10)
+

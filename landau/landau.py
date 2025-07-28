@@ -180,7 +180,7 @@ def landau_pdf(x):
 		result = float(result)
 	return result
 
-def landau_cdf(x, x_min: float=-5, x_max: float=9999, dx: float=1):
+def landau_cdf(x, x_min: float=-5, x_max: float=9999, dx: float=0.1):
 	"""Calculates the CDF of the "basic" Landau distribution, i.e. the 
 	distribution when the location parameter is 0 and the scale parameter 
 	is 1. The algorithm was adapted from [the Root implementation](https://root.cern.ch/doc/master/PdfFuncMathCore_8cxx_source.html).

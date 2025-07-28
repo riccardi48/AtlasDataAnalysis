@@ -179,7 +179,6 @@ class rawDataFileManager:
             "ext_TS2": int,
             "FIFO_overflow": bool,
         }
-        dtypes = defaultdict(None, dtypes)
         return pd.read_csv(
             self.pathToData,
             delimiter="\t",
@@ -491,7 +490,7 @@ class clusterHandler:
         return self.haveClusters
 
     def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
-        if self.clusters is not None and not recalc:
+        if "clusters" in self.__dict__ and not recalc:
             toBeReturned = self.clusters
         elif self.calcFileManager.fileExists("clusters") and not recalc:
             clusters = self.calcFileManager.loadFile("clusters")
