@@ -222,9 +222,10 @@ def Comparison_CCE_Vs_Depth(
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
+            GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
-        y = chargeCollectionEfficiencyFunc(x, *popt)
+        y = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
         cellText.append(
@@ -322,9 +323,10 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
+            GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
-        y = chargeCollectionEfficiencyFunc(x, *popt)
+        y = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
 
@@ -404,7 +406,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         index=[f"c = {c:.2f}" for c in np.linspace(0, 10, 101)],
         )
     print(df[(df["Nd [cm^-3]"] > df["Na [cm^-3]"]) & (df["Nd [cm^-3]"] < 1e21)])
-    c = 5
+    c = 3.5
     c_e = 0
     func = lambda V, a, b: depletionWidthFunc(V, a, b, c = c)
     popt, pcov = scipy.optimize.curve_fit(
@@ -493,11 +495,17 @@ def VoltageCalibrationHistograms(pathToOutput: str, layer: int = 4, saveToPDF: b
         )
     else:
         return plot.fig
+    
+
+
+
+
+    
 if __name__ == "__main__":
     import configLoader
 
     config = configLoader.loadConfig()
-
+    config["maxClusterWidth"] = 29
     dataFiles = initDataFiles(config)
     firstPeaks, _ = Comparison_ClustersCountOverTime(
         dataFiles[:8], config["pathToOutput"], layer=4, name="_kit", returnFirstPeaks=True
@@ -515,7 +523,7 @@ if __name__ == "__main__":
         dataFiles[:8],
         config["pathToOutput"],
         config["pathToCalcData"],
-        maxClusterWidth=30,
+        maxClusterWidth=config["maxClusterWidth"],
         layer=4,
         name="_kit",
         minTimes=firstPeaks,
@@ -527,7 +535,7 @@ if __name__ == "__main__":
         dataFiles[:8],
         config["pathToOutput"],
         config["pathToCalcData"],
-        maxClusterWidth=30,
+        maxClusterWidth=config["maxClusterWidth"],
         layer=4,
         name="_kit_tight",
         minTimes=firstPeaks,
@@ -536,30 +544,27 @@ if __name__ == "__main__":
         xlim=(82, 90),
     )
     Comparison_CCE_Vs_Depth(
-        dataFiles, config["pathToOutput"], config["pathToCalcData"], maxClusterWidth=30,hideLowWidths=False
+        dataFiles, config["pathToOutput"], config["pathToCalcData"], maxClusterWidth=config["maxClusterWidth"]
     )
     Comparison_CCE_Vs_Depth(
         dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
-        maxClusterWidth=30,
+        maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="ToT",
-        hideLowWidths=False,
     )
     Scatter_Epi_Thickness_Vs_Bias_Voltage(
         dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
-        maxClusterWidth=30,
+        maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="Hit_Voltage",
-        hideLowWidths=False,
     )
     Scatter_Epi_Thickness_Vs_Bias_Voltage(
         dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
-        maxClusterWidth=30,
+        maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="ToT",
-        hideLowWidths=False,
     )
     VoltageCalibrationHistograms(config["pathToOutput"], layer=4)

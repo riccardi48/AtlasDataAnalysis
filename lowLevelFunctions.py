@@ -5,6 +5,7 @@ import psutil
 import os
 import numpy.typing as npt
 from typing import Optional, Any, TypeAlias, Union
+from clusterClass import clusterClass
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
 
@@ -198,7 +199,31 @@ def calcClusters(
     print(f"{len(clusters)} clusters found")
     return clusters
 
-
+def checkDirection(values,x,width):
+    if width <=6 or len(values) <= 3:
+        return True
+    gaps = np.where(np.diff(x) > 1)[0]
+    #print(f"gaps: {gaps}")
+    if gaps.size > 0:
+        if np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)) > np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)):
+            rightToLeft = False
+        elif np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)) < np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)):
+            rightToLeft = True
+    
+    if 'rightToLeft' not in locals():
+        try:
+            gradient = np.average(np.gradient(values[1:-1],x[1:-1]),weights=np.diff(x[:-1]))/np.average(x[1:-1])*len(x[1:-1])
+        except:
+            print(width,values,x)
+        #print(f"gradient: {gradient}")
+        if gradient > 0.001:
+            rightToLeft = True
+        elif gradient < -0.001:
+            rightToLeft = False
+        else:
+            # Default is true as beam is going right to left
+            rightToLeft = True
+    return rightToLeft
 def calcHit_VoltageByPixel(
     clusters: clusterArray,
     clusterWidths: npt.NDArray[np.int_],
@@ -212,6 +237,7 @@ def calcHit_VoltageByPixel(
     npt.NDArray[np.int_],
     Optional[npt.NDArray[np.int_]],
 ]:
+    cluster: clusterClass
     uniqueClusterWidths, unique_counts = np.unique(clusterWidths, return_counts=True)
     hitPositionArray = np.empty(
         (maxClusterWidth, maxClusterWidth, np.max(unique_counts)), dtype=float
@@ -228,26 +254,31 @@ def calcHit_VoltageByPixel(
             width > 0
             and width <= maxClusterWidth
             and len(np.unique(cluster.getColumns(excludeCrossTalk))) == 1
+            and cluster.getSize(excludeCrossTalk) > width/3
         ):
             Hit_Voltages = np.zeros(width, dtype=float)
             Hit_VoltageErrors = np.zeros(width, dtype=float)
             sort_array = np.argsort(cluster.getRows(excludeCrossTalk))
             # Hit_Voltage = Hit_Voltages[cluster]
             x = cluster.getRows(excludeCrossTalk)[sort_array]
+            
             if measuredAttribute == "Hit_Voltage":
-                Hit_Voltages[(x - np.min(x)).astype(int)] = cluster.getHit_Voltages(
-                    excludeCrossTalk
-                )[sort_array]
-                Hit_VoltageErrors[(x - np.min(x)).astype(int)] = cluster.getHit_VoltageErrors(
-                    excludeCrossTalk
-                )[sort_array]
+                values = cluster.getHit_Voltages(excludeCrossTalk)[sort_array]
+                errors = cluster.getHit_VoltageErrors(excludeCrossTalk)[sort_array]
             elif measuredAttribute == "ToT":
-                Hit_Voltages[(x - np.min(x)).astype(int)] = cluster.getToTs(excludeCrossTalk)[
-                    sort_array
-                ]
-                Hit_VoltageErrors[(x - np.min(x)).astype(int)] = cluster.getToTErrors(
-                    excludeCrossTalk
-                )[sort_array]
+                values = cluster.getToTs(excludeCrossTalk)[sort_array]
+                errors = cluster.getToTErrors(excludeCrossTalk)[sort_array]
+            index = (x - np.min(x)).astype(int)
+            #print(f"rightToLeft: {checkDirection(values,x,width)}")
+            #print(f"x :{x}")
+            #print(f"values: {values}")
+            if checkDirection(values,x,width):
+                values = np.flip(values)
+                errors = np.flip(errors)
+                index = np.flip(index)
+            #input("---------")
+            Hit_Voltages[index] = values
+            Hit_VoltageErrors[index] = errors
             # Hit_Voltage = Hit_Voltage[np.argsort(x)]
             if counts[width - 2] < np.max(unique_counts):
                 hitPositionArray[width - 2, :width, counts[width - 2]] = Hit_Voltages
@@ -400,8 +431,13 @@ def histogramErrors(
         histErrors[i] += np.sqrt(np.sum(np.append(errorOut, errorIn)))
         # print(gaussianCDFFunc(binEdges[i+1],values,errors),gaussianCDFFunc(binEdges[i+1],values,errors))
         # histErrors[i] = np.sum([scipy.integrate.quad(gaussianFunc,binEdges[i],binEdges[i+1],args=(value,error)) for value,error in zip(values,errors)])
-    histErrors[histErrors < 0.01] = 0.01
-    return histErrors
+    histErrors[histErrors < 4] = 4
+    if np.max(binEdges) < 100:
+        histErrors[binEdges[1:] < 0.3] = histErrors[binEdges[1:] < 0.3]*1*np.exp(-(binEdges[1:][binEdges[1:] < 0.3]-0.16)/0.5)
+    else:
+        histErrors[binEdges[1:] < 10] = histErrors[binEdges[1:] < 10]*3*np.exp(-binEdges[1:][binEdges[1:] < 10]/15)
+    histErrors = histErrors  / (binEdges[1:] - binEdges[:-1])
+    return histErrors# * ((binEdges[1:] - binEdges[:-1])/np.min(np.diff(binEdges)))**2
 
 
 def chargeCollectionEfficiencyFunc(
@@ -410,7 +446,14 @@ def chargeCollectionEfficiencyFunc(
     t_epi: npt.NDArray[np.float64],
     edl: npt.NDArray[np.float64],
     base: float = 0,
+    GeV:Optional[int]=None
 ) -> npt.NDArray[np.float64]:
+    
+    if GeV is not None:
+        if GeV == 4:
+            base = 0.12
+        elif GeV == 6:
+            base = 0.09
     voltage = np.zeros(depth.shape)
     voltage[depth < t_epi] = V_0
     voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0-base) + base
@@ -419,15 +462,16 @@ def chargeCollectionEfficiencyFunc(
 
 
 def fitVoltageDepth(
-    x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr: npt.NDArray[np.float64]
+    x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr: npt.NDArray[np.float64] , GeV:int=6
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     unzippedBounds = [(0, np.inf), (0, 100), (1, np.inf)]
     lower_bounds, upper_bounds = zip(*unzippedBounds)
     bounds = (list(lower_bounds), list(upper_bounds))
     initial_guess = [0.25, 10, 50]
     cut = x > 0  # (x<70) & (y > 0.17)
+    func = lambda depth,V_0,t_epi,edl:chargeCollectionEfficiencyFunc(depth,V_0,t_epi,edl,GeV=GeV)
     popt, pcov = scipy.optimize.curve_fit(
-        chargeCollectionEfficiencyFunc,
+        func,
         x[cut],
         y[cut],
         p0=initial_guess,
@@ -450,3 +494,4 @@ def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.
         firstTS1024 = firstTS % 1024
         new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs() % 1024) - firstTS1024)
     return new_ext_TS.astype(np.int_)
+

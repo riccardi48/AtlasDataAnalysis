@@ -248,7 +248,7 @@ class dataHandler:
             else:
                 attr = getattr(self.dataFrameHandler, "get" + attribute)
                 if attribute in ["Hit_Voltage", "Hit_VoltageError"]:
-                    toBeReturned = attr(ToTs=self.baseAttr("ToT"))
+                    toBeReturned = attr(ToTs=self.baseAttr("ToT")[0])
                 else:
                     toBeReturned = attr()
                 getattr(self, attribute, toBeReturned)
