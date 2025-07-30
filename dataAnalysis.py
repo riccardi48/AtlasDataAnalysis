@@ -76,8 +76,12 @@ class dataAnalysis:
 
     def get_crossTalk(self, recalc: bool = False,**kwargs) -> npt.NDArray[np.bool_]:
         if "layer" in kwargs:
-            kwargs["layers"] = [kwargs["layer"]]
-            kwargs.pop("layer")
+            if kwargs["layer"] is None:
+                kwargs["layers"] = None
+                kwargs.pop("layer")
+            else:
+                kwargs["layers"] = [kwargs["layer"]]
+                kwargs.pop("layer")
         return self.dataHandler.getCrossTalk(recalc=recalc,**kwargs)
 
     def init_cluster_voltages(self) -> None:
@@ -331,17 +335,19 @@ class dataHandler:
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
         return np.invert(self.getCrossTalk())
 
-    def getCrossTalk(self, recalc: bool = False, layers:Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
+    def getCrossTalk(self, recalc: bool = False, layers:Optional[list[int]] = None,initClusters:bool=True) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
-            self.clusterHandler.setCalcCrossTalk(self.crossTalk)
+            if initClusters:
+                self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         elif self.calcFileManager.fileExists("crossTalk") and not recalc:
             self.crossTalk: npt.NDArray[np.bool_] = self.calcFileManager.loadFile("crossTalk")
             if self.telescope == "lancs":
                 row = 248
                 self.dataFrameHandler.cutSensor(row)
             toBeReturned = self.crossTalk
-            self.clusterHandler.setCalcCrossTalk(self.crossTalk)
+            if initClusters:
+                self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         else:
             self.crossTalk = self.clusterHandler.calcCrossTalk()
             if self.telescope == "lancs":

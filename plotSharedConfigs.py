@@ -520,7 +520,7 @@ def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
             check = dataFile.get_voltage() == attributeDict["Bias Voltage"]
             label = f"{x} Degrees" 
         if check:
-            crossTalkPercent = np.sum(dataFile.get_crossTalk(layer=layer))/dataFile.get_crossTalk(layer=layer).size
+            crossTalkPercent = np.sum(dataFile.get_crossTalk(layer=layer,initClusters=False))/dataFile.get_crossTalk(layer=layer,initClusters=False).size
             axs.scatter(x,crossTalkPercent,color = cmap((1 / attributeDict[attribute] * x)),label=label,marker="x")
     plot.set_config(
         axs,
@@ -534,14 +534,14 @@ def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
     # axs.set_yscale("log")
     if attribute == "Bias Voltage":
         axs.xaxis.set_major_locator(MultipleLocator(5))
-        axs.xaxis.set_major_formatter("{x:.2f}")
+        axs.xaxis.set_major_formatter("{x:.0f}")
         axs.xaxis.set_minor_locator(MultipleLocator(1))
     elif attribute == "Angle":
         axs.xaxis.set_major_locator(MultipleLocator(10))
-        axs.xaxis.set_major_formatter("{x:.2f}")
+        axs.xaxis.set_major_formatter("{x:.0f}")
         axs.xaxis.set_minor_locator(MultipleLocator(2))
     axs.yaxis.set_major_locator(MultipleLocator(0.05))
-    axs.yaxis.set_major_formatter("{x:.0f}")
+    axs.yaxis.set_major_formatter("{x:.2f}")
     axs.yaxis.set_minor_locator(MultipleLocator(0.01))
     if saveToPDF:
         plot.saveToPDF(f"Comparison_CrosstalkScatter_{attribute.replace(" ","_")}_{layer}{name}")
@@ -622,13 +622,15 @@ if __name__ == "__main__":
     config = configLoader.loadConfig()
     config["filterDict"] = {"telescope":"kit"}
     dataFiles = initDataFiles(config)
+    """
     Comparison_CrosstalkScatter(dataFiles,
         config["pathToOutput"],
-        layer= 4,
+        layer= None,
         attribute="Bias Voltage"
     )
+    """
     Comparison_CrosstalkScatter(dataFiles,
         config["pathToOutput"],
-        layer= 4,
+        layer= None,
         attribute="Angle"
     )

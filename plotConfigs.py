@@ -1025,7 +1025,7 @@ if __name__ == "__main__":
     config = configLoader.loadConfig()
     #config["filterDict"] = {"telescope":"kit","voltage":[48],"angle":[86.5]}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
-    config["filterDict"] = {"telescope":"kit","fileName":["angle6_4Gev_kit_2","angle6_6Gev_kit_4"]}
+    config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2","angle6_6Gev_kitHV6_kit_10"]}
     dataFiles = initDataFiles(config)
     config["maxClusterWidth"] = 50
     for dataFile in dataFiles:
@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
             hideLowWidths=False,
             measuredAttribute="ToT",
         )
-        """
+        
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1091,6 +1091,7 @@ if __name__ == "__main__":
             depthCorrection=False,
             hideLowWidths=False,
         )
+        """
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1099,6 +1100,7 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=True,
         )
+        """
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1115,7 +1117,7 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=False,
         )
-        """
+        
         LandauMPVWidthScatter(
             dataFile,
             depth,

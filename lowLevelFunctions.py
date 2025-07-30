@@ -321,10 +321,11 @@ def landauFunc(
     x_mpv: npt.NDArray[np.float64],
     xi: npt.NDArray[np.float64],
     scaler: npt.NDArray[np.float64],
+    threshold: float = 0.16
 ) -> npt.NDArray[np.float64]:
     y = landau.pdf(x, x_mpv, xi) * scaler
     y = np.reshape(y, np.size(y))
-    y[x < 0.16] = 0
+    y[x < threshold] = 0
     return y
 
 

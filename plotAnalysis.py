@@ -791,27 +791,41 @@ class correlationPlotter:
             toBeReturned = self.RowRow
         return toBeReturned
 
-def annotateIntegration(ax,popt,pcov,threshold=0.161, GeV:int=6):
-    x = np.linspace(0, 120, 1000)
+def effectiveDepth(popt,pcov,threshold=0.161, GeV:int=6):
+    x = np.linspace(0, 80, 80)
+    del_x = (x[1]-x[0])/2
     y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
+    upper = x[np.where(y>threshold)[0][-1]]
+    testVoltages = np.linspace(0,2,10000)
+    voltages = landauFunc(testVoltages,y[0]*del_x/50,(y[0]-0.09)*0.35*del_x/50,1,threshold=0)
+    voltages = voltages/(np.sum(voltages))
+    for i in range(1,len(x[x<=upper])):
+        width = (y[i]-0.09)*0.35
+        if width < 0:
+            width = 0
+        newVoltages = landauFunc(testVoltages,y[i]*del_x/50,width*del_x/50,1,threshold=0)
+        voltages = np.convolve(voltages,newVoltages/np.sum(newVoltages),mode="full")
+        voltages = voltages[:testVoltages.size]
+    func = lambda x,x_mpv,xi,scale: landauFunc(x,x_mpv,xi,scale,threshold=0)
+    ((x_mpv,xi,scale),(x_mpv_e,xi_e,scale_e)) = scipy.optimize.curve_fit(func,testVoltages,voltages,absolute_sigma=False,p0=[0.28,0.05,1])
+    return x_mpv/popt[0]*50
+def annotateIntegration(ax,popt,pcov,threshold=0.161, GeV:int=6):
     (V_0, t_epi, edl) = popt
     (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
-    upper = x[np.where(y<=threshold)[0][0]]
+    x = np.linspace(0, 100, 500)
+    y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
+    upper = x[np.where(y>threshold)[0][-1]]
     func = lambda x: chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
     area,area_e = scipy.integrate.quad(func,0,upper)
-    print(area)
-    print(area/popt[0])
-    area,area_e = scipy.integrate.quad(func,0,40)
-    print(area)
-    print(area/popt[0])
+    effectiveDepth = area/(popt[0])
     func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 - V_0_e,t_epi - t_epi_e,edl - edl_e,GeV=GeV)
     area,area_e = scipy.integrate.quad(func,0,upper)
-    print(area)
-    print(area/popt[0])
+    lowerError = area/(V_0 - V_0_e)
     func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 + V_0_e,t_epi + t_epi_e,edl + edl_e,GeV=GeV)
     area,area_e = scipy.integrate.quad(func,0,upper)
-    print(area)
-    print(area/popt[0])
+    upperError = area/(V_0 + V_0_e)
+    error = np.max([effectiveDepth-lowerError,upperError-effectiveDepth])
+    print(effectiveDepth,error)
 def fitAndPlotCCE(
     ax: Any, plot: plotClass, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr , GeV:int=6
 ) -> None:
