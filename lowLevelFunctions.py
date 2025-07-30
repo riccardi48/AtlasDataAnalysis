@@ -451,9 +451,10 @@ def chargeCollectionEfficiencyFunc(
     
     if GeV is not None:
         if GeV == 4:
-            base = 0.12
+            base = 0.00
         elif GeV == 6:
-            base = 0.09
+            base = 0.00
+    depth = np.reshape(depth,np.size(depth))
     voltage = np.zeros(depth.shape)
     voltage[depth < t_epi] = V_0
     voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0-base) + base

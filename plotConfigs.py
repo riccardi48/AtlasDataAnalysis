@@ -538,9 +538,17 @@ def HitDistributionInClusterAllOnOne(
     for clusterWidth in range(vmin, vmax + 1):
         hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth)[0])
         heights = np.zeros((clusterWidth))
-        x = np.linspace(0, 1 - (0.5 / clusterWidth), clusterWidth + 1) * d * 50
-        # if clusterWidth > (d*np.tan(np.deg2rad(dataFile.get_angle()))):
-        x = x * (clusterWidth / (d * np.tan(np.deg2rad(dataFile.get_angle()))))
+        x = calcDepth(
+            d,
+            clusterWidth,
+            dataFile.get_angle(),
+            depthCorrection=True,
+            upTwo=False,
+        )
+        x = np.sort(x)
+        diff = x[1]-x[0]
+        x = np.append(x[0]-diff,x[:]+diff)
+        
         for j in range(clusterWidth):
             if cutting:
                 heights[j] = np.sum(
@@ -577,9 +585,11 @@ def HitDistributionInClusterAllOnOne(
     MPVs = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
     #print(MPVs)
     y = np.zeros(x.size)
+    def func(x,m,c):
+        return m*x+c
     for i,MPV in enumerate(MPVs):
-        width = (MPV-0.1)*0.15
-        width = (0.035/(1+np.exp(30*(MPV-0.18)))) + 0.4*(MPV-0.17)
+        width = func(MPV,0.4,-0.04640574)
+        #width = (0.035/(1+np.exp(30*(MPV-0.18)))) + 0.4*(MPV-0.17)
         if width < 0.001:
             width = 0.001
         y[i] = (1 - landau.cdf(0.161, MPV, width))
@@ -935,7 +945,7 @@ def LandauMPVWidthScatter(
     allYValues: list[float] = []
     allYValueErrors = []
     for i in range(2, depth.maxClusterWidth + 1):
-        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 80 and np.rad2deg(np.arctan(i / d)) < 88):
+        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 86 and np.rad2deg(np.arctan(i / d)) < 87):
             hitPositionArray, _ = depth.loadOneLength(
                     dataFile, i, measuredAttribute=measuredAttribute
                 )
@@ -950,29 +960,30 @@ def LandauMPVWidthScatter(
                 params=[0, 1, 2, 3, 4, 5],
             )
             axs.scatter(
-                params_histogram[:,0], params_histogram[:,1], color=cmap((i - 2) / depth.maxClusterWidth), marker="x", s=15
+                params_histogram[1:-1,0], params_histogram[1:-1,1], color=cmap((i - 2) / depth.maxClusterWidth), marker="x", s=15
             )
             axs.errorbar(
-                params_histogram[:,0], 
-                params_histogram[:,1],
-                yerr=params_histogram[:,3],
-                xerr=params_histogram[:,4],
+                params_histogram[1:-1,0], 
+                params_histogram[1:-1,1],
+                xerr=params_histogram[1:-1,3],
+                yerr=params_histogram[1:-1,4],
                 fmt="none",
                 color=cmap((i - 2) / depth.maxClusterWidth),
                 elinewidth=0.5,
                 capsize=1,
             )
-            allXValues = allXValues + list(params_histogram[:,0])
-            allYValues = allYValues + list(params_histogram[:,1])
-            allYValueErrors = allYValueErrors + list(params_histogram[:,3])
+            allXValues = allXValues + list(params_histogram[1:-1,0])
+            allYValues = allYValues + list(params_histogram[1:-1,1])
+            allYValueErrors = allYValueErrors + list(params_histogram[1:-1,4])
     allXValues = np.array(allXValues)
     allYValues = np.array(allYValues)
     allYValueErrors = np.array(allYValueErrors)
     x = np.linspace(0.10, 0.32, 100)
     def func(x,m,c):
         return m*x+c
-    popt,pcov = scipy.optimize.curve_fit(func,allXValues[allXValues>0.18],allYValues[allXValues>0.18],sigma=allYValueErrors[allXValues>0.18]/allYValues[allXValues>0.18],absolute_sigma=False)
+    popt,pcov = scipy.optimize.curve_fit(func,allXValues[allXValues>0.14],allYValues[allXValues>0.14],sigma=allYValueErrors[allXValues>0.14]/allYValues[allXValues>0.14],absolute_sigma=False)
     y = func(x,*popt)
+    print(popt)
     axs.plot(
         x,
         y,
@@ -1014,7 +1025,7 @@ if __name__ == "__main__":
     config = configLoader.loadConfig()
     #config["filterDict"] = {"telescope":"kit","voltage":[48],"angle":[86.5]}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
-    config["filterDict"] = {"telescope":"kit","fileName":["angle6_4Gev_kit_2"]}
+    config["filterDict"] = {"telescope":"kit","fileName":["angle6_4Gev_kit_2","angle6_6Gev_kit_4"]}
     dataFiles = initDataFiles(config)
     config["maxClusterWidth"] = 50
     for dataFile in dataFiles:
@@ -1104,13 +1115,14 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=False,
         )
+        """
         LandauMPVWidthScatter(
             dataFile,
             depth,
             config["pathToOutput"],
             measuredAttribute = "Hit_Voltage",
             )
-        """
+        
         LandauMPVWidthScatter(
             dataFile,
             depth,

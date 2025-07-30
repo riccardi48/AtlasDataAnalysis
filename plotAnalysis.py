@@ -791,7 +791,27 @@ class correlationPlotter:
             toBeReturned = self.RowRow
         return toBeReturned
 
-
+def annotateIntegration(ax,popt,pcov,threshold=0.161, GeV:int=6):
+    x = np.linspace(0, 120, 1000)
+    y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
+    (V_0, t_epi, edl) = popt
+    (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
+    upper = x[np.where(y<=threshold)[0][0]]
+    func = lambda x: chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
+    area,area_e = scipy.integrate.quad(func,0,upper)
+    print(area)
+    print(area/popt[0])
+    area,area_e = scipy.integrate.quad(func,0,40)
+    print(area)
+    print(area/popt[0])
+    func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 - V_0_e,t_epi - t_epi_e,edl - edl_e,GeV=GeV)
+    area,area_e = scipy.integrate.quad(func,0,upper)
+    print(area)
+    print(area/popt[0])
+    func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 + V_0_e,t_epi + t_epi_e,edl + edl_e,GeV=GeV)
+    area,area_e = scipy.integrate.quad(func,0,upper)
+    print(area)
+    print(area/popt[0])
 def fitAndPlotCCE(
     ax: Any, plot: plotClass, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr , GeV:int=6
 ) -> None:
@@ -826,7 +846,7 @@ def fitAndPlotCCE(
      horizontalalignment='right',
      verticalalignment='top',
      transform = ax.transAxes)
-
+    annotateIntegration(ax,popt,pcov, GeV=GeV)
 def fit_dataFile(
     dataFile: dataAnalysis,
     depth: depthAnalysis,

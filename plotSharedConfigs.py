@@ -496,14 +496,64 @@ def VoltageCalibrationHistograms(pathToOutput: str, layer: int = 4, saveToPDF: b
     else:
         return plot.fig
     
+def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
+    pathToOutput: str,
+    layer: int = 4,
+    name: str = "",
+    saveToPDF: bool = True,
+    attribute="Bias Voltage"
+    ):
+    plot = plotClass(pathToOutput + f"Shared/")
+    axs = plot.axs
+    attributeDict = {
+        "Bias Voltage" : 48,
+        "Angle" : 86.5
+    }
+    cmap = plt.get_cmap("plasma")
+    for dataFile in dataFiles:
+        if attribute == "Bias Voltage":
+            x = dataFile.get_voltage()
+            check = dataFile.get_angle() == attributeDict["Angle"]
+            label = f"{x}V"
+        elif attribute == "Angle":
+            x = dataFile.get_angle()
+            check = dataFile.get_voltage() == attributeDict["Bias Voltage"]
+            label = f"{x} Degrees" 
+        if check:
+            crossTalkPercent = np.sum(dataFile.get_crossTalk(layer=layer))/dataFile.get_crossTalk(layer=layer).size
+            axs.scatter(x,crossTalkPercent,color = cmap((1 / attributeDict[attribute] * x)),label=label,marker="x")
+    plot.set_config(
+        axs,
+        ylim=(0, None),
+        xlim=(0,None),
+        title=f"{attribute} vs Crosstalk Percent",
+        legend=True,
+        xlabel=f"{attribute}",
+        ylabel=f"Crosstalk Percent of Total Hits",
+        )
+    # axs.set_yscale("log")
+    if attribute == "Bias Voltage":
+        axs.xaxis.set_major_locator(MultipleLocator(5))
+        axs.xaxis.set_major_formatter("{x:.2f}")
+        axs.xaxis.set_minor_locator(MultipleLocator(1))
+    elif attribute == "Angle":
+        axs.xaxis.set_major_locator(MultipleLocator(10))
+        axs.xaxis.set_major_formatter("{x:.2f}")
+        axs.xaxis.set_minor_locator(MultipleLocator(2))
+    axs.yaxis.set_major_locator(MultipleLocator(0.05))
+    axs.yaxis.set_major_formatter("{x:.0f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(0.01))
+    if saveToPDF:
+        plot.saveToPDF(f"Comparison_CrosstalkScatter_{attribute.replace(" ","_")}_{layer}{name}")
+    else:
+        return plot.fig
 
 
 
 
-    
 if __name__ == "__main__":
     import configLoader
-
+    """
     config = configLoader.loadConfig()
     config["maxClusterWidth"] = 29
     dataFiles = initDataFiles(config)
@@ -568,3 +618,17 @@ if __name__ == "__main__":
         measuredAttribute="ToT",
     )
     VoltageCalibrationHistograms(config["pathToOutput"], layer=4)
+    """
+    config = configLoader.loadConfig()
+    config["filterDict"] = {"telescope":"kit"}
+    dataFiles = initDataFiles(config)
+    Comparison_CrosstalkScatter(dataFiles,
+        config["pathToOutput"],
+        layer= 4,
+        attribute="Bias Voltage"
+    )
+    Comparison_CrosstalkScatter(dataFiles,
+        config["pathToOutput"],
+        layer= 4,
+        attribute="Angle"
+    )

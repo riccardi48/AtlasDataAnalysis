@@ -74,8 +74,11 @@ class dataAnalysis:
             attribute, excludeCrossTalk=excludeCrossTalk, **kwargs
         )
 
-    def get_crossTalk(self, recalc: bool = False) -> npt.NDArray[np.bool_]:
-        return self.dataHandler.getCrossTalk(recalc=recalc)
+    def get_crossTalk(self, recalc: bool = False,**kwargs) -> npt.NDArray[np.bool_]:
+        if "layer" in kwargs:
+            kwargs["layers"] = [kwargs["layer"]]
+            kwargs.pop("layer")
+        return self.dataHandler.getCrossTalk(recalc=recalc,**kwargs)
 
     def init_cluster_voltages(self) -> None:
         self.dataHandler.initClusterVoltages()
@@ -328,7 +331,7 @@ class dataHandler:
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
         return np.invert(self.getCrossTalk())
 
-    def getCrossTalk(self, recalc: bool = False) -> npt.NDArray[np.bool_]:
+    def getCrossTalk(self, recalc: bool = False, layers:Optional[list[int]] = None) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
             self.clusterHandler.setCalcCrossTalk(self.crossTalk)
@@ -351,6 +354,7 @@ class dataHandler:
                 self.clusterHandler.setCalcCrossTalk(self.crossTalk)
             self.calcFileManager.saveFile(self.crossTalk, attribute="crossTalk")
             toBeReturned = self.crossTalk
+        toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, False, layers)
         print_mem_usage()
         return toBeReturned
 
