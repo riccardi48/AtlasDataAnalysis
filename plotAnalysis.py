@@ -122,7 +122,7 @@ class depthAnalysis:
                 calcFileName=calcFileName, suppressText=True
             )
         if returnIndexes:
-            return toBeReturned[:-1], toBeReturned[-1]
+            return toBeReturned[:-1], toBeReturned[-1].astype(int)
         return (toBeReturned[:-1], None)
 
     def findPeak(
@@ -205,8 +205,8 @@ class depthAnalysis:
             errors = hitPositionErrorArray[i, :][hitPositionArray[i, :] != 0]
             errors = errors[np.invert(np.isnan(values))]
             values = values[np.invert(np.isnan(values))]
-            errors = errors[(values >_range[0]) & (values < _range[1])]
-            values = values[(values >_range[0]) & (values < _range[1])]
+            errors = errors[(values > _range[0]) & (values < _range[1])]
+            values = values[(values > _range[0]) & (values < _range[1])]
             if fitting == "histogram":
                 peaks[i] = self.fitPeak(values, errors=errors, returnParams=params, _range=_range)
             elif fitting == "nnlf":
@@ -237,24 +237,24 @@ class depthAnalysis:
                 peaks = np.zeros((clusterWidth, len(params)))
             else:
                 peaks = np.zeros(clusterWidth)
-            widths = np.zeros(((clusterWidth - 4 if clusterWidth < 20 else 15) - 4,2))
+            widths = np.zeros(((clusterWidth - 4 if clusterWidth < 20 else 15) - 4, 2))
             for i in range(4, (clusterWidth - 4) if clusterWidth < 20 else 15):
                 i = -i
                 values = hitPositionArray[i, :][hitPositionArray[i, :] != 0]
                 errors = hitPositionErrorArray[i, :][hitPositionArray[i, :] != 0]
                 errors = errors[np.invert(np.isnan(values))]
                 values = values[np.invert(np.isnan(values))]
-                errors = errors[(values >_range[0]) & (values < _range[1])]
-                values = values[(values >_range[0]) & (values < _range[1])]
+                errors = errors[(values > _range[0]) & (values < _range[1])]
+                values = values[(values > _range[0]) & (values < _range[1])]
                 if fitting == "histogram":
                     widths[i + 4] = self.fitPeak(
-                        values, errors=errors, returnParams=[1,2], _range=_range
+                        values, errors=errors, returnParams=[1, 2], _range=_range
                     )
                 elif fitting == "nnlf":
                     widths[i + 4] = self.fitPeak_nnlf(
                         values, errors=errors, returnParams=[1], _range=_range
                     )
-            avgWidth = np.mean(widths,axis=0)
+            avgWidth = np.mean(widths, axis=0)
             xi_bounds = (avgWidth[0] / 10, avgWidth[0] * 2)
             scale_bounds = (avgWidth[1] / 1.1, avgWidth[1] * 2)
             for i in range(clusterWidth):
@@ -262,8 +262,8 @@ class depthAnalysis:
                 errors = hitPositionErrorArray[i, :][hitPositionArray[i, :] != 0]
                 errors = errors[np.invert(np.isnan(values))]
                 values = values[np.invert(np.isnan(values))]
-                errors = errors[(values >_range[0]) & (values < _range[1])]
-                values = values[(values >_range[0]) & (values < _range[1])]
+                errors = errors[(values > _range[0]) & (values < _range[1])]
+                values = values[(values > _range[0]) & (values < _range[1])]
                 if fitting == "histogram":
                     peaks[i] = self.fitPeak(
                         values,
@@ -341,51 +341,61 @@ class depthAnalysis:
         _range: tuple[float, float] = (0.162, 2),
         x_mpv_bounds: Optional[tuple[float, float]] = None,
         xi_bounds: tuple[float, float] = (0.01, 100),
-        scale_bounds:Optional[tuple[float,float]] = None
+        scale_bounds: Optional[tuple[float, float]] = None,
     ) -> npt.NDArray[np.float64]:
         if x_mpv_bounds is None:
-            x_mpv_bounds = (0,_range[1])
-        
+            x_mpv_bounds = (0, _range[1])
+
         hist, binEdges, binCentres = self.histogramHit_Voltage(values, _range=_range)
         histErrors = histogramErrors(values, binEdges, errors)
-        Z = (1 - landau.cdf(_range[0], binCentres[np.argmax(hist)], (binCentres[np.argmax(hist)]-0.12)*0.5))
+        Z = 1 - landau.cdf(
+            _range[0], binCentres[np.argmax(hist)], (binCentres[np.argmax(hist)] - 0.12) * 0.5
+        )
         if scale_bounds is None:
-            scale_bounds = (0.8*np.sum(hist*np.diff(binEdges))/Z, 3*np.sum(hist*np.diff(binEdges))/Z)
+            scale_bounds = (
+                0.8 * np.sum(hist * np.diff(binEdges)) / Z,
+                3 * np.sum(hist * np.diff(binEdges)) / Z,
+            )
         unzippedBounds = [x_mpv_bounds, xi_bounds, scale_bounds]
         lower_bounds, upper_bounds = zip(*unzippedBounds)
         bounds = (list(lower_bounds), list(upper_bounds))
         initial_guess = [
             binCentres[3:][np.argmax(hist[3:])],
-            (binCentres[3:][np.argmax(hist[3:])]-0.5)*0.5,
+            (binCentres[3:][np.argmax(hist[3:])] - 0.5) * 0.5,
             np.average(scale_bounds),
         ]
         if initial_guess[1] < bounds[0][1]:
-            initial_guess[1] = bounds[0][1]*1.01
+            initial_guess[1] = bounds[0][1] * 1.01
         elif initial_guess[1] > bounds[1][1]:
-            initial_guess[1] = bounds[1][1]*0.98
+            initial_guess[1] = bounds[1][1] * 0.98
         if initial_guess[0] < bounds[0][0]:
-            initial_guess[0] = bounds[0][0]*1.01
+            initial_guess[0] = bounds[0][0] * 1.01
         elif initial_guess[0] > bounds[1][0]:
-            initial_guess[0] = bounds[1][0]*0.98
+            initial_guess[0] = bounds[1][0] * 0.98
         popt, pcov = scipy.optimize.curve_fit(
             landauFunc,
             binCentres[hist > 0],
             hist[hist > 0],
             p0=initial_guess,
             bounds=bounds,
-            sigma = histErrors[hist > 0]/hist[hist > 0],
+            sigma=histErrors[hist > 0] / hist[hist > 0],
             absolute_sigma=False,
             maxfev=500000,
-            xtol = 1e-6,
-            ftol = 1e-6,
-
+            xtol=1e-6,
+            ftol=1e-6,
         )
         outputErrors = np.sqrt(np.diag(pcov))
         toBeReturned = np.append(popt, outputErrors)
         return toBeReturned[returnParams]
 
     def histogramHit_Voltage(
-        self, values: npt.NDArray[np.float64], _range: tuple[float, float] = (0.162, 2),points_per_bin: int = 20,min_bin_width:Optional[float] = None , max_bin_width:Optional[float] = None) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        self,
+        values: npt.NDArray[np.float64],
+        _range: tuple[float, float] = (0.162, 2),
+        points_per_bin: int = 20,
+        min_bin_width: Optional[float] = None,
+        max_bin_width: Optional[float] = None,
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         values = values[(values >= _range[0]) & (values <= _range[1])]
         values = np.sort(values)
         if min_bin_width is None:
@@ -405,11 +415,7 @@ class depthAnalysis:
                 if n_bins < 1:
                     raise ValueError("Too few data points for the desired points per bin.")
 
-        edges = np.interp(
-            np.linspace(0, n, n_bins + 1),
-            np.arange(n),
-            values
-        )
+        edges = np.interp(np.linspace(0, n, n_bins + 1), np.arange(n), values)
 
         new_edges = [edges[0]]
         for i in range(1, len(edges)):
@@ -431,7 +437,7 @@ class depthAnalysis:
         binCentres = (binEdges[:-1] + binEdges[1:]) / 2
         hist = hist / (binEdges[1:] - binEdges[:-1])
         return hist, binEdges, binCentres
-    
+
         number = np.sum(values > range[0])
         if number > 5000:
             bins = 84
@@ -599,10 +605,11 @@ class clusterPlotter:
             y[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
                 cluster.getColumns(excludeCrossTalk=self.excludeCrossTalk)
             )
-            Hit_Voltage[
-                count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)
-            ] = getattr(cluster, "get" + z)(
-                excludeCrossTalk=self.excludeCrossTalk
+            values = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
+            if type(values) == type(np.array([])):
+                values = values - np.min(values)
+            Hit_Voltage[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
+                values
             )
             count += cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)
         display, extent = self.constructDisplay(x, y)
@@ -749,62 +756,83 @@ class correlationPlotter:
             toBeReturned = self.RowRow
         return toBeReturned
 
-def effectiveDepth(popt,pcov,threshold=0.161, GeV:int=6):
+
+def effectiveDepth(popt, pcov, threshold=0.161, GeV: int = 6):
     x = np.linspace(0, 80, 80)
-    del_x = (x[1]-x[0])/2
-    y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
-    upper = x[np.where(y>threshold)[0][-1]]
-    testVoltages = np.linspace(0,2,10000)
-    voltages = landauFunc(testVoltages,y[0]*del_x/50,(y[0]-0.09)*0.35*del_x/50,1,threshold=0)
-    voltages = voltages/(np.sum(voltages))
-    for i in range(1,len(x[x<=upper])):
-        width = (y[i]-0.09)*0.35
+    del_x = (x[1] - x[0]) / 2
+    y = chargeCollectionEfficiencyFunc(x, *popt, GeV=GeV)
+    upper = x[np.where(y > threshold)[0][-1]]
+    testVoltages = np.linspace(0, 2, 10000)
+    voltages = landauFunc(
+        testVoltages, y[0] * del_x / 50, (y[0] - 0.09) * 0.35 * del_x / 50, 1, threshold=0
+    )
+    voltages = voltages / (np.sum(voltages))
+    for i in range(1, len(x[x <= upper])):
+        width = (y[i] - 0.09) * 0.35
         if width < 0:
             width = 0
-        newVoltages = landauFunc(testVoltages,y[i]*del_x/50,width*del_x/50,1,threshold=0)
-        voltages = np.convolve(voltages,newVoltages/np.sum(newVoltages),mode="full")
-        voltages = voltages[:testVoltages.size]
-    func = lambda x,x_mpv,xi,scale: landauFunc(x,x_mpv,xi,scale,threshold=0)
-    ((x_mpv,xi,scale),(x_mpv_e,xi_e,scale_e)) = scipy.optimize.curve_fit(func,testVoltages,voltages,absolute_sigma=False,p0=[0.28,0.05,1])
-    return x_mpv/popt[0]*50
-def annotateIntegration(ax,popt,pcov,threshold=0.161, GeV:int=6):
+        newVoltages = landauFunc(
+            testVoltages, y[i] * del_x / 50, width * del_x / 50, 1, threshold=0
+        )
+        voltages = np.convolve(voltages, newVoltages / np.sum(newVoltages), mode="full")
+        voltages = voltages[: testVoltages.size]
+    func = lambda x, x_mpv, xi, scale: landauFunc(x, x_mpv, xi, scale, threshold=0)
+    ((x_mpv, xi, scale), (x_mpv_e, xi_e, scale_e)) = scipy.optimize.curve_fit(
+        func, testVoltages, voltages, absolute_sigma=False, p0=[0.28, 0.05, 1]
+    )
+    return x_mpv / popt[0] * 50
+
+
+def annotateIntegration(ax, popt, pcov, threshold=0.161, GeV: int = 6):
     (V_0, t_epi, edl) = popt
     (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
     x = np.linspace(0, 100, 500)
-    y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
-    upper = x[np.where(y>threshold)[0][-1]]
-    func = lambda x: chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
-    area,area_e = scipy.integrate.quad(func,0,upper)
-    effectiveDepth = area/(popt[0])
-    func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 - V_0_e,t_epi - t_epi_e,edl - edl_e,GeV=GeV)
-    area,area_e = scipy.integrate.quad(func,0,upper)
-    lowerError = area/(V_0 - V_0_e)
-    func = lambda x: chargeCollectionEfficiencyFunc(x, V_0 + V_0_e,t_epi + t_epi_e,edl + edl_e,GeV=GeV)
-    area,area_e = scipy.integrate.quad(func,0,upper)
-    upperError = area/(V_0 + V_0_e)
-    error = np.max([effectiveDepth-lowerError,upperError-effectiveDepth])
-    print(effectiveDepth,error)
+    y = chargeCollectionEfficiencyFunc(x, *popt, GeV=GeV)
+    upper = x[np.where(y > threshold)[0][-1]]
+    func = lambda x: chargeCollectionEfficiencyFunc(x, *popt, GeV=GeV)
+    area, area_e = scipy.integrate.quad(func, 0, upper)
+    effectiveDepth = area / (popt[0])
+    func = lambda x: chargeCollectionEfficiencyFunc(
+        x, V_0 - V_0_e, t_epi - t_epi_e, edl - edl_e, GeV=GeV
+    )
+    area, area_e = scipy.integrate.quad(func, 0, upper)
+    lowerError = area / (V_0 - V_0_e)
+    func = lambda x: chargeCollectionEfficiencyFunc(
+        x, V_0 + V_0_e, t_epi + t_epi_e, edl + edl_e, GeV=GeV
+    )
+    area, area_e = scipy.integrate.quad(func, 0, upper)
+    upperError = area / (V_0 + V_0_e)
+    error = np.max([effectiveDepth - lowerError, upperError - effectiveDepth])
+    print(effectiveDepth, error)
+
+
 def fitAndPlotCCE(
-    ax: Any, plot: plotClass, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr , GeV:int=6
+    ax: Any,
+    plot: plotClass,
+    x: npt.NDArray[np.float64],
+    y: npt.NDArray[np.float64],
+    yerr,
+    GeV: int = 6,
 ) -> None:
     popt, pcov = fitVoltageDepth(x, y, yerr, GeV=GeV)
     (V_0, t_epi, edl) = popt
     (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
     x = np.linspace(0, 120, 1000)
-    y = chargeCollectionEfficiencyFunc(x, *popt,GeV=GeV)
+    y = chargeCollectionEfficiencyFunc(x, *popt, GeV=GeV)
     ax.plot(
         x,
         y,
         color=plot.colorPalette[0],
         linestyle="dashed",
     )
-    
+
     possibleLines = np.random.default_rng().multivariate_normal(popt, pcov, 1000)
     ylist = [
-        chargeCollectionEfficiencyFunc(x, param[0], param[1], param[2],GeV=GeV) for param in possibleLines
+        chargeCollectionEfficiencyFunc(x, param[0], param[1], param[2], GeV=GeV)
+        for param in possibleLines
     ]
     ylist = [
-        chargeCollectionEfficiencyFunc(x, _V_0, _t_epi, _edl,GeV=GeV)
+        chargeCollectionEfficiencyFunc(x, _V_0, _t_epi, _edl, GeV=GeV)
         for _V_0 in [V_0 - V_0_e, V_0 + V_0_e]
         for _t_epi in [t_epi - t_epi_e, t_epi + t_epi_e]
         for _edl in [edl - edl_e, edl + edl_e]
@@ -812,12 +840,18 @@ def fitAndPlotCCE(
     ax.fill_between(
         x, np.min(ylist, axis=0), np.max(ylist, axis=0), color=plot.colorPalette[6], zorder=-1
     )
-    ax.text(0.98, 0.98, f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
+    ax.text(
+        0.98,
+        0.98,
+        f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
         + f"edl    :{edl:.3f} ± {edl_e:.3f}",
-     horizontalalignment='right',
-     verticalalignment='top',
-     transform = ax.transAxes)
-    #annotateIntegration(ax,popt,pcov, GeV=GeV)
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax.transAxes,
+    )
+    # annotateIntegration(ax,popt,pcov, GeV=GeV)
+
+
 def fit_dataFile(
     dataFile: dataAnalysis,
     depth: depthAnalysis,
@@ -825,8 +859,8 @@ def fit_dataFile(
     hideLowWidths: bool = True,
     fitting: str = "histogram",
     measuredAttribute: str = "Hit_Voltage",
-    GeV:int=6,
-    maxClusterWidth:Optional[int] = None
+    GeV: int = 6,
+    maxClusterWidth: Optional[int] = None,
 ):
     if maxClusterWidth is None:
         maxClusterWidth = depth.maxClusterWidth
@@ -850,13 +884,15 @@ def fit_dataFile(
             upTwo=False,
         )
         y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute=measuredAttribute)
-        #if measuredAttribute == "Hit_Voltage":
+        # if measuredAttribute == "Hit_Voltage":
         #    y, y_err = depth.findPeak(dataFile, i, fitting=fitting, measuredAttribute="ToT")
         #    y_err = y_err * (lambert_W_ToT_to_u(y, 0.161, 8, 110, 70) / y)
         #    y = lambert_W_ToT_to_u(y, 0.161, 8, 110, 70)
-        #if i < 20:
+        # if i < 20:
         #    y, y_err = adjustPeakVoltage(y, y_err, d, i)
-        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87):
+        if not hideLowWidths or (
+            np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87
+        ):
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
             allYValuesErrors = allYValues + list(y_err[1:-1])
@@ -866,9 +902,10 @@ def fit_dataFile(
     y = allYValues_np[np.argsort(allXValues_np)]
     yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
     x = allXValues_np[np.argsort(allXValues_np)]
-    cut = (y>0.1) & (x < d*50*0.85)
-    popt, pcov = fitVoltageDepth(x[cut], y[cut], yerr[cut],GeV=GeV)
+    cut = (y > 0.1) & (x < d * 50 * 0.85)
+    popt, pcov = fitVoltageDepth(x[cut], y[cut], yerr[cut], GeV=GeV)
     return popt, pcov, x[cut], y[cut], yerr[cut]
+
 
 if __name__ == "__main__":
     pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
@@ -884,4 +921,3 @@ if __name__ == "__main__":
         excludeCrossTalk=True,
     )
     depth.findPeak(dataFile, 10)
-

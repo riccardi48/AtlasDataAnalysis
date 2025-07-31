@@ -19,10 +19,10 @@ def Clusters(
     plotter = clusterPlotter(dataFile, excludeCrossTalk=excludeCrossTalk)
     clusters = dataFile.get_clusters(layer=layer, excludeCrossTalk=excludeCrossTalk)
     dataFile.init_cluster_voltages()
-    firstTS = clusters[1000].getTSs(excludeCrossTalk=excludeCrossTalk)[0]
+    firstTS = clusters[1000].getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0]
     # firstTS = dataFile.get_base_attr("ext_TS", excludeCrossTalk=excludeCrossTalk)[50000]
-    lastTs = firstTS + 100 / (25 / 1000000)
-    TSs = np.array([cluster.getTSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
+    lastTs = firstTS + 300 / (25 / 1000000)
+    TSs = np.array([cluster.getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
     clusters = clusters[(TSs <= lastTs) & (TSs >= firstTS)]
     # clusters = dataFile.get_clusters(layer=layer,excludeCrossTalk=excludeCrossTalk)[:40]
     im = plotter.plotClusters(axs, clusters, z=z)

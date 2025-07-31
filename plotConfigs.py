@@ -994,6 +994,8 @@ if __name__ == "__main__":
     config["filterDict"] = {"telescope":"kit"}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2","angle6_6Gev_kitHV6_kit_10"]}
+    config["maxClusterWidth"] = 29
+    config["filterDict"] = {"telescope":"lancs"}
     dataFiles = initDataFiles(config)
     for dataFile in dataFiles:
         depth = depthAnalysis(
