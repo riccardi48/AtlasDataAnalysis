@@ -9,9 +9,6 @@ from lowLevelFunctions import (
     fitVoltageDepth,
     chargeCollectionEfficiencyFunc,
     calcDepth,
-    lambert_W_ToT_to_u,
-    adjustPeakVoltage,
-
 )
 import matplotlib.pyplot as plt
 from matplotlib import patheffects
@@ -346,15 +343,12 @@ class depthAnalysis:
         xi_bounds: tuple[float, float] = (0.01, 100),
         scale_bounds:Optional[tuple[float,float]] = None
     ) -> npt.NDArray[np.float64]:
-        # x_mpv_bounds=(0.2, 1.4), xi_bounds=(0.01, 1)):
         if x_mpv_bounds is None:
             x_mpv_bounds = (0,_range[1])
         
         hist, binEdges, binCentres = self.histogramHit_Voltage(values, _range=_range)
         histErrors = histogramErrors(values, binEdges, errors)
         Z = (1 - landau.cdf(_range[0], binCentres[np.argmax(hist)], (binCentres[np.argmax(hist)]-0.12)*0.5))
-        #print(Z)
-        #print(Z * np.sum(hist*np.diff(binEdges))*0.5)
         if scale_bounds is None:
             scale_bounds = (0.8*np.sum(hist*np.diff(binEdges))/Z, 3*np.sum(hist*np.diff(binEdges))/Z)
         unzippedBounds = [x_mpv_bounds, xi_bounds, scale_bounds]
@@ -373,10 +367,6 @@ class depthAnalysis:
             initial_guess[0] = bounds[0][0]*1.01
         elif initial_guess[0] > bounds[1][0]:
             initial_guess[0] = bounds[1][0]*0.98
-        # print(histErrors)
-        # print(hist)
-        #print(initial_guess)
-        #print(bounds)
         popt, pcov = scipy.optimize.curve_fit(
             landauFunc,
             binCentres[hist > 0],
@@ -391,12 +381,7 @@ class depthAnalysis:
 
         )
         outputErrors = np.sqrt(np.diag(pcov))
-        #cut = (values > popt[0]*0.8) & (values < popt[0]*1.2)
-        #if outputErrors[0] < (np.sum(errors[cut]))/(np.sum(cut)**1.25):
-        #    outputErrors[0] = (np.sum(errors[cut]))/(np.sum(cut)**1.25)
         toBeReturned = np.append(popt, outputErrors)
-        # if toBeReturned[3] < (binCentres[1]-binCentres[0])/5:
-        #    toBeReturned[3] = (binCentres[1]-binCentres[0])/5
         return toBeReturned[returnParams]
 
     def histogramHit_Voltage(
@@ -411,7 +396,6 @@ class depthAnalysis:
         n = len(values)
         n_bins = n // points_per_bin
 
-        # Make sure we have enough data
         if n_bins < 1:
             points_per_bin = 10
             n_bins = n // points_per_bin
@@ -421,14 +405,12 @@ class depthAnalysis:
                 if n_bins < 1:
                     raise ValueError("Too few data points for the desired points per bin.")
 
-        # Choose edges such that each bin has ~equal number of points
         edges = np.interp(
             np.linspace(0, n, n_bins + 1),
             np.arange(n),
             values
         )
 
-        # Step 2: Enforce minimum bin width
         new_edges = [edges[0]]
         for i in range(1, len(edges)):
             proposed_edge = edges[i]
@@ -436,24 +418,20 @@ class depthAnalysis:
             width = proposed_edge - last_edge
 
             if width < min_bin_width:
-                # Skip this edge, bin too small
                 continue
             elif width > max_bin_width:
-                # Split the bin into smaller chunks
                 num_subbins = int(np.ceil(width / max_bin_width))
                 sub_edges = np.linspace(last_edge, proposed_edge, num_subbins + 1)[1:]
                 new_edges.extend(sub_edges)
             else:
                 new_edges.append(proposed_edge)
 
-        # Step 3: Histogram with filtered bin edges
         final_edges = np.array(new_edges)
         hist, binEdges = np.histogram(values, bins=final_edges)
         binCentres = (binEdges[:-1] + binEdges[1:]) / 2
         hist = hist / (binEdges[1:] - binEdges[:-1])
         return hist, binEdges, binCentres
-
-        
+    
         number = np.sum(values > range[0])
         if number > 5000:
             bins = 84
@@ -508,26 +486,6 @@ class depthAnalysis:
                     ]
                 )
             )
-            - dataFile.get_angle()
-        ) ** 2
-        bins = np.rad2deg(bins)
-        binCentres1 = (bins[:-1] + bins[1:]) / 2
-        peaks1, properties1 = scipy.signal.find_peaks(values[ignoreFirst:], width=2, height=0)
-        bins, values = self.findClusterAngleDistribution(dataFile, d, maxColumnWidth=2)
-        bins = np.rad2deg(bins)
-        binCentres2 = (bins[:-1] + bins[1:]) / 2
-        peaks2, properties2 = scipy.signal.find_peaks(values[ignoreFirst:], width=2, height=0)
-        # print(binCentres1[peaks1])
-        # print(properties1)
-        # print(binCentres2[peaks2])
-        # print(properties2)
-        if len(peaks1) == 0 or len(peaks2) == 0:
-            return (binCentres1[maxValueIndex] - dataFile.get_angle()) ** 2 * 2
-        return (
-            binCentres1[peaks1[np.argmax(properties1["peak_heights"])] + ignoreFirst]
-            - dataFile.get_angle()
-        ) ** 2 + (
-            binCentres2[peaks2[np.argmax(properties2["peak_heights"])] + ignoreFirst]
             - dataFile.get_angle()
         ) ** 2
 
@@ -645,7 +603,7 @@ class clusterPlotter:
                 count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)
             ] = getattr(cluster, "get" + z)(
                 excludeCrossTalk=self.excludeCrossTalk
-            )  # cluster.getHit_Voltages(excludeCrossTalk = self.excludeCrossTalk)
+            )
             count += cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)
         display, extent = self.constructDisplay(x, y)
         display = self.addToDisplay(display, x, y, Hit_Voltage)
@@ -830,7 +788,6 @@ def fitAndPlotCCE(
     ax: Any, plot: plotClass, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr , GeV:int=6
 ) -> None:
     popt, pcov = fitVoltageDepth(x, y, yerr, GeV=GeV)
-    # pcov = pcov / scipy.stats.chisquare(popt).statistic/(np.sum(cut)-3)
     (V_0, t_epi, edl) = popt
     (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
     x = np.linspace(0, 120, 1000)
@@ -860,7 +817,7 @@ def fitAndPlotCCE(
      horizontalalignment='right',
      verticalalignment='top',
      transform = ax.transAxes)
-    annotateIntegration(ax,popt,pcov, GeV=GeV)
+    #annotateIntegration(ax,popt,pcov, GeV=GeV)
 def fit_dataFile(
     dataFile: dataAnalysis,
     depth: depthAnalysis,
@@ -899,7 +856,7 @@ def fit_dataFile(
         #    y = lambert_W_ToT_to_u(y, 0.161, 8, 110, 70)
         #if i < 20:
         #    y, y_err = adjustPeakVoltage(y, y_err, d, i)
-        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 85 and np.rad2deg(np.arctan(i / d)) < 87):
+        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87):
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
             allYValuesErrors = allYValues + list(y_err[1:-1])

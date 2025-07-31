@@ -17,8 +17,6 @@ import numpy.typing as npt
 from glob import glob
 from typing import Optional, Any, TypeAlias
 import configLoader
-from collections import defaultdict
-
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
 
@@ -74,7 +72,7 @@ class dataAnalysis:
             attribute, excludeCrossTalk=excludeCrossTalk, **kwargs
         )
 
-    def get_crossTalk(self, recalc: bool = False,**kwargs) -> npt.NDArray[np.bool_]:
+    def get_crossTalk(self, recalc: bool = False, **kwargs) -> npt.NDArray[np.bool_]:
         if "layer" in kwargs:
             if kwargs["layer"] is None:
                 kwargs["layers"] = None
@@ -82,7 +80,7 @@ class dataAnalysis:
             else:
                 kwargs["layers"] = [kwargs["layer"]]
                 kwargs.pop("layer")
-        return self.dataHandler.getCrossTalk(recalc=recalc,**kwargs)
+        return self.dataHandler.getCrossTalk(recalc=recalc, **kwargs)
 
     def init_cluster_voltages(self) -> None:
         self.dataHandler.initClusterVoltages()
@@ -335,7 +333,9 @@ class dataHandler:
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
         return np.invert(self.getCrossTalk())
 
-    def getCrossTalk(self, recalc: bool = False, layers:Optional[list[int]] = None,initClusters:bool=True) -> npt.NDArray[np.bool_]:
+    def getCrossTalk(
+        self, recalc: bool = False, layers: Optional[list[int]] = None, initClusters: bool = True
+    ) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
             if initClusters:
@@ -614,7 +614,7 @@ class clusterHandler:
             filter = self.layerFilter(self.clusters, layers=layers)
         elif attribute == "Times":
             toBeReturned = np.array(
-                [np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self.clusters]
+                [np.min([cluster.getTSs(excludeCrossTalk)]) for cluster in self.clusters]
             )
             toBeReturned = TStoMS(toBeReturned.astype(int) - int(np.min(toBeReturned)))
             filter = self.layerFilter(self.clusters, layers=layers)
@@ -787,19 +787,3 @@ def initDataFiles(config: dict = {}) -> list[dataAnalysis]:
         filterDict=config["filterDict"],
     )
     return dataFiles
-
-
-if __name__ == "__main__":
-    pathToData = "/home/atlas/rballard/for_magda/data/Cut/202204071531_udp_beamonall_angle6_6Gev_kit_4_decode.dat"
-    pathToOutput = "/home/atlas/rballard/AtlasDataAnalysis/output"
-    pathToCalcData = "/home/atlas/rballard/AtlasDataAnalysis/calculatedData"
-    dataFile = dataAnalysis(pathToData, pathToCalcData, maxLine=100000)
-    print(dataFile.get_angle())
-    print(dataFile.get_base_attr("ToT")[0].shape)
-    print(dataFile.get_base_attr("Hit_Voltage", returnIndexes=True, layers=[4])[0])
-    print(dataFile.get_base_attr("ToT", excludeCrossTalk=True)[0].shape)
-    print(dataFile.get_cluster_attr("Sizes")[0].shape)
-    print(dataFile.get_cluster_attr("RowWidths", excludeCrossTalk=True)[0].shape)
-    print(dataFile.get_cluster_attr("ColumnWidths", excludeCrossTalk=True, layers=[4])[0].shape)
-    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True)[0].shape)
-    print(dataFile.get_cluster_attr("Sizes", excludeCrossTalk=True, layers=[4])[0].shape)

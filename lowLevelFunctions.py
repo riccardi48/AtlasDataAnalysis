@@ -4,7 +4,7 @@ from landau import landau
 import psutil
 import os
 import numpy.typing as npt
-from typing import Optional, Any, TypeAlias, Union
+from typing import Optional, TypeAlias, Union
 from clusterClass import clusterClass
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
@@ -94,9 +94,7 @@ def calcHit_Voltage(
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(
-            lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c)
-        )
+        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
     return hit_voltage
 
 
@@ -115,9 +113,7 @@ def calcHit_VoltageError(
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(
-            lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c)
-        )
+        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
         upper = lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0, a, b, c)
         lower = lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0, a, b, c)
         upperError = upper - hit_voltage[Layers == k]
@@ -127,12 +123,12 @@ def calcHit_VoltageError(
 
 
 def lambert_W_ToT_to_u(
-    ToT: Union[npt.NDArray[np.int_]|npt.NDArray[np.float64]| float| int],
-    u_0: Union[npt.NDArray[np.float64]| float],
-    a: Union[npt.NDArray[np.float64]| float],
-    b: Union[npt.NDArray[np.float64]| float],
-    c: Union[npt.NDArray[np.float64]| float],
-) -> Union[npt.NDArray[np.float64]| float]:
+    ToT: Union[npt.NDArray[np.int_] | npt.NDArray[np.float64] | float | int],
+    u_0: Union[npt.NDArray[np.float64] | float],
+    a: Union[npt.NDArray[np.float64] | float],
+    b: Union[npt.NDArray[np.float64] | float],
+    c: Union[npt.NDArray[np.float64] | float],
+) -> Union[npt.NDArray[np.float64] | float]:
     u = u_0 + (a / b) * scipy.special.lambertw((b / a) * u_0 * np.exp((ToT - c - (b * u_0)) / a))
     return np.real(u)
 
@@ -199,23 +195,30 @@ def calcClusters(
     print(f"{len(clusters)} clusters found")
     return clusters
 
-def checkDirection(values,x,width):
-    if width <=6 or len(values) <= 3:
+
+def checkDirection(values, x, width):
+    if width <= 6 or len(values) <= 3:
         return True
     gaps = np.where(np.diff(x) > 1)[0]
-    #print(f"gaps: {gaps}")
     if gaps.size > 0:
-        if np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)) > np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)):
+        if np.sum(
+            (x[gaps] - np.min(x) > width / 2) | (x[gaps + 1] - np.min(x) > width / 2)
+        ) > np.sum((x[gaps] - np.min(x) > width / 2) | (x[gaps + 1] - np.min(x) > width / 2)):
             rightToLeft = False
-        elif np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)) < np.sum((x[gaps]-np.min(x) > width/2)|(x[gaps+1]-np.min(x) > width/2)):
+        elif np.sum(
+            (x[gaps] - np.min(x) > width / 2) | (x[gaps + 1] - np.min(x) > width / 2)
+        ) < np.sum((x[gaps] - np.min(x) > width / 2) | (x[gaps + 1] - np.min(x) > width / 2)):
             rightToLeft = True
-    
-    if 'rightToLeft' not in locals():
+
+    if "rightToLeft" not in locals():
         try:
-            gradient = np.average(np.gradient(values[1:-1],x[1:-1]),weights=np.diff(x[:-1]))/np.average(x[1:-1])*len(x[1:-1])
+            gradient = (
+                np.average(np.gradient(values[1:-1], x[1:-1]), weights=np.diff(x[:-1]))
+                / np.average(x[1:-1])
+                * len(x[1:-1])
+            )
         except:
-            print(width,values,x)
-        #print(f"gradient: {gradient}")
+            print(width, values, x)
         if gradient > 0.001:
             rightToLeft = True
         elif gradient < -0.001:
@@ -224,6 +227,8 @@ def checkDirection(values,x,width):
             # Default is true as beam is going right to left
             rightToLeft = True
     return rightToLeft
+
+
 def calcHit_VoltageByPixel(
     clusters: clusterArray,
     clusterWidths: npt.NDArray[np.int_],
@@ -254,14 +259,13 @@ def calcHit_VoltageByPixel(
             width > 0
             and width <= maxClusterWidth
             and len(np.unique(cluster.getColumns(excludeCrossTalk))) == 1
-            and cluster.getSize(excludeCrossTalk) > width/3
+            and cluster.getSize(excludeCrossTalk) > width / 3
         ):
             Hit_Voltages = np.zeros(width, dtype=float)
             Hit_VoltageErrors = np.zeros(width, dtype=float)
             sort_array = np.argsort(cluster.getRows(excludeCrossTalk))
-            # Hit_Voltage = Hit_Voltages[cluster]
             x = cluster.getRows(excludeCrossTalk)[sort_array]
-            
+
             if measuredAttribute == "Hit_Voltage":
                 values = cluster.getHit_Voltages(excludeCrossTalk)[sort_array]
                 errors = cluster.getHit_VoltageErrors(excludeCrossTalk)[sort_array]
@@ -269,17 +273,13 @@ def calcHit_VoltageByPixel(
                 values = cluster.getToTs(excludeCrossTalk)[sort_array]
                 errors = cluster.getToTErrors(excludeCrossTalk)[sort_array]
             index = (x - np.min(x)).astype(int)
-            #print(f"rightToLeft: {checkDirection(values,x,width)}")
-            #print(f"x :{x}")
-            #print(f"values: {values}")
-            if checkDirection(values,x,width):
+            if checkDirection(values, x, width):
                 values = np.flip(values)
                 errors = np.flip(errors)
                 index = np.flip(index)
-            #input("---------")
+            # input("---------")
             Hit_Voltages[index] = values
             Hit_VoltageErrors[index] = errors
-            # Hit_Voltage = Hit_Voltage[np.argsort(x)]
             if counts[width - 2] < np.max(unique_counts):
                 hitPositionArray[width - 2, :width, counts[width - 2]] = Hit_Voltages
                 hitPositionErrorArray[width - 2, :width, counts[width - 2]] = Hit_VoltageErrors
@@ -321,7 +321,7 @@ def landauFunc(
     x_mpv: npt.NDArray[np.float64],
     xi: npt.NDArray[np.float64],
     scaler: npt.NDArray[np.float64],
-    threshold: float = 0.16
+    threshold: float = 0.16,
 ) -> npt.NDArray[np.float64]:
     y = landau.pdf(x, x_mpv, xi) * scaler
     y = np.reshape(y, np.size(y))
@@ -419,7 +419,6 @@ def histogramErrors(
     ) ** 2
     histErrors[0] += np.sqrt(np.sum(errorOut))
     for i in range(len(binEdges[1:])):
-        # print(len(values),len(errors))
         inRange = (values > binEdges[i]) & (values < binEdges[i + 1])
         errorOut = (
             gaussianCDFFunc(binEdges[i + 1], values[np.invert(inRange)], errors[np.invert(inRange)])
@@ -430,15 +429,19 @@ def histogramErrors(
             + (1 - gaussianCDFFunc(binEdges[i + 1], values[inRange], errors[inRange]))
         ) ** 2
         histErrors[i] += np.sqrt(np.sum(np.append(errorOut, errorIn)))
-        # print(gaussianCDFFunc(binEdges[i+1],values,errors),gaussianCDFFunc(binEdges[i+1],values,errors))
-        # histErrors[i] = np.sum([scipy.integrate.quad(gaussianFunc,binEdges[i],binEdges[i+1],args=(value,error)) for value,error in zip(values,errors)])
     histErrors[histErrors < 4] = 4
     if np.max(binEdges) < 100:
-        histErrors[binEdges[1:] < 0.3] = histErrors[binEdges[1:] < 0.3]*1*np.exp(-(binEdges[1:][binEdges[1:] < 0.3]-0.16)/0.5)
+        histErrors[binEdges[1:] < 0.3] = (
+            histErrors[binEdges[1:] < 0.3]
+            * 1
+            * np.exp(-(binEdges[1:][binEdges[1:] < 0.3] - 0.16) / 0.5)
+        )
     else:
-        histErrors[binEdges[1:] < 10] = histErrors[binEdges[1:] < 10]*3*np.exp(-binEdges[1:][binEdges[1:] < 10]/15)
-    histErrors = histErrors  / (binEdges[1:] - binEdges[:-1])
-    return histErrors# * ((binEdges[1:] - binEdges[:-1])/np.min(np.diff(binEdges)))**2
+        histErrors[binEdges[1:] < 10] = (
+            histErrors[binEdges[1:] < 10] * 3 * np.exp(-binEdges[1:][binEdges[1:] < 10] / 15)
+        )
+    histErrors = histErrors / (binEdges[1:] - binEdges[:-1])
+    return histErrors
 
 
 def chargeCollectionEfficiencyFunc(
@@ -447,31 +450,35 @@ def chargeCollectionEfficiencyFunc(
     t_epi: npt.NDArray[np.float64],
     edl: npt.NDArray[np.float64],
     base: float = 0,
-    GeV:Optional[int]=None
+    GeV: Optional[int] = None,
 ) -> npt.NDArray[np.float64]:
-    
+
     if GeV is not None:
         if GeV == 4:
             base = 0.00
         elif GeV == 6:
             base = 0.00
-    depth = np.reshape(depth,np.size(depth))
+    depth = np.reshape(depth, np.size(depth))
     voltage = np.zeros(depth.shape)
     voltage[depth < t_epi] = V_0
-    voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0-base) + base
-    #voltage[voltage < base] = base
+    voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0 - base) + base
     return voltage
 
 
 def fitVoltageDepth(
-    x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], yerr: npt.NDArray[np.float64] , GeV:int=6
+    x: npt.NDArray[np.float64],
+    y: npt.NDArray[np.float64],
+    yerr: npt.NDArray[np.float64],
+    GeV: int = 6,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     unzippedBounds = [(0, np.inf), (0, 100), (1, np.inf)]
     lower_bounds, upper_bounds = zip(*unzippedBounds)
     bounds = (list(lower_bounds), list(upper_bounds))
     initial_guess = [0.25, 10, 50]
     cut = x > 0  # (x<70) & (y > 0.17)
-    func = lambda depth,V_0,t_epi,edl:chargeCollectionEfficiencyFunc(depth,V_0,t_epi,edl,GeV=GeV)
+    func = lambda depth, V_0, t_epi, edl: chargeCollectionEfficiencyFunc(
+        depth, V_0, t_epi, edl, GeV=GeV
+    )
     popt, pcov = scipy.optimize.curve_fit(
         func,
         x[cut],
@@ -485,7 +492,9 @@ def fitVoltageDepth(
     return popt, pcov
 
 
-def depletionWidthFunc(V: npt.NDArray[np.float64], a: float, b: float,c:float = 0) -> npt.NDArray[np.float64]:
+def depletionWidthFunc(
+    V: npt.NDArray[np.float64], a: float, b: float, c: float = 0
+) -> npt.NDArray[np.float64]:
     return np.sqrt(a * (V + b)) + c
 
 
@@ -496,4 +505,3 @@ def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.
         firstTS1024 = firstTS % 1024
         new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs() % 1024) - firstTS1024)
     return new_ext_TS.astype(np.int_)
-

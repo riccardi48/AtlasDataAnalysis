@@ -7,6 +7,12 @@ def setConfigDefaults():
     with open(path, "w") as f:
         json.dump(config, f)
 
+# filterDict = {
+# "telescope" : ["kit","lancs"],
+# "voltage" : [0,2,4,6,8,10,15,20,30,48],
+# "angle" : [0,11,20.5,28,40.5.45.86.5]
+# "fileName" : ["angle6_4Gev_kit_2",...]
+# }
 
 def defaultConfig():
     config = {

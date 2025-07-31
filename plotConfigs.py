@@ -76,9 +76,6 @@ def AngleDistribution_2(
     axs.stairs(
         values, np.rad2deg(bins), label=f"{d*50:.2f} μm", baseline=None, color=plot.colorPalette[3]
     )
-    # bins, values = depth.findClusterAngleDistribution(dataFile, d,maxColumnWidth=2)
-    # axs.stairs(values, np.rad2deg(bins), label=f"{d*50:.2f} μm - 2 Column Widths", baseline=None, color=plot.colorPalette[0])
-
     plot.set_config(
         axs,
         ylim=(0, None),
@@ -180,11 +177,6 @@ def RowWidthDistribution(
     bins = 60
     range = (0, 60)
     rowsWidths, _ = dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True)
-    # times = dataFile.get_cluster_attr("Times",layer=layer,excludeCrossTalk = True)
-    # print(np.min(times),np.max(times))
-    minTime = 100000
-    maxTime = 200000
-    # rowsWidths = rowsWidths[(times > minTime) & (times < maxTime)]
     height, x = np.histogram(rowsWidths, bins=bins, range=range)
     axs.bar(x[:-1], height, width=1, color=plot.colorPalette[3])
     plot.set_config(
@@ -196,7 +188,6 @@ def RowWidthDistribution(
         xlabel="Row Width [px]",
         ylabel="Frequency",
     )
-    # axs.set_yscale("log")
     axs.xaxis.set_major_locator(MultipleLocator(50))
     axs.xaxis.set_major_formatter("{x:.0f}")
     axs.xaxis.set_minor_locator(MultipleLocator(10))
@@ -245,7 +236,7 @@ def VoltageDepthScatter(
         #    y_err = y_err * (lambert_W_ToT_to_u(y, 0.161, 8, 110, 70) / y)
         #    y = lambert_W_ToT_to_u(y, 0.161, 8, 110, 70)
         # y, y_err = adjustPeakVoltage(y, y_err, d, i)
-        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 86 and np.rad2deg(np.arctan(i / d)) < 87):
+        if not hideLowWidths or (np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87):
             axs.scatter(
                 x, y, color=cmap((i - 2) / depth.maxClusterWidth), marker="x", s=15, label=str(i)
             )
@@ -260,22 +251,7 @@ def VoltageDepthScatter(
             )
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
-            # allXValuesErrors = allXValues+list()
             allYValuesErrors = allYValues + list(y_err[1:-1])
-        if i == int(np.floor((d * np.tan(np.deg2rad(dataFile.get_angle()))))):
-            # axs.plot(x, y, color=plot.colorPalette[3], linestyle="dashed")
-            if annotate:
-                axs.annotate(
-                    f"Expected width of {i}",
-                    (x[-2], y[-2]),
-                    (x[-2] * 1.1, y[-2] * 1.1),
-                    axs.transData,
-                    axs.transData,
-                    color=plot.colorPalette[3],
-                    fontweight="bold",
-                    horizontalalignment="left",
-                    verticalalignment="bottom",
-                )
 
     rightSide = axs.get_xlim()[1]
     allXValues_np = np.array(allXValues)
@@ -379,7 +355,6 @@ def Hit_VoltageDistributionByPixel(
         _range=_range,
         params=[0, 1, 2, 3, 4, 5],
     )
-    #params_nnlf = depth.findPeaks_widthRestricted(hitPositionArray,fitting="nnlf",_range=(0.162, 2),params=[0,1])
     for j in range(clusterWidth):
         values = hitPositionArray[j][hitPositionArray[j] != 0]
         errors = hitPositionErrorArray[j][hitPositionArray[j] != 0]
@@ -566,11 +541,7 @@ def HitDistributionInClusterAllOnOne(
             x,
             color=cmap((clusterWidth) / (depth.maxClusterWidth)),
             baseline=None,
-            #label=f"{clusterWidth}",
         )
-        # for j in range(clusterWidth):
-        #    heights[j] = np.sum(hitPositionArray[j]>0.162)
-        # axs.stairs(heights, x, color=plot.colorPalette[0])
     popt, pcov, _, __, ___ = fit_dataFile(
             dataFile,
             depth,
@@ -583,7 +554,6 @@ def HitDistributionInClusterAllOnOne(
         )
     x = np.linspace(0, np.max(x), 1000)
     MPVs = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
-    #print(MPVs)
     y = np.zeros(x.size)
     def func(x,m,c):
         return m*x+c
@@ -594,14 +564,12 @@ def HitDistributionInClusterAllOnOne(
             width = 0.001
         y[i] = (1 - landau.cdf(0.161, MPV, width))
     y=y/y[0]
-    #print(y)
     axs.plot(x[MPVs > 0.04], y[MPVs > 0.04], linestyle="dashed", label="Expected", color=plot.colorPalette[3])
     for i,MPV in enumerate(MPVs):
         width = (MPV-0.09)*0.4
         if width < 0.001:
             width = 0.001
         y[i] = (1 - landau.cdf(0.161, MPV, width))
-    #print(y)
     y=y/y[0]
     axs.plot(x[MPVs > 0.09], y[MPVs > 0.09], linestyle="dashed", label="Expected", color=plot.colorPalette[2])
     plot.set_config(
@@ -1023,29 +991,26 @@ if __name__ == "__main__":
     import configLoader
 
     config = configLoader.loadConfig()
-    #config["filterDict"] = {"telescope":"kit","voltage":[48],"angle":[86.5]}
+    config["filterDict"] = {"telescope":"kit"}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
-    config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2","angle6_6Gev_kitHV6_kit_10"]}
+    #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2","angle6_6Gev_kitHV6_kit_10"]}
     dataFiles = initDataFiles(config)
-    config["maxClusterWidth"] = 50
     for dataFile in dataFiles:
         depth = depthAnalysis(
             config["pathToCalcData"],
             maxLine=config["maxLine"],
-            maxClusterWidth=30,
+            maxClusterWidth=config["maxClusterWidth"],
             layers=config["layers"],
             excludeCrossTalk=config["excludeCrossTalk"],
         )
-        
         AngleDistribution(dataFile, depth, config["pathToOutput"])
         WidthDistribution(dataFile, depth, config["pathToOutput"])
-        #AngleDistribution_2(dataFile, depth, config["pathToOutput"])
+        AngleDistribution_2(dataFile, depth, config["pathToOutput"])
         ColumnWidthDistribution(dataFile, config["pathToOutput"], layer=4)
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=4)
         ColumnWidthDistribution(dataFile, config["pathToOutput"], layer=1)
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=1)
         ClustersCountOverTime(dataFile, config["pathToOutput"])
-        """
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1091,7 +1056,6 @@ if __name__ == "__main__":
             depthCorrection=False,
             hideLowWidths=False,
         )
-        """
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1100,7 +1064,6 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=True,
         )
-        """
         VoltageDepthScatter(
             dataFile,
             depth,
@@ -1117,7 +1080,7 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=False,
         )
-        
+        """
         LandauMPVWidthScatter(
             dataFile,
             depth,
@@ -1133,13 +1096,6 @@ if __name__ == "__main__":
             _range=(0,256)
             )
         """
-        depth = depthAnalysis(
-            config["pathToCalcData"],
-            maxLine=config["maxLine"],
-            maxClusterWidth=50,
-            layers=config["layers"],
-            excludeCrossTalk=config["excludeCrossTalk"],
-        )
         HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
         if config["maxClusterWidth"] > 15:
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=15)
@@ -1150,14 +1106,11 @@ if __name__ == "__main__":
                 HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=16,vmax=config["maxClusterWidth"])
         else:
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
-        
-        #CuttingComparison(dataFile,config["pathToOutput"],layer=config["pathToOutput"])
-        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=False,maxLine=config["maxLine"])
-        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=True,maxLine=config["maxLine"])
-        """
-        iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27,32,35,38,45]
+        CuttingComparison(dataFile,config["pathToOutput"],layer=config["pathToOutput"])
+        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=False,maxLine=config["maxLine"])
+        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=True,maxLine=config["maxLine"])
+        iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
         for i in iList:
             HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
-            #Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
+            Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
             Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],_range=(0.162, 1))
-        """

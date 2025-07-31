@@ -55,7 +55,6 @@ dataFiles = filterDataFiles(
     filterDict=config["filterDict"],
 )
 for dataFile in dataFiles:
-    #dataFile.get_base_attr("Row",excludeCrossTalk = True)
     RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=False,recalc=False,log=True)
     RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=True,recalc=False,log=True)
     clusters = dataFile.get_clusters(layers=[4])

@@ -12,6 +12,7 @@ from typing import Optional, Union
 import numpy.typing as npt
 import pandas as pd
 
+
 def Comparison_RowWidthDistribution(
     dataFiles: list[dataAnalysis],
     pathToOutput: str,
@@ -37,8 +38,6 @@ def Comparison_RowWidthDistribution(
         times, _ = dataFile.get_cluster_attr(
             "Times", layer=layer, excludeCrossTalk=excludeCrossTalk
         )
-        # print(f"{np.min(times):.0f}")
-        # print(f"{np.max(times):.0f}")
         if minTimes is not None and maxTimes is not None:
             minTime = minTimes[i]
             maxTime = maxTimes[i]
@@ -62,7 +61,6 @@ def Comparison_RowWidthDistribution(
         xlabel="Row Width [px]",
         ylabel="Frequency",
     )
-    # axs.set_yscale("log")
     axs.xaxis.set_major_locator(MultipleLocator(5))
     axs.xaxis.set_major_formatter("{x:.0f}")
     axs.xaxis.set_minor_locator(MultipleLocator(1))
@@ -82,12 +80,16 @@ def Comparison_ClustersCountOverTime(
     name: str = "",
     saveToPDF: bool = True,
     returnFirstPeaks: bool = False,
+    excludeCrossTalk: bool = True,
 ) -> tuple[npt.NDArray[np.int_], object]:
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
     firstPeaks = []
     for i, dataFile in enumerate(dataFiles):
-        times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True)[0] / 1000
+        times = (
+            dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)[0]
+            / 1000
+        )
         maxTime = np.max(times)
         maxTime = 600
         minTime = 0
@@ -225,7 +227,9 @@ def Comparison_CCE_Vs_Depth(
             GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
-        y = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
+        y = chargeCollectionEfficiencyFunc(
+            x, *popt, GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6
+        )
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
         cellText.append(
@@ -326,7 +330,9 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
             GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
-        y = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
+        y = chargeCollectionEfficiencyFunc(
+            x, *popt, GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6
+        )
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
 
@@ -346,7 +352,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
             capsize=1,
         )
         t_epi_list.append(t_epi)  # Convert to m
-        t_epi_e_list.append(t_epi_e) # Convert to m
+        t_epi_e_list.append(t_epi_e)  # Convert to m
         V_list.append(float(dataFile.get_voltage()))
     t_epi_np = np.array(t_epi_list, dtype=float)
     t_epi_e_np = np.array(t_epi_e_list, dtype=float)
@@ -360,7 +366,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
     print(t_epi_e_np)
     value_list = []
     for c in np.linspace(0, 10, 101):
-        func = lambda V, a, b: depletionWidthFunc(V, a, b, c = c)
+        func = lambda V, a, b: depletionWidthFunc(V, a, b, c=c)
         popt, pcov = scipy.optimize.curve_fit(
             func,
             V_np,
@@ -373,22 +379,20 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         )
         (a, b) = popt
         (a_e, b_e) = np.sqrt(np.diag(pcov))
-        #print(f"a: {a:.5f} ± {a_e:.5f} µm/√V, ∆V_bi: {b:.5f} ± {b_e:.5f} V, c: {c:.5f} ± 0.0001 µm")
         a = a / 10000  # Convert to cm
         a_e = a_e / 10000  # Convert to cm
-        epsilon = 1.034 * 10**(-12)
-        q = 1.602 * 10**(-19)
-        Na = (2*epsilon)/(q*(a**2))
-        Na_e = (4*epsilon)/(q*(a**3)) * a_e
+        epsilon = 1.034 * 10 ** (-12)
+        q = 1.602 * 10 ** (-19)
+        Na = (2 * epsilon) / (q * (a**2))
+        Na_e = (4 * epsilon) / (q * (a**3)) * a_e
         n = 1.5 * 10**10
         kT_q = 0.0259
-        Nd = ((n**2) * np.exp(b/kT_q) )/ Na
+        Nd = ((n**2) * np.exp(b / kT_q)) / Na
 
         dND_da = Nd / Na * (4 * epsilon / (q * a**3))
         dND_db = (kT_q) * Nd
-        Nd_e = np.sqrt((dND_da * a_e)**2 + (dND_db * b_e)**2)
-        #print(f"Na: {Na:.2e} cm^-3, Nd: {Nd:.2e} cm^-3")
-        value_list.append((a*10000,a_e*10000, b,b_e, c,Na , Na_e/Na,Nd , Nd_e/Nd))
+        Nd_e = np.sqrt((dND_da * a_e) ** 2 + (dND_db * b_e) ** 2)
+        value_list.append((a * 10000, a_e * 10000, b, b_e, c, Na, Na_e / Na, Nd, Nd_e / Nd))
     value_list = np.array(value_list, dtype=float)
     df = pd.DataFrame(
         value_list,
@@ -401,14 +405,14 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
             "Na [cm^-3]",
             "Na_e [cm^-3]",
             "Nd [cm^-3]",
-            "Nd_e [cm^-3]"
+            "Nd_e [cm^-3]",
         ],
         index=[f"c = {c:.2f}" for c in np.linspace(0, 10, 101)],
-        )
+    )
     print(df[(df["Nd [cm^-3]"] > df["Na [cm^-3]"]) & (df["Nd [cm^-3]"] < 1e21)])
     c = 3.5
     c_e = 0
-    func = lambda V, a, b: depletionWidthFunc(V, a, b, c = c)
+    func = lambda V, a, b: depletionWidthFunc(V, a, b, c=c)
     popt, pcov = scipy.optimize.curve_fit(
         func,
         V_np,
@@ -423,7 +427,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
     (a_e, b_e) = np.sqrt(np.diag(pcov))
 
     x = np.linspace(0, 50, 1000)
-    y = depletionWidthFunc(x, a, b ,c)
+    y = depletionWidthFunc(x, a, b, c)
     axs.plot(
         x,
         y,
@@ -453,14 +457,15 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
     else:
         return plot.fig
 
+
 def VoltageCalibrationHistograms(pathToOutput: str, layer: int = 4, saveToPDF: bool = True):
     plot = plotClass(pathToOutput + "Shared/", shape=(2, 2), sizePerPlot=(5, 4))
     axs = plot.axs
     calibrationArray = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{layer}.npy")
-    u_0 = calibrationArray[: , :, 0].flatten()
-    a = calibrationArray[: , :, 1].flatten()
-    b = calibrationArray[: , :, 2].flatten()
-    c = calibrationArray[: , :, 3].flatten()
+    u_0 = calibrationArray[:, :, 0].flatten()
+    a = calibrationArray[:, :, 1].flatten()
+    b = calibrationArray[:, :, 2].flatten()
+    c = calibrationArray[:, :, 3].flatten()
     axs[0, 0].hist(u_0, bins=50, color=plot.colorPalette[0])
     plot.set_config(
         axs[0, 0],
@@ -490,25 +495,22 @@ def VoltageCalibrationHistograms(pathToOutput: str, layer: int = 4, saveToPDF: b
         ylabel="Frequency",
     )
     if saveToPDF:
-        plot.saveToPDF(
-            f"VoltageCalibrationHistograms_{layer}"
-        )
+        plot.saveToPDF(f"VoltageCalibrationHistograms_{layer}")
     else:
         return plot.fig
-    
-def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
+
+
+def Comparison_CrosstalkScatter(
+    dataFiles: list[dataAnalysis],
     pathToOutput: str,
     layer: int = 4,
     name: str = "",
     saveToPDF: bool = True,
-    attribute="Bias Voltage"
-    ):
+    attribute="Bias Voltage",
+):
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
-    attributeDict = {
-        "Bias Voltage" : 48,
-        "Angle" : 86.5
-    }
+    attributeDict = {"Bias Voltage": 48, "Angle": 86.5}
     cmap = plt.get_cmap("plasma")
     for dataFile in dataFiles:
         if attribute == "Bias Voltage":
@@ -518,19 +520,29 @@ def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
         elif attribute == "Angle":
             x = dataFile.get_angle()
             check = dataFile.get_voltage() == attributeDict["Bias Voltage"]
-            label = f"{x} Degrees" 
+            label = f"{x} Degrees"
         if check:
-            crossTalkPercent = np.sum(dataFile.get_crossTalk(layer=layer,initClusters=False))/dataFile.get_crossTalk(layer=layer,initClusters=False).size
-            axs.scatter(x,crossTalkPercent,color = cmap((1 / attributeDict[attribute] * x)),label=label,marker="x")
+            crossTalkPercent = (
+                np.sum(dataFile.get_crossTalk(layer=layer, initClusters=False))
+                / dataFile.get_crossTalk(layer=layer, initClusters=False).size
+            )
+            axs.scatter(
+                x,
+                crossTalkPercent,
+                color=cmap((1 / attributeDict[attribute] * x)),
+                label=label,
+                marker="x",
+            )
     plot.set_config(
         axs,
         ylim=(0, None),
-        xlim=(0,None),
+        xlim=(-2, None),
         title=f"{attribute} vs Crosstalk Percent",
         legend=True,
         xlabel=f"{attribute}",
         ylabel=f"Crosstalk Percent of Total Hits",
-        )
+        ncols=2,
+    )
     # axs.set_yscale("log")
     if attribute == "Bias Voltage":
         axs.xaxis.set_major_locator(MultipleLocator(5))
@@ -549,22 +561,25 @@ def Comparison_CrosstalkScatter(dataFiles: list[dataAnalysis],
         return plot.fig
 
 
-
-
 if __name__ == "__main__":
     import configLoader
-    """
+
     config = configLoader.loadConfig()
     config["maxClusterWidth"] = 29
+    config["filterDict"] = {"telescope":"lancs"}
     dataFiles = initDataFiles(config)
+    if "telescope" in config["filterDict"]:
+        name = name = f"_{config["filterDict"]["telescope"]}"
+    else:
+        name = ""
     firstPeaks, _ = Comparison_ClustersCountOverTime(
-        dataFiles[:8], config["pathToOutput"], layer=4, name="_kit", returnFirstPeaks=True
+        dataFiles[:8], config["pathToOutput"], layer=4, name=name, returnFirstPeaks=True
     )
     Comparison_RowWidthDistribution(
         dataFiles[:8],
         config["pathToOutput"],
         layer=4,
-        name="_kit",
+        name=name,
         minTimes=firstPeaks.astype(float),
         maxTimes=firstPeaks.astype(float) + 200000.0,
         excludeCrossTalk=True,
@@ -575,7 +590,7 @@ if __name__ == "__main__":
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
         layer=4,
-        name="_kit",
+        name=name,
         minTimes=firstPeaks,
         maxTimes=firstPeaks + 200000,
         excludeCrossTalk=True,
@@ -587,14 +602,18 @@ if __name__ == "__main__":
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
         layer=4,
-        name="_kit_tight",
+        name=f"{name}_tight",
         minTimes=firstPeaks,
         maxTimes=firstPeaks + 200000,
         excludeCrossTalk=True,
         xlim=(82, 90),
     )
     Comparison_CCE_Vs_Depth(
-        dataFiles, config["pathToOutput"], config["pathToCalcData"], maxClusterWidth=config["maxClusterWidth"]
+        dataFiles,
+        config["pathToOutput"],
+        config["pathToCalcData"],
+        maxClusterWidth=config["maxClusterWidth"],
+        name=name,
     )
     Comparison_CCE_Vs_Depth(
         dataFiles,
@@ -602,6 +621,7 @@ if __name__ == "__main__":
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="ToT",
+        name=name,
     )
     Scatter_Epi_Thickness_Vs_Bias_Voltage(
         dataFiles,
@@ -609,6 +629,7 @@ if __name__ == "__main__":
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="Hit_Voltage",
+        name=name,
     )
     Scatter_Epi_Thickness_Vs_Bias_Voltage(
         dataFiles,
@@ -616,21 +637,38 @@ if __name__ == "__main__":
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
         measuredAttribute="ToT",
+        name=name,
     )
     VoltageCalibrationHistograms(config["pathToOutput"], layer=4)
-    """
     config = configLoader.loadConfig()
-    config["filterDict"] = {"telescope":"kit"}
+    config["filterDict"] = {"telescope": "kit"}
     dataFiles = initDataFiles(config)
-    """
-    Comparison_CrosstalkScatter(dataFiles,
+    Comparison_CrosstalkScatter(
+        dataFiles,
         config["pathToOutput"],
-        layer= None,
-        attribute="Bias Voltage"
+        layer=4,
+        attribute="Bias Voltage",
+        name=name,
     )
-    """
-    Comparison_CrosstalkScatter(dataFiles,
+    Comparison_CrosstalkScatter(
+        dataFiles,
         config["pathToOutput"],
-        layer= None,
-        attribute="Angle"
+        layer=None,
+        attribute="Bias Voltage",
+        name=name,
+    )
+
+    Comparison_CrosstalkScatter(
+        dataFiles,
+        config["pathToOutput"],
+        layer=None,
+        attribute="Angle",
+        name=name,
+    )
+    Comparison_CrosstalkScatter(
+        dataFiles,
+        config["pathToOutput"],
+        layer=4,
+        attribute="Angle",
+        name=name,
     )
