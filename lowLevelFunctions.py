@@ -88,7 +88,7 @@ def calcHit_Voltage(
 ) -> npt.NDArray[np.float_]:
     hit_voltage = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{k}.npy")
+        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
         calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
@@ -107,7 +107,7 @@ def calcHit_VoltageError(
     hit_voltage = np.empty(len(rows), dtype=float)
     hit_voltageError = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{k}.npy")
+        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
         calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
@@ -430,6 +430,7 @@ def histogramErrors(
         ) ** 2
         histErrors[i] += np.sqrt(np.sum(np.append(errorOut, errorIn)))
     histErrors[histErrors < 4] = 4
+    """
     if np.max(binEdges) < 100:
         histErrors[binEdges[1:] < 0.3] = (
             histErrors[binEdges[1:] < 0.3]
@@ -440,6 +441,7 @@ def histogramErrors(
         histErrors[binEdges[1:] < 10] = (
             histErrors[binEdges[1:] < 10] * 3 * np.exp(-binEdges[1:][binEdges[1:] < 10] / 15)
         )
+    """
     histErrors = histErrors / (binEdges[1:] - binEdges[:-1])
     return histErrors
 

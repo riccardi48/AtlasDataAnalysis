@@ -13,6 +13,7 @@ def Clusters(
     z="Hit_Voltages",
     layer=4,
     saveToPDF=True,
+    name = "",
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", sizePerPlot=(20, 20))
     axs = plot.axs
@@ -40,6 +41,7 @@ def Clusters(
         plot.saveToPDF(
             "Clusters/Clusters"
             + f"{f"_{layer}" if layer is not None else ""}{"_cut" if excludeCrossTalk else ""}"
+            +f"{f"_{name}" if name != "" else ""}"
         )
     else:
         return plot.fig
@@ -49,8 +51,6 @@ config = configLoader.loadConfig()
 
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
-    Clusters(dataFile, config["pathToOutput"], z="TSs", layer=1, excludeCrossTalk=True)
-    Clusters(dataFile, config["pathToOutput"], z="TSs", layer=2, excludeCrossTalk=True)
-    Clusters(dataFile, config["pathToOutput"], z="TSs", layer=3, excludeCrossTalk=True)
-    Clusters(dataFile, config["pathToOutput"], z="TSs", layer=4, excludeCrossTalk=True)
-    Clusters(dataFile, config["pathToOutput"], z="Layer", layer=None, excludeCrossTalk=True)
+    #Clusters(dataFile, config["pathToOutput"], z="TSs", layer=4, excludeCrossTalk=True,name="TSs")
+    Clusters(dataFile, config["pathToOutput"], z="Hit_Voltages", layer=4, excludeCrossTalk=True,name="Hit_Voltages")
+    #Clusters(dataFile, config["pathToOutput"], z="Layer", layer=None, excludeCrossTalk=True)

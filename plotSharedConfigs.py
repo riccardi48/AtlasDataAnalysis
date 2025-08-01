@@ -31,6 +31,7 @@ def Comparison_RowWidthDistribution(
     range = (0, 60)
     minTime = 400000
     maxTime = 600000
+    cmap = plt.get_cmap("plasma")
     for i, dataFile in enumerate(dataFiles):
         rowsWidths, _ = dataFile.get_cluster_attr(
             "RowWidths", layer=layer, excludeCrossTalk=excludeCrossTalk
@@ -49,7 +50,7 @@ def Comparison_RowWidthDistribution(
             height,
             x - 0.5,
             baseline=None,
-            color=plot.colorPalette[i],
+            color=cmap(1/len(dataFiles)*i),
             label=f"{dataFile.get_fileName()}",
         )
     plot.set_config(
@@ -88,6 +89,7 @@ def Comparison_RowWidthDistribution_2(
 ):
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
+    cmap = plt.get_cmap("plasma")
     for i, dataFile in enumerate(dataFiles):
         depth = depthAnalysis(pathToCalcData,maxClusterWidth=maxClusterWidth,layers=[layer],excludeCrossTalk = excludeCrossTalk)
         x, y = depth.findClusterWidthDistribution(dataFile)
@@ -96,7 +98,7 @@ def Comparison_RowWidthDistribution_2(
             y,
             np.append(x[0] - 0.5,x + 0.5),
             baseline=None,
-            color=plot.colorPalette[i],
+            color=cmap(1/len(dataFiles)*i),
             label=f"{dataFile.get_fileName()}",
         )
     plot.set_config(
@@ -131,21 +133,25 @@ def Comparison_ClustersCountOverTime(
     plot = plotClass(pathToOutput + f"Shared/")
     axs = plot.axs
     firstPeaks = []
+    cmap = plt.get_cmap("plasma")
     for i, dataFile in enumerate(dataFiles):
         times = (
             dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)[0]
             / 1000
         )
         maxTime = np.max(times)
-        maxTime = 600
-        minTime = 0
+        maxTime = 10000
+        minTime = 10
         range = (minTime, maxTime)
         bins = int(np.ptp(range) / 1)
         height, x = np.histogram(times, bins=bins, range=range)
         axs.stairs(
-            height, x, baseline=None, color=plot.colorPalette[i], label=f"{dataFile.get_fileName()}"
+            height, x, baseline=None, color=cmap(1/len(dataFiles)*i), label=f"{dataFile.get_fileName()}"
         )
-        firstPeaks.append(x[np.where(height > 300)][0] * 1000)
+        try:
+            firstPeaks.append(x[np.where(height > 200)][0] * 1000)
+        except:
+            firstPeaks.append(0)
     plot.set_config(
         axs,
         ylim=(0, None),
@@ -183,6 +189,7 @@ def Comparison_AngleDistribution(
         layers=[layer],
         excludeCrossTalk=excludeCrossTalk,
     )
+    cmap = plt.get_cmap("plasma")
     for i, dataFile in enumerate(dataFiles):
         d = depth.find_d_value(dataFile)
         rowWidths, _ = dataFile.get_cluster_attr(
@@ -206,7 +213,7 @@ def Comparison_AngleDistribution(
             np.rad2deg(bins),
             label=f"{d*50:.2f} μm - {dataFile.get_fileName()}",
             baseline=None,
-            color=plot.colorPalette[i],
+            color=cmap(1/len(dataFiles)*i),
         )
     plot.set_config(
         axs,
@@ -266,7 +273,7 @@ def Comparison_CCE_Vs_Depth(
         popt, pcov, x, y, yerr = fit_dataFile(
             dataFile,
             depth,
-            depthCorrection=depthCorrection,
+            depthCorrection=True,
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
@@ -301,7 +308,7 @@ def Comparison_CCE_Vs_Depth(
     if measuredAttribute == "Hit_Voltage":
         plot.set_config(
             axs,
-            ylim=(-0.1, 0.4),
+            ylim=(-0.2, 0.5),
             xlim=(0, None),
             title="Voltage change withing a Cluster",
             xlabel="Depth [μm]",
@@ -369,7 +376,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         popt, pcov, x, y, yerr = fit_dataFile(
             dataFile,
             depth,
-            depthCorrection=depthCorrection,
+            depthCorrection=True,
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
@@ -456,7 +463,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         index=[f"c = {c:.2f}" for c in np.linspace(0, 10, 101)],
     )
     print(df[(df["Nd [cm^-3]"] > df["Na [cm^-3]"]) & (df["Nd [cm^-3]"] < 1e21)])
-    c = 3.5
+    c = 5
     c_e = 0
     func = lambda V, a, b: depletionWidthFunc(V, a, b, c=c)
     popt, pcov = scipy.optimize.curve_fit(
@@ -611,7 +618,7 @@ if __name__ == "__main__":
     import configLoader
 
     config = configLoader.loadConfig()
-    config["maxClusterWidth"] = 29
+    #config["maxClusterWidth"] = 29
     #config["filterDict"] = {"telescope":"lancs"}
     dataFiles = initDataFiles(config)
     if "telescope" in config["filterDict"]:
@@ -619,10 +626,10 @@ if __name__ == "__main__":
     else:
         name = ""
     firstPeaks, _ = Comparison_ClustersCountOverTime(
-        dataFiles[:8], config["pathToOutput"], layer=4, name=name, returnFirstPeaks=True
+        dataFiles, config["pathToOutput"], layer=4, name=name, returnFirstPeaks=True
     )
     Comparison_RowWidthDistribution(
-        dataFiles[:8],
+        dataFiles,
         config["pathToOutput"],
         layer=4,
         name=name,
@@ -630,8 +637,9 @@ if __name__ == "__main__":
         maxTimes=firstPeaks.astype(float) + 200000.0,
         excludeCrossTalk=True,
     )
+    """
     Comparison_RowWidthDistribution_2(
-        dataFiles[:8],
+        dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
         maxClusterWidth=40,
@@ -642,8 +650,9 @@ if __name__ == "__main__":
         excludeCrossTalk=True,
 
     )
+    """
     Comparison_AngleDistribution(
-        dataFiles[:8],
+        dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
@@ -655,7 +664,7 @@ if __name__ == "__main__":
         xlim=(0, 90),
     )
     Comparison_AngleDistribution(
-        dataFiles[:8],
+        dataFiles,
         config["pathToOutput"],
         config["pathToCalcData"],
         maxClusterWidth=config["maxClusterWidth"],
@@ -698,6 +707,7 @@ if __name__ == "__main__":
         name=name,
     )
     VoltageCalibrationHistograms(config["pathToOutput"], layer=4)
+    """
     config = configLoader.loadConfig()
     config["filterDict"] = {"telescope": "kit"}
     dataFiles = initDataFiles(config)
@@ -730,3 +740,4 @@ if __name__ == "__main__":
         attribute="Angle",
         name=name,
     )
+    """

@@ -167,7 +167,7 @@ class depthAnalysis:
             hitPositionErrorArray=hitPositionErrorArray[:,remove]
             hitPositionArray=hitPositionArray[:,remove]
             if measuredAttribute == "Hit_Voltage":
-                _range = (0.162, 1)
+                _range = (0.162, 2)
             elif measuredAttribute == "ToT":
                 _range = (40, 256)
             if fitting == "histogram":
@@ -262,7 +262,7 @@ class depthAnalysis:
                         values, errors=errors, returnParams=[1], _range=_range
                     )
             avgWidth = np.mean(widths, axis=0)
-            xi_bounds = (avgWidth[0] / 10, avgWidth[0] * 2)
+            xi_bounds = (avgWidth[0] / 4, avgWidth[0] * 2)
             scale_bounds = (avgWidth[1] / 1.1, avgWidth[1] * 2)
             for i in range(clusterWidth):
                 values = hitPositionArray[i, :][hitPositionArray[i, :] != 0]
@@ -363,13 +363,13 @@ class depthAnalysis:
                 0.8 * np.sum(hist * np.diff(binEdges)) / Z,
                 3 * np.sum(hist * np.diff(binEdges)) / Z,
             )
-        unzippedBounds = [x_mpv_bounds, xi_bounds, scale_bounds]
+        unzippedBounds = [x_mpv_bounds, xi_bounds, (0,np.inf)]
         lower_bounds, upper_bounds = zip(*unzippedBounds)
         bounds = (list(lower_bounds), list(upper_bounds))
         initial_guess = [
             binCentres[3:][np.argmax(hist[3:])],
             (binCentres[3:][np.argmax(hist[3:])] - 0.5) * 0.5,
-            np.average(scale_bounds),
+            np.sum(hist * np.diff(binEdges)),
         ]
         if initial_guess[1] < bounds[0][1]:
             initial_guess[1] = bounds[0][1] * 1.01
@@ -406,7 +406,7 @@ class depthAnalysis:
         values = values[(values >= _range[0]) & (values <= _range[1])]
         values = np.sort(values)
         if min_bin_width is None:
-            min_bin_width = (values.max() - values.min()) / 150
+            min_bin_width = (values.max() - values.min()) / 300
         if max_bin_width is None:
             max_bin_width = (values.max() - values.min()) / 20
 
@@ -495,24 +495,23 @@ class depthAnalysis:
 
     def residual(self, dataFile: dataAnalysis, d: float) -> float:
         bins, values = self.findClusterAngleDistribution(dataFile, d)
-        ignoreFirst = 10
-        maxValueIndex = np.argmax(values[ignoreFirst:])
-        shift = 0
+        ignoreFirst = 8
+        maxValueIndex = np.argsort(values[ignoreFirst:])[-4:]
+        #print(maxValueIndex)
+        shift = -1
+        #print(values[maxValueIndex+ignoreFirst])
         return (
-            np.average(
+            np.sum(
                 np.rad2deg(
-                    bins[
+                    (bins[1:]+np.diff(bins))[
                         maxValueIndex
-                        + ignoreFirst
-                        + shift : maxValueIndex
-                        + 2
                         + ignoreFirst
                         + shift
                     ]
                 )
-            )
             - dataFile.get_angle()
-        ) ** 2
+            ) ** 2
+            )
 
     def find_d_value(self, dataFile: dataAnalysis) -> float:
         func = lambda d: self.residual(dataFile, d)
@@ -625,7 +624,7 @@ class clusterPlotter:
                 cluster.getColumns(excludeCrossTalk=self.excludeCrossTalk)
             )
             values = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
-            if type(values) == type(np.array([])):
+            if type(values) == type(np.array([])) and z == "TSs":
                 values = values - np.min(values)
             Hit_Voltage[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
                 values
@@ -638,14 +637,15 @@ class clusterPlotter:
             display - np.nanmin(display),
             extent,
             vmin=0,
-            vmax=float(np.nanmax(display) - np.nanmin(display) + 1),
+            vmax=2,
+            #vmax=float(np.nanmax(display[display]) - np.nanmin(display) + 1),
         )
-        minTS = np.average(clusters[0].getTSs(excludeCrossTalk=self.excludeCrossTalk))
+        minTS = np.average(clusters[0].getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk))
         for cluster in clusters:
             ang = np.random.uniform(0, 2)
             value = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
             value = np.reshape(value, np.size(value))[0]
-            time = f"{TStoMS(np.average(cluster.getTSs(excludeCrossTalk=self.excludeCrossTalk)) - minTS):.2f} ms"
+            time = f"{TStoMS(np.average(cluster.getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk)) - minTS):.2f} ms"
             # time = f"{np.average(cluster.getTSs(excludeCrossTalk=self.excludeCrossTalk)):.0f}"
             ax.annotate(
                 time,
@@ -910,7 +910,7 @@ def fit_dataFile(
         # if i < 20:
         #    y, y_err = adjustPeakVoltage(y, y_err, d, i)
         if not hideLowWidths or (
-            np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87
+            np.rad2deg(np.arctan(i / d)) > 85 and np.rad2deg(np.arctan(i / d)) < 86.8
         ):
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
@@ -921,7 +921,7 @@ def fit_dataFile(
     y = allYValues_np[np.argsort(allXValues_np)]
     yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
     x = allXValues_np[np.argsort(allXValues_np)]
-    cut = (y > 0.1) & (x < d * 50 * 0.85)
+    cut = (y>0.10) & (x < d*50*0.9)
     popt, pcov = fitVoltageDepth(x[cut], y[cut], yerr[cut], GeV=GeV)
     return popt, pcov, x[cut], y[cut], yerr[cut]
 
