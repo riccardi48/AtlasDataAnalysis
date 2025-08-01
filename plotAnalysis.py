@@ -153,12 +153,19 @@ class depthAnalysis:
             errors = self.calcFileManager.loadFile(calcFileName=calcFileName, suppressText=True)
             toBeReturned = (peaks, errors)
         else:
-            hitPositionArray, _ = self.loadOneLength(
-                dataFile, clusterWidth, measuredAttribute=measuredAttribute
+            hitPositionArray, Indexes = self.loadOneLength(
+                dataFile, clusterWidth, measuredAttribute=measuredAttribute,returnIndexes=True
             )
             hitPositionErrorArray, _ = self.loadOneLength(
                 dataFile, clusterWidth, error=True, measuredAttribute=measuredAttribute
             )
+            remove = np.full(hitPositionArray.shape[1],True)
+            for i,cluster in enumerate(dataFile.get_clusters(excludeCrossTalk=True)[Indexes]):
+                times = cluster.getTSs(excludeCrossTalk=True) - np.min(cluster.getTSs(excludeCrossTalk=True))
+                if np.all(times<3):
+                    remove[i]=False
+            hitPositionErrorArray=hitPositionErrorArray[:,remove]
+            hitPositionArray=hitPositionArray[:,remove]
             if measuredAttribute == "Hit_Voltage":
                 _range = (0.162, 1)
             elif measuredAttribute == "ToT":
@@ -392,14 +399,14 @@ class depthAnalysis:
         self,
         values: npt.NDArray[np.float64],
         _range: tuple[float, float] = (0.162, 2),
-        points_per_bin: int = 20,
+        points_per_bin: int = 100,
         min_bin_width: Optional[float] = None,
         max_bin_width: Optional[float] = None,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         values = values[(values >= _range[0]) & (values <= _range[1])]
         values = np.sort(values)
         if min_bin_width is None:
-            min_bin_width = (values.max() - values.min()) / 300
+            min_bin_width = (values.max() - values.min()) / 150
         if max_bin_width is None:
             max_bin_width = (values.max() - values.min()) / 20
 
@@ -455,6 +462,17 @@ class depthAnalysis:
         x = np.zeros(self.maxClusterWidth - 1)
         y = np.zeros(self.maxClusterWidth - 1)
         for i in range(2, self.maxClusterWidth + 1):
+            """
+            hitPositionArray, Indexes = self.loadOneLength(
+                dataFile, i,returnIndexes=True
+            )
+            remove = np.full(hitPositionArray.shape[1],True)
+            for j,cluster in enumerate(dataFile.get_clusters(excludeCrossTalk=True)[Indexes]):
+                times = cluster.getTSs(excludeCrossTalk=True) - np.min(cluster.getTSs(excludeCrossTalk=True))
+                if np.all(times<3):
+                    remove[j]=False
+            y[i - 2] = np.sum(remove)
+            """
             x[i - 2] = i
             y[i - 2] = len(self.loadOneLength(dataFile, i)[0][0])
         return x, y
@@ -470,6 +488,7 @@ class depthAnalysis:
         )
         rowWidths = rowWidths[(columnWidths <= maxColumnWidth)]
         x, heights = np.unique(rowWidths[rowWidths < self.maxClusterWidth], return_counts=True)
+        #x, heights = self.findClusterWidthDistribution(dataFile)
         bins = np.append(np.arctan((x[0] - 0.5 - 1) / d), np.arctan((x + 0.5 - 1) / d))
         heights = heights / np.rad2deg(np.diff(bins))
         return bins, heights

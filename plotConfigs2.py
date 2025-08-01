@@ -94,8 +94,17 @@ def Hit_VoltageDistributionByPixel(
         axs[j].text(
             5,
             hist[binCentres==0][0]*2,
-            f"{np.sum(hist[binCentres>5])}",
+            f"{np.sum(hist[binCentres>=3])}",
             color=plot.colorPalette[5],
+            fontweight="bold",
+            horizontalalignment="center",
+            verticalalignment="bottom",
+        )
+        axs[j].text(
+            1,
+            hist[binCentres==0][0]*2,
+            f"{np.sum(hist[binCentres>=3])/np.sum(hist)*100:.2f}%",
+            color=plot.colorPalette[0],
             fontweight="bold",
             horizontalalignment="center",
             verticalalignment="bottom",

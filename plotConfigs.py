@@ -602,13 +602,13 @@ def HitDistributionInClusterAllOnOne(
 
 
 def CuttingComparison(
-    dataFile: dataAnalysis, pathToOutput: str, layer: Optional[int] = None, saveToPDF: bool = True
+    dataFile: dataAnalysis, pathToOutput: str, layers: Optional[int] = None, saveToPDF: bool = True
 ):
     plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", shape=(2, 2), sizePerPlot=(5, 4))
     axs = plot.axs
     bins = 128
     range = (0, 256)
-    height, x = np.histogram(dataFile.get_base_attr("ToT", layer=layer)[0], bins=bins, range=range)
+    height, x = np.histogram(dataFile.get_base_attr("ToT", layers=layers)[0], bins=bins, range=range)
     axs[0, 0].step(
         x,
         np.append(height[0], height),
@@ -618,7 +618,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("ToT", layer=layer, excludeCrossTalk=True)[0], bins=bins, range=range
+        dataFile.get_base_attr("ToT", layers=layers, excludeCrossTalk=True)[0], bins=bins, range=range
     )
     axs[0, 0].step(
         x,
@@ -660,7 +660,7 @@ def CuttingComparison(
     bins = 132
     range = (0, bins)
     height, x = np.histogram(
-        dataFile.get_base_attr("Column", layer=layer)[0], bins=bins, range=range
+        dataFile.get_base_attr("Column", layers=layers)[0], bins=bins, range=range
     )
     axs[1, 0].step(
         x,
@@ -671,7 +671,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("Column", layer=layer, excludeCrossTalk=True)[0],
+        dataFile.get_base_attr("Column", layers=layers, excludeCrossTalk=True)[0],
         bins=bins,
         range=range,
     )
@@ -704,7 +704,7 @@ def CuttingComparison(
 
     bins = 372
     range = (0, bins)
-    height, x = np.histogram(dataFile.get_base_attr("Row", layer=layer)[0], bins=bins, range=range)
+    height, x = np.histogram(dataFile.get_base_attr("Row", layers=layers)[0], bins=bins, range=range)
     axs[1, 1].step(
         x,
         np.append(height[0], height),
@@ -714,7 +714,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_base_attr("Row", layer=layer, excludeCrossTalk=True)[0], bins=bins, range=range
+        dataFile.get_base_attr("Row", layers=layers, excludeCrossTalk=True)[0], bins=bins, range=range
     )
     axs[1, 1].step(
         x,
@@ -749,7 +749,7 @@ def CuttingComparison(
     bins = 372
     range = (0, bins)
     height, x = np.histogram(
-        dataFile.get_cluster_attr("RowWidths", layer=layer)[0], bins=bins, range=range
+        dataFile.get_cluster_attr("RowWidths", layers=layers)[0], bins=bins, range=range
     )
     axs[0, 1].step(
         x,
@@ -760,7 +760,7 @@ def CuttingComparison(
         label="Raw",
     )
     height, x = np.histogram(
-        dataFile.get_cluster_attr("RowWidths", layer=layer, excludeCrossTalk=True)[0],
+        dataFile.get_cluster_attr("RowWidths", layers=layers, excludeCrossTalk=True)[0],
         bins=bins,
         range=range,
     )
@@ -803,7 +803,7 @@ def CuttingComparison(
         f"{dataFile.get_fileName()} removed cross talk comparison", fontsize="x-large"
     )
     if saveToPDF:
-        plot.saveToPDF(f"CutComparison{f"_{layer}" if layer is not None else ""}")
+        plot.saveToPDF(f"CutComparison{f"_{layers}" if layers is not None else ""}")
     else:
         return plot.fig
 
@@ -991,11 +991,9 @@ if __name__ == "__main__":
     import configLoader
 
     config = configLoader.loadConfig()
-    config["filterDict"] = {"telescope":"kit"}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
-    #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2","angle6_6Gev_kitHV6_kit_10"]}
+    config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2"]}
     config["maxClusterWidth"] = 29
-    config["filterDict"] = {"telescope":"lancs"}
     dataFiles = initDataFiles(config)
     for dataFile in dataFiles:
         depth = depthAnalysis(
@@ -1108,9 +1106,9 @@ if __name__ == "__main__":
                 HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=16,vmax=config["maxClusterWidth"])
         else:
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
-        CuttingComparison(dataFile,config["pathToOutput"],layer=config["pathToOutput"])
-        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=False,maxLine=config["maxLine"])
-        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=[4] ,excludeCrossTalk=True,maxLine=config["maxLine"])
+        #CuttingComparison(dataFile,config["pathToOutput"],layers=config["layers"])
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"])
         iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
         for i in iList:
             HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])

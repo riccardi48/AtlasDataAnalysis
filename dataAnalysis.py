@@ -48,8 +48,12 @@ class dataAnalysis:
         self, attribute: str, **kwargs
     ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[Any]]]:
         if "layer" in kwargs:
-            kwargs["layers"] = [kwargs["layer"]]
-            kwargs.pop("layer")
+            if kwargs["layer"] is None:
+                kwargs["layers"] = None
+                kwargs.pop("layer")
+            else:
+                kwargs["layers"] = [kwargs["layer"]]
+                kwargs.pop("layer")
         return self.dataHandler.baseAttr(attribute, **kwargs)
 
     def get_clusters(self, **kwargs) -> clusterArray:
@@ -66,8 +70,12 @@ class dataAnalysis:
         self, attribute, excludeCrossTalk: bool = False, **kwargs
     ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[np.int_]]]:
         if "layer" in kwargs:
-            kwargs["layers"] = [kwargs["layer"]]
-            kwargs.pop("layer")
+            if kwargs["layer"] is None:
+                kwargs["layers"] = None
+                kwargs.pop("layer")
+            else:
+                kwargs["layers"] = [kwargs["layer"]]
+                kwargs.pop("layer")
         return self.dataHandler.getClustersAttr(
             attribute, excludeCrossTalk=excludeCrossTalk, **kwargs
         )
@@ -777,7 +785,7 @@ def filterDataFiles(allDataFiles: list[dataAnalysis], filterDict: dict = {}) -> 
 def initDataFiles(config: dict = {}) -> list[dataAnalysis]:
     if config == {}:
         config = configLoader.defaultConfig()
-    files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
+    files = glob(f"{config["pathToData"]}{config["fileFormat"]}")
     allDataFiles = [
         dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"])
         for pathToDataFile in files

@@ -20,7 +20,7 @@ def defaultConfig():
         "pathToOutput": "/home/atlas/rballard/AtlasDataAnalysis/output/",
         "pathToCalcData": "/home/atlas/rballard/AtlasDataAnalysis/calculatedData/",
         "pathToData": "/home/atlas/rballard/for_magda/data/Cut/",
-        "fileFormate": "202204*udp*_decode.dat",
+        "fileFormat": "202204*udp*_decode.dat",
         "pathToDataOutput": "/home/atlas/rballard/for_magda/data/pythonOutput/",
         "filterDict": {
             "telescope": "kit",

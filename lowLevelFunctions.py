@@ -433,8 +433,8 @@ def histogramErrors(
     if np.max(binEdges) < 100:
         histErrors[binEdges[1:] < 0.3] = (
             histErrors[binEdges[1:] < 0.3]
-            * 1
-            * np.exp(-(binEdges[1:][binEdges[1:] < 0.3] - 0.16) / 0.5)
+            * 3
+            * np.exp(-(binEdges[1:][binEdges[1:] < 0.3] - 0.1) / 0.3)
         )
     else:
         histErrors[binEdges[1:] < 10] = (

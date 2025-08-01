@@ -72,6 +72,52 @@ def Comparison_RowWidthDistribution(
     else:
         return plot.fig
 
+def Comparison_RowWidthDistribution_2(
+    dataFiles: list[dataAnalysis],
+    pathToOutput: str,
+    pathToCalcData: str,
+    maxClusterWidth : int = 30,
+    layer: int = 4,
+    name: str = "",
+    minTimes: Optional[npt.NDArray[np.float64]] = None,
+    maxTimes: Optional[npt.NDArray[np.float64]] = None,
+    minTime: float = 400000,
+    maxTime: float = 600000,
+    excludeCrossTalk: bool = True,
+    saveToPDF: bool = True,
+):
+    plot = plotClass(pathToOutput + f"Shared/")
+    axs = plot.axs
+    for i, dataFile in enumerate(dataFiles):
+        depth = depthAnalysis(pathToCalcData,maxClusterWidth=maxClusterWidth,layers=[layer],excludeCrossTalk = excludeCrossTalk)
+        x, y = depth.findClusterWidthDistribution(dataFile)
+        y = y/y[0]
+        axs.stairs(
+            y,
+            np.append(x[0] - 0.5,x + 0.5),
+            baseline=None,
+            color=plot.colorPalette[i],
+            label=f"{dataFile.get_fileName()}",
+        )
+    plot.set_config(
+        axs,
+        ylim=(0, None),
+        xlim=(0,maxClusterWidth),
+        title="Row Width Distribution",
+        legend=True,
+        xlabel="Row Width [px]",
+        ylabel="Frequency",
+    )
+    axs.xaxis.set_major_locator(MultipleLocator(5))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(1))
+    axs.yaxis.set_major_locator(MultipleLocator(1000))
+    axs.yaxis.set_major_formatter("{x:.0f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(200))
+    if saveToPDF:
+        plot.saveToPDF(f"Comparison_RowWidthDistribution2_{layer}{name}")
+    else:
+        return plot.fig
 
 def Comparison_ClustersCountOverTime(
     dataFiles: list[dataAnalysis],
@@ -566,7 +612,7 @@ if __name__ == "__main__":
 
     config = configLoader.loadConfig()
     config["maxClusterWidth"] = 29
-    config["filterDict"] = {"telescope":"lancs"}
+    #config["filterDict"] = {"telescope":"lancs"}
     dataFiles = initDataFiles(config)
     if "telescope" in config["filterDict"]:
         name = name = f"_{config["filterDict"]["telescope"]}"
@@ -583,6 +629,18 @@ if __name__ == "__main__":
         minTimes=firstPeaks.astype(float),
         maxTimes=firstPeaks.astype(float) + 200000.0,
         excludeCrossTalk=True,
+    )
+    Comparison_RowWidthDistribution_2(
+        dataFiles[:8],
+        config["pathToOutput"],
+        config["pathToCalcData"],
+        maxClusterWidth=40,
+        layer=4,
+        name=name,
+        minTimes=firstPeaks.astype(float),
+        maxTimes=firstPeaks.astype(float) + 200000.0,
+        excludeCrossTalk=True,
+
     )
     Comparison_AngleDistribution(
         dataFiles[:8],
