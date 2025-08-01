@@ -1,66 +1,59 @@
-from plotAnalysis import plotClass, correlationPlotter
-from dataAnalysis import dataAnalysis, crossTalkFinder, filterDataFiles
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-from matplotlib.colors import LogNorm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from glob import glob
+from dataAnalysis import initDataFiles
+from lowLevelFunctions import calcDepthsFromTSs
 import numpy as np
 import configLoader
-
-def RowRowCorrelation(dataFile : dataAnalysis,pathToOutput,pathToCalcData ,layers:list[int] = [1,2,3,4],excludeCrossTalk=True,recalc:bool=False,log=True):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/",sizePerPlot=(8, 8))
-    axs = plot.axs
-    
-    rowRowPlotter = correlationPlotter(pathToCalcData,layers=layers,excludeCrossTalk=excludeCrossTalk)
-    RowRow = rowRowPlotter.RowRowCorrelation(dataFile,recalc=recalc)
-    extent = (
-        0.5,
-        371.5,
-        0.5,
-        371.5,
-    )
-    norm = None
-    if log:
-        norm = LogNorm(vmin=1, vmax=np.max(RowRow, where=~np.isnan(RowRow), initial=-1))
-    im = axs.imshow(RowRow, origin="lower", aspect="equal", extent=extent, norm=norm)
-    plot.set_config(axs, title="RowRow correlation", xlabel="Row [px]", ylabel="Row [px]")
-    axs.xaxis.set_major_locator(MultipleLocator(30))
-    axs.xaxis.set_major_formatter("{x:.0f}")
-    axs.xaxis.set_minor_locator(MultipleLocator(10))
-    axs.yaxis.set_major_locator(MultipleLocator(30))
-    axs.yaxis.set_major_formatter("{x:.0f}")
-    axs.yaxis.set_minor_locator(MultipleLocator(10))
-    divider = make_axes_locatable(axs)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = plt.colorbar(im, cax=cax, orientation="vertical")
-    cbar.set_label("Frequency", rotation=270, labelpad=15)
-    tempCrossTalkFinder = crossTalkFinder()
-    x = []
-    y = []
-    for _x,_y in tempCrossTalkFinder.crossTalkFunction(None,returnDict=True).items():
-        for i,j in _y:
-            x.append(i)
-            y.append(j)
-
-    axs.scatter(x, y, c="r", s=1)
-    plot.saveToOutput(f"RowRowCorrelation{"_cut" if excludeCrossTalk else ""}{"_"+"".join(str(x) for x in layers) if layers is not None else ""}")
+from plotAnalysis import plotClass
 
 config = configLoader.loadConfig()
+dataFiles = initDataFiles(config)
 
-files = glob(f"{config["pathToData"]}{config["fileFormate"]}")
-allDataFiles = [dataAnalysis(pathToDataFile, config["pathToCalcData"], maxLine=config["maxLine"]) for pathToDataFile in files]
-dataFiles = filterDataFiles(
-    allDataFiles,
-    filterDict=config["filterDict"],
-)
 for dataFile in dataFiles:
-    RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=False,recalc=False,log=True)
-    RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToCalcData"],layers=[4] ,excludeCrossTalk=True,recalc=False,log=True)
-    clusters = dataFile.get_clusters(layers=[4])
+    indexes = []
+    clusters = dataFile.get_clusters(layers=[4],excludeCrossTalk=True)
     for cluster in clusters:
-        print(dataFile.get_dataFrame().iloc[cluster.getIndexes()])
-        print(cluster.crossTalk)
-        print(cluster.getToTs())
-        print(cluster.getIndexes())
-        input("Press enter to continue...")
+        if cluster.getSize(True) > 4 and np.unique(cluster.getColumns(True)).size==1 and cluster.getSize(True) > cluster.getRowWidth(True)/2:
+            #print(dataFile.get_dataFrame().iloc[cluster.getIndexes(True)])
+            calcDepthsFromTSs(cluster)
+            indexes.append(cluster.getIndex())
+            #input()
+    testAngles = np.linspace(0,90,900)
+    angles = np.zeros(testAngles.shape)
+    d=-1
+    clusters = dataFile.get_clusters(excludeCrossTalk=True)
+    for cluster in clusters[indexes]:
+        angle = np.rad2deg(np.arctan(np.ptp(cluster.getRows(True))/np.ptp(cluster.depth)))
+        angleMax = np.rad2deg(np.arctan(np.ptp(cluster.getRows(True)[cluster.depth>-1])/(np.max(cluster.depth-cluster.depthError)-np.min((cluster.depth+cluster.depthError)[cluster.depth>-1]))))
+        angleMin = np.rad2deg(np.arctan(np.ptp(cluster.getRows(True)[cluster.depth>-1])/(np.max(cluster.depth+cluster.depthError)-np.min((cluster.depth-cluster.depthError)[cluster.depth>-1]))))
+        angles[(testAngles>=angleMin) & (testAngles<=angleMax)] += 1/np.sum([(testAngles>=angleMin) & (testAngles<=angleMax)])
+    plot = plotClass(config["pathToOutput"] + "AngleTest/")
+    axs = plot.axs
+    #hist, binEdges = np.histogram(angles,bins=50,range=(75,90))
+    axs.stairs(
+            angles,
+            np.linspace(-0.5,90.5,901),
+            label=f"{-d*50:.0f} μm",
+            baseline=None,
+            color=plot.colorPalette[3],
+        )
+    axs.vlines(
+        dataFile.get_angle(), 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
+    )
+    axs.text(
+        dataFile.get_angle(),
+        axs.get_ylim()[1],
+        dataFile.get_angle(),
+        color=plot.textColor,
+        fontweight="bold",
+        horizontalalignment="right",
+        verticalalignment="top",
+    )
+    plot.set_config(
+        axs,
+        ylim=(0, None),
+        xlim=(75, 90),
+        title="Angle Distribution",
+        legend=True,
+        xlabel="Equivalent Angle [Degrees]",
+        ylabel="Frequency",
+    )
+    plot.saveToPDF(f"AngleDistribution_{dataFile.get_fileName()}")

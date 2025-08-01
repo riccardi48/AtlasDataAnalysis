@@ -507,3 +507,63 @@ def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.
         firstTS1024 = firstTS % 1024
         new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs() % 1024) - firstTS1024)
     return new_ext_TS.astype(np.int_)
+
+def linearLine(a,b,x):
+    m = 1/(a-b)
+    y = m*(x-a)
+    return y
+def calcDepthsFromTSs(cluster,excludeCrossTalk=True,residual=1/np.sqrt(12)):
+    rows = cluster.getRows(excludeCrossTalk)
+    sortArray = np.argsort(rows)
+    rows = rows[sortArray]
+    TSs = cluster.getTSs(excludeCrossTalk)[sortArray]
+    if np.ptp(TSs) > 500:
+        TSs = (TSs+512)%1024
+    relativeTSs = TSs - np.min(TSs)
+    highTSs = np.where(relativeTSs>=2)[0]
+    #print(highTSs)
+    if highTSs.size > 0 and np.average(highTSs) < cluster.getRowWidth(excludeCrossTalk)/2:
+        rightToLeft = True
+    else:
+        rightToLeft = False
+    relativeRows = rows-np.min(rows)
+    if rightToLeft:
+        rows = np.flip(rows)
+        relativeTSs = np.flip(relativeTSs)
+        highTSs = np.where(relativeTSs>=2)[0]
+    if 0 in highTSs:
+        minStart = residual
+        maxStart = 0.5
+        startIndex = 1
+    else:
+        minStart = -residual
+        maxStart = +residual
+        startIndex = 0
+    try:
+        if highTSs.size > 0 and np.all(np.isin(np.arange(highTSs[startIndex],highTSs[-1]+1),highTSs)):
+            minStop = relativeRows[highTSs[startIndex]-1]-residual
+            maxStop = relativeRows[highTSs[startIndex]-1]+1**(-rightToLeft)-residual
+        else:
+            minStop = relativeRows[-1]-residual
+            maxStop = relativeRows[-1]+1-residual
+    except:
+        print(highTSs)
+        print(startIndex)
+        print(rightToLeft)
+        print(relativeTSs)
+        print(relativeRows)
+    minDepth = np.zeros(relativeRows.shape)
+    maxDepth = np.zeros(relativeRows.shape)
+    minDepth[rows<maxStop] = linearLine(minStart,minStop,relativeRows[rows<maxStop])
+    minDepth[rows>=maxStop]  = linearLine(maxStart,minStop,relativeRows[rows>=maxStop])
+    maxDepth[rows<maxStop] = linearLine(maxStart,maxStop,relativeRows[rows<maxStop])
+    maxDepth[rows>=maxStop]  = linearLine(minStart,maxStop,relativeRows[rows>=maxStop])
+    depth = np.average([minDepth,maxDepth],axis=0)
+    error = np.ptp([minDepth,maxDepth],axis=0)/2
+    if rightToLeft:
+        depth = np.flip(depth)
+        error = np.flip(error)
+    depth = depth[np.argsort(sortArray)]
+    error = error[np.argsort(sortArray)]
+    cluster.depth = depth
+    cluster.depthError = error
