@@ -9,12 +9,12 @@ from ._dependencies import (
 )
 
 
-def _isFiltered(dataAnalysis: object, filter_dict: dict = {}) -> bool:
+def _isFiltered(dataFile: dataAnalysis, filter_dict: dict = {}) -> bool:
     # Takes in an array of data_class and filters and sorts them
     # filter_dict has keys that are attributes of data_class with values that you want to filter for
     # Returns filtered list sorted by angle and then by voltage
     for f in filter_dict.keys():
-        attr = getattr(dataAnalysis, f"{f}")
+        attr = getattr(dataFile, f"{f}")
         if isinstance(f, list):
             if not np.isin(attr, filter_dict[f]):
                 return False
@@ -87,3 +87,13 @@ class dataAnalysis:
 
     def save_nonCrossTalk_to_csv(self, path) -> None:
         self.dataHandler.save_nonCrossTalk_to_csv(path, self.fileName)
+
+    def get_flatClusters(self,width,**kwargs) -> clusterArray:
+        if "layer" in kwargs:
+            if kwargs["layer"] is None:
+                kwargs["layers"] = None
+                kwargs.pop("layer")
+            else:
+                kwargs["layers"] = [kwargs["layer"]]
+                kwargs.pop("layer")
+        return self.dataHandler.getFlatClusters(width,**kwargs)

@@ -5,7 +5,7 @@ config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
     start = time.time()
-    dataFile.get_clusters(excludeCrossTalk=True, recalc = False)
+    print([cluster.getColumnWidth(True) for cluster in dataFile.get_flatClusters(20,excludeCrossTalk=True,layer=4)])
     end = time.time()
     print(f"Time taken for {dataFile.fileName}: {end - start:.2f}")
     printMemUsage()

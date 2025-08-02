@@ -205,6 +205,10 @@ class dataHandler:
             self.getCrossTalk(), path, name, self.getClusters()
         )
 
+    def getFlatClusters(self,width, excludeCrossTalk: bool = False,**kwargs) -> clusterArray:
+        if excludeCrossTalk:
+            self.getCrossTalk(**kwargs)
+        return self.clusterHandler.getFlatClusters(width, excludeCrossTalk = excludeCrossTalk,**kwargs)
 
 class dataFrameHandler:
     # Stores the data frame
@@ -392,7 +396,7 @@ class clusterHandler:
             cluster.setCrossTalk(self.crossTalkFinder.findCrossTalk_OneCluster(cluster))
             crossTalk[cluster.getIndexes()] = cluster.crossTalk
             if i % 1000 == 0:
-                print(f"{i/clusters.size*100:.2f}%", end="\r")
+                print(f"{i/len(clusters)*100:.2f}%", end="\r")
         print("100.00%")
         self.haveCrossTalk = True
         return crossTalk
@@ -444,3 +448,27 @@ class clusterHandler:
             return np.full(len(clusters), True, bool)
         else:
             return np.isin([cluster.layer for cluster in clusters], layers)
+
+    def getFlatClusters(self,width,excludeCrossTalk:bool = False, layers:Optional[list[int]] = None) -> clusterArray:
+        self._widthDict = self._loadOrMakeWidthDict(excludeCrossTalk)
+        clusters = self.getClusters()
+        filter = self.layerFilter(self._clusters, layers=layers)
+        return clusters[self._widthDict[width]][filter[self._widthDict[width]]]
+    def _loadOrMakeWidthDict(self,excludeCrossTalk:bool = False):
+        if "_widthDict" in self.__dict__:
+            return self._widthDict
+        clusters = self.getClusters()
+        cluster: clusterClass
+        self._widthDict = {}
+        for cluster in clusters:
+            width = cluster.getRowWidth(excludeCrossTalk)
+            if (
+                cluster.getColumnWidth(excludeCrossTalk) != 1
+                or cluster.getSize(excludeCrossTalk) < width/3
+                ):
+                continue
+            if width in self._widthDict:
+                self._widthDict[width].append(cluster.getIndex())
+                continue
+            self._widthDict[width] = [cluster.getIndex()]
+        return self._widthDict
