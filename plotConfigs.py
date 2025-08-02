@@ -1004,6 +1004,7 @@ if __name__ == "__main__":
             layers=config["layers"],
             excludeCrossTalk=config["excludeCrossTalk"],
         )
+        """
         AngleDistribution(dataFile, depth, config["pathToOutput"])
         WidthDistribution(dataFile, depth, config["pathToOutput"])
         AngleDistribution_2(dataFile, depth, config["pathToOutput"])
@@ -1082,6 +1083,7 @@ if __name__ == "__main__":
             hideLowWidths=False,
         )
         """
+        """
         LandauMPVWidthScatter(
             dataFile,
             depth,
@@ -1108,8 +1110,8 @@ if __name__ == "__main__":
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
         """
         #CuttingComparison(dataFile,config["pathToOutput"],layers=config["layers"])
-        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
-        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"])
+        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
+        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"])
         #iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
         #iList = [30,35,38,45]
         #for i in iList:

@@ -85,7 +85,7 @@ def calcHit_Voltage(
     columns: npt.NDArray[np.int_],
     ToTs: npt.NDArray[np.int_],
     Layers: npt.NDArray[np.int_],
-) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[np.float64]:
     hit_voltage = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
         calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
@@ -103,7 +103,7 @@ def calcHit_VoltageError(
     columns: npt.NDArray[np.int_],
     ToTs: npt.NDArray[np.int_],
     Layers: npt.NDArray[np.int_],
-) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[np.float64]:
     hit_voltage = np.empty(len(rows), dtype=float)
     hit_voltageError = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
@@ -237,8 +237,8 @@ def calcHit_VoltageByPixel(
     returnIndexes: bool = False,
     measuredAttribute: str = "Hit_Voltage",
 ) -> tuple[
-    npt.NDArray[np.float_],
-    npt.NDArray[np.float_],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
     npt.NDArray[np.int_],
     Optional[npt.NDArray[np.int_]],
 ]:
