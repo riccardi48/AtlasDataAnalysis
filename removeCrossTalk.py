@@ -1,5 +1,5 @@
-from dataAnalysis import dataAnalysis,initDataFiles
-import configLoader
+from dataAnalysis import initDataFiles
+import dataAnalysis.configLoader as configLoader
 import glob
 
 configLoader.saveConfig({"filterDict":{"telescope":"kit","fileName":"angle6_4Gev_kit_2"}},path="config.json")

@@ -1,6 +1,6 @@
 from plotAnalysis import depthAnalysis, plotClass, correlationPlotter, fitAndPlotCCE, fit_dataFile
-from dataAnalysis import dataAnalysis, crossTalkFinder, initDataFiles
-from lowLevelFunctions import (
+from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, crossTalkFinder, initDataFiles
+from AtlasDataAnalysis.Code.lowLevelFunctions import (
     calcDepth,
     adjustPeakVoltage,
     histogramErrors,
@@ -989,7 +989,7 @@ def LandauMPVWidthScatter(
 
 if __name__ == "__main__":
     print_mem_usage()
-    import configLoader
+    import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
 
     config = configLoader.loadConfig()
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}

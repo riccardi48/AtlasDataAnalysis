@@ -1,5 +1,5 @@
-from dataAnalysis import dataAnalysis, calcDataFileManager, crossTalkFinder, clusterClass
-from lowLevelFunctions import (
+from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, calcDataFileManager, crossTalkFinder, clusterClass
+from AtlasDataAnalysis.Code.lowLevelFunctions import (
     calcHit_VoltageByPixel,
     histogramErrors,
     neg_log_likelihood_truncated,

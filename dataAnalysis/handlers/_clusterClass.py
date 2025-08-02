@@ -1,6 +1,7 @@
-import numpy as np
-import numpy.typing as npt
-
+from dataAnalysis._dependencies import (
+    npt,                # numpy.typing
+    np,                 # numpy
+)
 
 class clusterClass:
     def __init__(

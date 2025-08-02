@@ -1,7 +1,7 @@
-from dataAnalysis import initDataFiles
-from lowLevelFunctions import calcDepthsFromTSs
+from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import initDataFiles
+from AtlasDataAnalysis.Code.lowLevelFunctions import calcDepthsFromTSs
 import numpy as np
-import configLoader
+import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
 from plotAnalysis import plotClass
 
 config = configLoader.loadConfig()

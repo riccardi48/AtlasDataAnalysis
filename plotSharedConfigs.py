@@ -1,6 +1,6 @@
 from plotAnalysis import depthAnalysis, plotClass, fit_dataFile
-from dataAnalysis import dataAnalysis, initDataFiles
-from lowLevelFunctions import (
+from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, initDataFiles
+from AtlasDataAnalysis.Code.lowLevelFunctions import (
     chargeCollectionEfficiencyFunc,
     depletionWidthFunc,
 )
@@ -615,7 +615,7 @@ def Comparison_CrosstalkScatter(
 
 
 if __name__ == "__main__":
-    import configLoader
+    import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
 
     config = configLoader.loadConfig()
     #config["maxClusterWidth"] = 29

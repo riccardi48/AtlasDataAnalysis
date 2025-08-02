@@ -1,10 +1,10 @@
 from plotConfigs import AngleDistribution,WidthDistribution,AngleDistribution_2,ColumnWidthDistribution,RowWidthDistribution,VoltageDepthScatter,HitDistributionInClusterAllOnOne,CuttingComparison,RowRowCorrelation
-from dataAnalysis import initDataFiles
+from AtlasDataAnalysis.Code.dataAnalysis import initDataFiles
 from plotAnalysis import depthAnalysis
 from matplotlib.backends.backend_pdf import PdfPages
 
 if __name__ == "__main__":
-    import configLoader
+    import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
     config = configLoader.loadConfig()
     dataFiles = initDataFiles(config)
     for dataFile in dataFiles:

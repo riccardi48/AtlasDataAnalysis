@@ -1,200 +1,11 @@
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from dataAnalysis import *
 import numpy as np
 import scipy
-from landau import landau
-import psutil
-import os
 import numpy.typing as npt
-from typing import Optional, TypeAlias, Union
-from clusterClass import clusterClass
-
-clusterArray: TypeAlias = npt.NDArray[np.object_]
-
-
-def usage() -> float:
-    process = psutil.Process(os.getpid())
-    return process.memory_info()[0] / float(2**20)
-
-
-def print_mem_usage() -> None:
-    print(f"\033[93mCurrent Mem Usage:{usage():.2f}Mb\033[0m")
-
-
-def isFiltered(dataAnalysis: object, filter_dict: dict = {}) -> bool:
-    # Takes in an array of data_class and filters and sorts them
-    # filter_dict has keys that are attributes of data_class with values that you want to filter for
-    # Returns filtered list sorted by angle and then by voltage
-    for f in filter_dict.keys():
-        attr = getattr(dataAnalysis, "get_" + f)
-        if isinstance(f, list):
-            if not np.isin(attr, filter_dict[f]):
-                return True
-        else:
-            if not attr == filter_dict[f]:
-                return True
-    return False
-
-
-def readFileName(path: str) -> tuple[str, int, float, str]:
-    angle_dict = {
-        "angle1": 45,
-        "angle2": 40.5,
-        "angle3": 28,
-        "angle4": 20.5,
-        "angle5": 11,
-        "angle6": 86.5,
-    }
-    voltage_dict = {
-        "V48": 48,
-        "V30": 30,
-        "V20": 20,
-        "V15": 15,
-        "V10": 10,
-        "V8": 8,
-        "V6": 6,
-        "V4": 4,
-        "V2": 2,
-        "V0": 0,
-    }
-    file_name = "_".join(path.split("/")[-1].split(".")[0].split("_")[3:]).removesuffix("_decode")
-    angle: float = 0
-    for k in angle_dict.keys():
-        if k in file_name:
-            angle = angle_dict[k]
-            break
-    voltage = -1
-    for k in voltage_dict.keys():
-        if k in file_name:
-            voltage = voltage_dict[k]
-            break
-
-    if "kit" in path:
-        telescope = "kit"
-    elif "lancs" in path:
-        telescope = "lancs"
-    if voltage == -1:
-        voltage = 48
-    return file_name, voltage, angle, telescope
-
-
-def calcToT(TS: npt.NDArray[np.int_], TS2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
-    return (TS2 * 2 - TS) % 256
-
-
-def calcHit_Voltage(
-    rows: npt.NDArray[np.int_],
-    columns: npt.NDArray[np.int_],
-    ToTs: npt.NDArray[np.int_],
-    Layers: npt.NDArray[np.int_],
-) -> npt.NDArray[np.float64]:
-    hit_voltage = np.empty(len(rows), dtype=float)
-    for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
-        calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
-        u_0 = calibration_array_indexes[:, 0]
-        a = calibration_array_indexes[:, 1]
-        b = calibration_array_indexes[:, 2]
-        c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
-    return hit_voltage
-
-
-def calcHit_VoltageError(
-    rows: npt.NDArray[np.int_],
-    columns: npt.NDArray[np.int_],
-    ToTs: npt.NDArray[np.int_],
-    Layers: npt.NDArray[np.int_],
-) -> npt.NDArray[np.float64]:
-    hit_voltage = np.empty(len(rows), dtype=float)
-    hit_voltageError = np.empty(len(rows), dtype=float)
-    for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
-        calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
-        u_0 = calibration_array_indexes[:, 0]
-        a = calibration_array_indexes[:, 1]
-        b = calibration_array_indexes[:, 2]
-        c = calibration_array_indexes[:, 3]
-        hit_voltage[Layers == k] = np.real(lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
-        upper = lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0, a, b, c)
-        lower = lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0, a, b, c)
-        upperError = upper - hit_voltage[Layers == k]
-        lowerError = hit_voltage[Layers == k] - lower
-        hit_voltageError[Layers == k] = np.max([upperError, lowerError], axis=0)
-    return hit_voltageError
-
-
-def lambert_W_ToT_to_u(
-    ToT: Union[npt.NDArray[np.int_] | npt.NDArray[np.float64] | float | int],
-    u_0: Union[npt.NDArray[np.float64] | float],
-    a: Union[npt.NDArray[np.float64] | float],
-    b: Union[npt.NDArray[np.float64] | float],
-    c: Union[npt.NDArray[np.float64] | float],
-) -> Union[npt.NDArray[np.float64] | float]:
-    u = u_0 + (a / b) * scipy.special.lambertw((b / a) * u_0 * np.exp((ToT - c - (b * u_0)) / a))
-    return np.real(u)
-
-
-def lambert_W_u_to_ToT(
-    u: npt.NDArray[np.float64],
-    u_0: npt.NDArray[np.float64],
-    a: npt.NDArray[np.float64],
-    b: npt.NDArray[np.float64],
-    c: npt.NDArray[np.float64],
-) -> npt.NDArray[np.float64]:
-    u = np.reshape(u, np.size(u))
-    ToT = np.empty(np.shape(u))
-    ToT[u > u_0] = (a * np.log((u[u > u_0] - u_0) / u_0)) + (b * u[u > u_0]) + c
-    ToT[u <= u_0] = 0
-    ToT[ToT < 0] = 0
-    return ToT
-
-
-def calcClusters(
-    Layers: npt.NDArray[np.int_],
-    TriggerID: npt.NDArray[np.int_],
-    TS: npt.NDArray[np.int_],
-    time_variance: np.uint16 = np.uint16(80),
-    trigger_variance: np.int32 = np.int32(1),
-) -> clusterArray:
-    clusters = np.empty(len(Layers), dtype=object)
-    count = 0
-    count_2 = 0
-    max_cluster_size = 300
-    # Does one layer at a time. Ensures each cluster is on one layer
-    for j in range(1, 5):
-        diff_TS = np.min(
-            [np.diff(TS[Layers == j]), np.diff((TS[Layers == j] + 512) % 1024)], axis=0
-        )
-        diff_TriggerID = np.diff(TriggerID[Layers == j])
-        pixels = np.zeros(max_cluster_size, dtype=int)
-        onLayer = np.where(Layers == j)[0]
-        for i, index in enumerate(onLayer):
-            if index != onLayer[-1]:
-                if (
-                    # Doesn't account for looping around 1024
-                    (abs(diff_TS[i]) <= time_variance)
-                    and (abs(diff_TriggerID[i]) <= trigger_variance)
-                    and (count_2 < max_cluster_size - 1)
-                ):
-                    pixels[count_2] = index
-                    count_2 += 1
-                else:
-                    pixels[count_2] = index
-                    count_2 += 1
-                    clusters[count] = np.array(pixels[:count_2], dtype=int)
-                    count += 1
-                    pixels[:] = 0
-                    count_2 = 0
-            else:
-                pixels[count_2] = index
-                count_2 += 1
-                clusters[count] = np.array(pixels[:count_2], dtype=int)
-                count += 1
-                pixels[:] = 0
-                count_2 = 0
-    clusters = clusters[:count]
-    print(f"{len(clusters)} clusters found")
-    return clusters
-
+from landau import landau
+from typing import Optional, Union, Any
 
 def checkDirection(values, x, width):
     if width <= 6 or len(values) <= 3:
@@ -348,15 +159,6 @@ def gaussianCDFFunc(
     y = scipy.stats.norm.cdf(x, mu, sig)
     return np.asarray(y, dtype=np.float64)
 
-
-def TStoMS(TS: npt.NDArray[np.int_]) -> npt.NDArray[np.float64]:
-    return TS * 25 / 1000000
-
-
-def MStoTS(Time: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
-    return np.round(Time * 1000000 / 25).astype(np.int_)
-
-
 def neg_log_likelihood_truncated(
     params: npt.NDArray[np.float64], data: npt.ArrayLike, threshold: float = 0.162
 ) -> float:
@@ -498,15 +300,6 @@ def depletionWidthFunc(
     V: npt.NDArray[np.float64], a: float, b: float, c: float = 0
 ) -> npt.NDArray[np.float64]:
     return np.sqrt(a * (V + b)) + c
-
-
-def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
-    new_ext_TS = np.zeros(ext_TS.size)
-    for cluster in clusters:
-        firstTS = np.min(cluster.getTSs(excludeCrossTalk=True))
-        firstTS1024 = firstTS % 1024
-        new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs() % 1024) - firstTS1024)
-    return new_ext_TS.astype(np.int_)
 
 def linearLine(a,b,x):
     m = 1/(a-b)

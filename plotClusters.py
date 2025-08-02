@@ -1,9 +1,9 @@
 from plotAnalysis import plotClass, clusterPlotter
-from dataAnalysis import dataAnalysis, initDataFiles
+from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, initDataFiles
 from matplotlib.ticker import MultipleLocator
 import numpy as np
 import matplotlib.pyplot as plt
-import configLoader
+import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
 
 
 def Clusters(
