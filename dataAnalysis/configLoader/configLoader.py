@@ -7,6 +7,7 @@ import json
 # "fileName" : ["angle6_4Gev_kit_2",...]
 # }
 
+
 def _defaultConfig():
     config = {
         "maxLine": None,

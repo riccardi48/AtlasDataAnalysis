@@ -1,10 +1,11 @@
 from typing import Union
-from dataAnalysis._types import clusterClass,dataAnalysis,clusterArray
+from dataAnalysis._types import clusterClass, dataAnalysis, clusterArray
 from dataAnalysis._dependencies import (
-    npt,                # numpy.typing
-    np,                 # numpy
-    lambertw,           # scipy
+    npt,  # numpy.typing
+    np,  # numpy
+    lambertw,  # scipy
 )
+
 
 def _lambert_W_ToT_to_u(
     ToT: Union[npt.NDArray[np.int_] | npt.NDArray[np.float64] | float | int],
@@ -31,6 +32,7 @@ def _lambert_W_u_to_ToT(
     ToT[ToT < 0] = 0
     return ToT
 
+
 def calcHit_Voltage(
     rows: npt.NDArray[np.int_],
     columns: npt.NDArray[np.int_],
@@ -47,6 +49,7 @@ def calcHit_Voltage(
         c = calibration_array_indexes[:, 3]
         hit_voltage[Layers == k] = np.real(_lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
     return hit_voltage
+
 
 def calcHit_VoltageError(
     rows: npt.NDArray[np.int_],

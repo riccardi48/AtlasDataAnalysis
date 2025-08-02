@@ -1,7 +1,8 @@
 from dataAnalysis._dependencies import (
-    npt,                # numpy.typing
-    np,                 # numpy
+    npt,  # numpy.typing
+    np,  # numpy
 )
+
 
 class clusterClass:
     def __init__(
@@ -118,9 +119,9 @@ class clusterClass:
 
     def getTSs(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.TSs[self.notCrossTalk]%1024
+            return self.TSs[self.notCrossTalk] % 1024
         else:
-            return self.TSs%1024
+            return self.TSs % 1024
 
     def getEXT_TSs(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:

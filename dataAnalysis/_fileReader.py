@@ -1,10 +1,11 @@
 from ._dependencies import (
-    pd,                 # pandas
-    np,                 # numpy
-    npt,                # numpy.typing
+    pd,  # pandas
+    np,  # numpy
+    npt,  # numpy.typing
 )
 from typing import Optional, Any
 import os
+
 
 class calcDataFileManager:
     def __init__(self, pathToCalcData: str, fileName: str, maxLine: Optional[int] = None):
@@ -80,7 +81,7 @@ class calcDataFileManager:
 
 
 class rawDataFileManager:
-    def __init__(self, pathToData: str,columns:list[str], maxLine: Optional[int] = None):
+    def __init__(self, pathToData: str, columns: list[str], maxLine: Optional[int] = None):
         self.pathToData = pathToData
         self.columns = columns
         self.maxLine = maxLine

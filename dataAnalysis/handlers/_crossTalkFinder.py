@@ -1,10 +1,12 @@
-from dataAnalysis._types import clusterClass,dataAnalysis,clusterArray
+from dataAnalysis._types import clusterClass, dataAnalysis, clusterArray
 from dataAnalysis._dependencies import (
-    np,                 # numpy
-    npt,                # numpy.typing
-    njit,               # numba
-    numba,              # numba
+    np,  # numpy
+    npt,  # numpy.typing
+    njit,  # numba
+    numba,  # numba
 )
+
+
 class crossTalkFinder:
     def __init__(self) -> None:
         # Precompute the cross-talk dictionary once

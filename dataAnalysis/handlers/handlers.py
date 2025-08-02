@@ -1,16 +1,17 @@
 from typing import Optional, Any
-from dataAnalysis._types import clusterClass,dataAnalysis,clusterArray
+from dataAnalysis._types import clusterClass, dataAnalysis, clusterArray
 from dataAnalysis._dependencies import (
-    pd,                 # pandas
-    np,                 # numpy
-    npt,                # numpy.typing
+    pd,  # pandas
+    np,  # numpy
+    npt,  # numpy.typing
 )
 from dataAnalysis._fileReader import rawDataFileManager, calcDataFileManager
-from ._functions import readFileName,calcToT,trueTimeStamps,TStoMS
-from ._hit_voltage import calcHit_Voltage,calcHit_VoltageError
+from ._functions import readFileName, calcToT, trueTimeStamps, TStoMS
+from ._hit_voltage import calcHit_Voltage, calcHit_VoltageError
 from ._crossTalkFinder import crossTalkFinder
 from ._clusters import calcClusters
 from ._clusterClass import clusterClass
+
 
 class dataHandler:
     def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None):
@@ -30,7 +31,7 @@ class dataHandler:
             "FIFO_overflow",
         ]
         self.dataFrameHandler = dataFrameHandler(
-            pathToData,self.baseAttrNames, maxLine=maxLine, telescope=self.telescope
+            pathToData, self.baseAttrNames, maxLine=maxLine, telescope=self.telescope
         )
         self.calcFileManager = calcDataFileManager(pathToCalcData, self.fileName, maxLine)
         self.clusterHandler = clusterHandler(self.calcFileManager, self.dataFrameHandler)
@@ -211,17 +212,17 @@ class dataFrameHandler:
     def __init__(
         self,
         pathToData: str,
-        columnNames:list[str],
+        columnNames: list[str],
         maxLine: Optional[int] = None,
         telescope: str = "kit",
     ):
-        self.dataFileManager = rawDataFileManager(pathToData,columnNames, maxLine=maxLine)
+        self.dataFileManager = rawDataFileManager(pathToData, columnNames, maxLine=maxLine)
         self.telescope = telescope
 
     def loadDataIfNotLoaded(self) -> None:
         if not self.checkLoadedData():
             self.data = self.dataFileManager.readFile()
-            self.dataLength:int = len(self.data)
+            self.dataLength: int = len(self.data)
 
     def cutSensor(self, row: int) -> pd.DataFrame:
         self.loadDataIfNotLoaded()
@@ -305,6 +306,7 @@ class clusterHandler:
             filter = self.layerFilter(self.clusters, layers=layers)
             return clusters[filter]
         return clusters
+
     def _loadOrCalculateClusters(self, recalc: bool = False) -> clusterArray:
         if not recalc and self._clusters is not None:
             return self._clusters
@@ -320,24 +322,16 @@ class clusterHandler:
         rawClusters = self.calcFileManager.loadFile("clusters")
         self._clusters = self.initClusters(rawClusters)
         return self._clusters
+
     def _calculateNewClusters(self) -> clusterArray:
         Layers = self.dataFrameHandler.readDataFrameAttr("Layer")
         TriggerIDs = self.dataFrameHandler.readDataFrameAttr("TriggerID")
         TSs = self.dataFrameHandler.readDataFrameAttr("TS")
-        rawClusters = calcClusters(
-            Layers, 
-            TriggerIDs, 
-            TSs
-        )
+        rawClusters = calcClusters(Layers, TriggerIDs, TSs)
         print(f"{len(rawClusters)} clusters found")
         self.calcFileManager.saveFile(rawClusters, attribute="clusters")
-        self._clusters = self.initClusters(
-            rawClusters, 
-            layers=Layers, 
-            TSs=TSs
-        )
+        self._clusters = self.initClusters(rawClusters, layers=Layers, TSs=TSs)
         return self._clusters
-
 
     def initClusters(
         self,

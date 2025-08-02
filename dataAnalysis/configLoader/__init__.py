@@ -1,1 +1,1 @@
-from .configLoader import saveConfig,loadConfig
+from .configLoader import saveConfig, loadConfig

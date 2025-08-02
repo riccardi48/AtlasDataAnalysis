@@ -1,12 +1,13 @@
 from typing import Optional, Any
-from ._types import clusterClass,dataAnalysis,clusterArray
-from .handlers import dataHandler,readFileName
+from ._types import clusterClass, dataAnalysis, clusterArray
+from .handlers import dataHandler, readFileName
 from ._memCheck import printMemUsage
 from ._dependencies import (
-    pd,                 # pandas
-    np,                 # numpy
-    npt,                # numpy.typing
+    pd,  # pandas
+    np,  # numpy
+    npt,  # numpy.typing
 )
+
 
 def _isFiltered(dataAnalysis: object, filter_dict: dict = {}) -> bool:
     # Takes in an array of data_class and filters and sorts them
@@ -86,7 +87,3 @@ class dataAnalysis:
 
     def save_nonCrossTalk_to_csv(self, path) -> None:
         self.dataHandler.save_nonCrossTalk_to_csv(path, self.get_fileName())
-
-
-
-
