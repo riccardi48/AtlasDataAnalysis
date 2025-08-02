@@ -277,7 +277,7 @@ class dataHandler:
 
     def getClusters(self, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
-            self.getCrossTalk()
+            self.getCrossTalk(**kwargs)
         return self.clusterHandler.getClusters(**kwargs)
 
     def getClustersAttr(
