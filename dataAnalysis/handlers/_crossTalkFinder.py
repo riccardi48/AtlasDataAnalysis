@@ -14,7 +14,7 @@ class crossTalkFinder:
         # Convert to numba-compatible format for JIT compilation
         self.crossTalkDict = self._convert_to_numba_dict(raw_dict)
 
-    def findCrossTalk_OneCluster(self, cluster) -> npt.NDArray[np.bool_]:
+    def findCrossTalk_OneCluster(self, cluster:clusterClass) -> npt.NDArray[np.bool_]:
         shortIndexes = cluster.getShortIndexes()
         ToTs = cluster.getToTs()
         columns = cluster.getColumns()

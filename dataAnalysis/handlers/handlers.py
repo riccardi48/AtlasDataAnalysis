@@ -1,5 +1,5 @@
 from typing import Optional, Any
-from dataAnalysis._types import clusterClass, dataAnalysis, clusterArray
+from dataAnalysis._types import dataAnalysis, clusterArray
 from dataAnalysis._dependencies import (
     pd,  # pandas
     np,  # numpy

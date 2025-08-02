@@ -6,8 +6,8 @@ if TYPE_CHECKING:
     from .handlers import clusterClass
     from .dataAnalysis import dataAnalysis
 
-    clusterArray: TypeAlias = np.ndarray[_AnyShape, clusterClass]
+    clusterArray: TypeAlias = list[clusterClass]
 else:
     clusterClass: TypeAlias = object
-    clusterArray: TypeAlias = np.ndarray[_AnyShape, clusterClass]
+    clusterArray: TypeAlias = list[clusterClass]
     dataAnalysis: TypeAlias = object

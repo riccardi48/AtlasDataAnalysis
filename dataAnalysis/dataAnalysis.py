@@ -86,4 +86,4 @@ class dataAnalysis:
         self.dataHandler.initClusterVoltages()
 
     def save_nonCrossTalk_to_csv(self, path) -> None:
-        self.dataHandler.save_nonCrossTalk_to_csv(path, self.get_fileName())
+        self.dataHandler.save_nonCrossTalk_to_csv(path, self.fileName)
