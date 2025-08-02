@@ -29,18 +29,6 @@ class dataAnalysis:
         self.dataHandler = dataHandler(pathToData, pathToCalcData, maxLine=maxLine)
         self.pathToData = pathToData
 
-    def get_voltage(self) -> int:
-        return self.dataHandler.voltage
-
-    def get_angle(self) -> float:
-        return self.dataHandler.angle
-
-    def get_fileName(self) -> str:
-        return self.dataHandler.fileName
-
-    def get_telescope(self) -> str:
-        return self.dataHandler.telescope
-
     def check_if_filtered(self, filterDict) -> bool:
         return _isFiltered(self, filter_dict=filterDict)
 
