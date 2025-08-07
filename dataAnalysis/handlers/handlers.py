@@ -147,22 +147,11 @@ class dataHandler:
                 self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         elif self.calcFileManager.fileExists("crossTalk") and not recalc:
             self.crossTalk: npt.NDArray[np.bool_] = self.calcFileManager.loadFile("crossTalk")
-            if self.telescope == "lancs":
-                row = 248
-                self.dataFrameHandler.cutSensor(row)
             toBeReturned = self.crossTalk
             if initClusters:
                 self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         else:
             self.crossTalk = self.clusterHandler.calcCrossTalk()
-            if self.telescope == "lancs":
-                row = 248
-                self.crossTalk = self.crossTalk[np.where(self.baseAttr("Row")[0] < row)[0]]
-                self.dataFrameHandler.cutSensor(row)
-                self.getClusters(recalc=True)
-                self.baseAttr("ToT", recalc=True)
-                self.baseAttr("Hit_Voltage", recalc=True)
-                self.clusterHandler.setCalcCrossTalk(self.crossTalk)
             self.calcFileManager.saveFile(self.crossTalk, attribute="crossTalk")
             toBeReturned = self.crossTalk
         toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, False, layers)
@@ -227,14 +216,6 @@ class dataFrameHandler:
         if not self.checkLoadedData():
             self.data = self.dataFileManager.readFile()
             self.dataLength: int = len(self.data)
-
-    def cutSensor(self, row: int) -> pd.DataFrame:
-        self.loadDataIfNotLoaded()
-        positions = np.where(self.data["Row"].to_numpy() >= row)[0]
-        index_labels = self.data.index[positions]
-        self.data = self.data.drop(index=index_labels)
-        self.data.reset_index(drop=True, inplace=True)
-        return self.data
 
     def checkLoadedData(self) -> bool:
         if "data" in self.__dict__.keys():
