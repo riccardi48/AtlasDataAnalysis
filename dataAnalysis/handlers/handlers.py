@@ -54,14 +54,14 @@ class dataHandler:
                 toBeReturned = getattr(self, attribute)
             elif self.calcFileManager.fileExists(attribute) and not recalc:
                 toBeReturned = self.calcFileManager.loadFile(attribute)
-                getattr(self, attribute, toBeReturned)
+                setattr(self, attribute, toBeReturned)
             else:
                 attr = getattr(self.dataFrameHandler, "get" + attribute)
                 if attribute in ["Hit_Voltage", "Hit_VoltageError"]:
                     toBeReturned = attr(ToTs=self.baseAttr("ToT")[0])
                 else:
                     toBeReturned = attr()
-                getattr(self, attribute, toBeReturned)
+                setattr(self, attribute, toBeReturned)
                 self.calcFileManager.saveFile(toBeReturned, attribute=attribute)
         toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, excludeCrossTalk, layers)
         if returnIndexes:

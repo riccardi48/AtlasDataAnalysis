@@ -762,9 +762,6 @@ class correlationPlotter:
             rows, _ = dataFile.get_base_attr("Row")
             indexes = rows - np.min(rows)
             for cluster in clusters:
-                # print(cluster.notCrossTalk)
-                # print(cluster.getRows(excludeCrossTalk = self.excludeCrossTalk))
-                # input()
                 for pixel in cluster.getIndexes(excludeCrossTalk=self.excludeCrossTalk):
                     self.RowRow[
                         indexes[pixel],

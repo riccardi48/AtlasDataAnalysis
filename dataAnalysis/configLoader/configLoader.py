@@ -41,7 +41,10 @@ def loadConfig(path: str = "") -> dict:
     except:
         print(f"{path} does not exist. Loading default config")
         return _defaultConfig()
-    default = _defaultConfig()
+    config = addMissingKeys(config,_defaultConfig())
+    return config
+
+def addMissingKeys(config:dict,default:dict) -> dict:
     for key in default.keys():
         if key not in config:
             config[key] = default[key]

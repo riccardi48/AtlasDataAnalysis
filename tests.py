@@ -1,6 +1,7 @@
 from dataAnalysis import initDataFiles,printMemUsage
 import dataAnalysis.configLoader as configLoader
 import time
+printMemUsage()
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
