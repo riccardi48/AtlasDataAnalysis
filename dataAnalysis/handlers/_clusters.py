@@ -1,4 +1,3 @@
-from dataAnalysis._types import clusterClass, dataAnalysis, clusterArray
 from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     np,  # numpy
@@ -8,8 +7,67 @@ import warnings
 
 warnings.filterwarnings("ignore", "unsafe cast from int64 to int32")
 
-
+class clusterChecker:
+    def __init__(self,layer,index,TS,TriggerID):
+        self.layer = layer
+        self.indexes = [index]
+        self.minTS = TS
+        self.maxTS = TS
+        self.minTriggerID = TriggerID
+        self.maxTriggerID = TriggerID
+    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 80, triggerVariance = 1):
+        if self.layer != layer:
+            return False
+        if TriggerID <= self.maxTriggerID and TriggerID >= self.minTriggerID:
+            pass
+        elif abs(TriggerID - self.maxTriggerID) > triggerVariance and abs(TriggerID - self.minTriggerID) > triggerVariance:
+            return False
+        if TS <= self.maxTS and TS >= self.minTS:
+            pass
+        elif abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance:
+            return False
+        return True
+    def addHit(self,index,TS,TriggerID):
+        self.indexes.append(index)
+        if TS > self.maxTS:
+            self.maxTS = TS
+        if TS < self.minTS:
+            self.minTS = TS
+        if TriggerID > self.maxTriggerID:
+            self.maxTriggerID = TriggerID
+        if TriggerID < self.minTriggerID:
+            self.minTriggerID = TriggerID
+    def checkActive(self,TriggerID, triggerVariance = 10):
+        return True if self.maxTriggerID + triggerVariance >= TriggerID else False
+    
 def calcClusters(
+    Layers: npt.NDArray[np.int_],
+    TriggerID: npt.NDArray[np.int_],
+    TS: npt.NDArray[np.int_],
+    time_variance: np.int_ = 80,
+    trigger_variance: np.int_ = 1,
+) -> list[npt.NDArray[np.int_]]:
+    activeClusters = []
+    finishedClusters = []
+    for i in range(len(Layers)):
+        layer = Layers[i]
+        triggerID = TriggerID[i]
+        ts = TS[i]
+        index = i
+        addedToCluster = False
+        for cluster in activeClusters:
+            if cluster.checkHit(layer,index,ts,triggerID,timeVariance=time_variance,triggerVariance=trigger_variance):
+                cluster.addHit(index,ts,triggerID)
+                addedToCluster = True
+                break
+        if not addedToCluster:
+            activeClusters.append(clusterChecker(layer,index,ts,triggerID))
+        # Remove inactive clusters
+        finishedClusters += [cluster.indexes for cluster in activeClusters if not cluster.checkActive(triggerID)]
+        activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
+    return np.array(finishedClusters, dtype=object)
+
+def _calcClusters(
     Layers: npt.NDArray[np.int_],
     TriggerID: npt.NDArray[np.int_],
     TS: npt.NDArray[np.int_],
