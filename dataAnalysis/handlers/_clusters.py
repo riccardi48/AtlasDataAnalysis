@@ -63,11 +63,11 @@ def calcClusters(
         if not addedToCluster:
             activeClusters.append(clusterChecker(layer,index,ts,triggerID))
         # Remove inactive clusters
-        finishedClusters += [cluster.indexes for cluster in activeClusters if not cluster.checkActive(triggerID)]
+        finishedClusters += [np.array(cluster.indexes) for cluster in activeClusters if not cluster.checkActive(triggerID)]
         activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
     return np.array(finishedClusters, dtype=object)
 
-def _calcClusters(
+def __calcClusters(
     Layers: npt.NDArray[np.int_],
     TriggerID: npt.NDArray[np.int_],
     TS: npt.NDArray[np.int_],

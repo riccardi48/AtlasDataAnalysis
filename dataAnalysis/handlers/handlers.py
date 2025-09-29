@@ -318,6 +318,7 @@ class clusterHandler:
         return self._clusters
 
     def _calculateNewClusters(self) -> clusterArray:
+        print(f"Calculating Clusters")
         Layers = self.dataFrameHandler.readDataFrameAttr("Layer")
         TriggerIDs = self.dataFrameHandler.readDataFrameAttr("TriggerID")
         TSs = self.dataFrameHandler.readDataFrameAttr("TS")
