@@ -157,7 +157,7 @@ class dataHandler:
             if initClusters:
                 self.clusterHandler.setCalcCrossTalk(self.crossTalk)
         else:
-            self.crossTalk = self.clusterHandler.calcCrossTalk()
+            self.crossTalk = self.clusterHandler.calcCrossTalk(recalc=recalc)
             self.calcFileManager.saveFile(self.crossTalk, attribute="crossTalk")
             toBeReturned = self.crossTalk
         toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, False, layers)
@@ -325,7 +325,7 @@ class clusterHandler:
         rawClusters = calcClusters(Layers, TriggerIDs, TSs)
         print(f"{len(rawClusters)} clusters found")
         self.calcFileManager.saveFile(rawClusters, attribute="clusters")
-        self._clusters = self.initClusters(rawClusters, layers=Layers, TSs=TSs)
+        self._clusters = self.initClusters(rawClusters, layers=Layers)
         return self._clusters
 
     def initClusters(
@@ -379,8 +379,8 @@ class clusterHandler:
             cluster.setCrossTalk(crosstalk[cluster.indexes])
         self.haveCrossTalk = True
 
-    def calcCrossTalk(self) -> npt.NDArray[np.bool_]:
-        clusters = self.getClusters()
+    def calcCrossTalk(self,recalc:bool=False) -> npt.NDArray[np.bool_]:
+        clusters = self.getClusters(recalc=recalc)
         print(f"Finding Cross Talk")
         crossTalk = np.full(self.dataFrameHandler.getDataLength(), False, dtype=bool)
         for i, cluster in enumerate(clusters):

@@ -7,15 +7,15 @@ from plotAnalysis import plotClass
 import numpy as np
 
 config = configLoader.loadConfig()
+config["filterDict"] = {"telescope":"kit","angle":86.5,"voltage":48}
 dataFiles = initDataFiles(config)
 
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
     times4,indexes = dataFile.get_cluster_attr("Times", layer=4, excludeCrossTalk=True,returnIndexes=True)
-
     minTime = 130000
-    maxTime = 130200
+    maxTime = 132000
     range = (minTime, maxTime)
     bins = int(np.ptp(range) / 1)
     height, x = np.histogram(times4, bins=bins, range=range)
@@ -34,7 +34,7 @@ for i, dataFile in enumerate(dataFiles):
     axs = plot.axs
     timesDiff4 = np.diff(times4)
     minTime = 130000
-    maxTime = 130200
+    maxTime = 132000
     range = (minTime, maxTime)
     axs.scatter(
         times4[1:],
@@ -74,8 +74,8 @@ for i, dataFile in enumerate(dataFiles):
     )
     plot.saveToPDF(f"ClusterTimeDifferences_{dataFile.fileName}")
 
-    clusters = dataFile.get_clusters(layer=4,excludeCrossTalk = True)[indexes[(times4>minTime) & (times4<maxTime)]]
-    df = dataFile.get_dataFrame()
-    print(len(clusters))
-    for cluster in clusters:
-        print(df.iloc[cluster.indexes])
+    #clusters = dataFile.get_clusters(excludeCrossTalk = True)[indexes[(times4>minTime) & (times4<maxTime)]]
+    #df = dataFile.get_dataFrame()
+    #print(len(clusters))
+    #for cluster in clusters:
+    #    print(df.iloc[cluster.indexes])
