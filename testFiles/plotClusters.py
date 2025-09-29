@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+
 from plotAnalysis import plotClass, clusterPlotter
 from dataAnalysis import dataAnalysis, initDataFiles, configLoader
 from matplotlib.ticker import MultipleLocator
@@ -24,21 +28,21 @@ def Clusters(
     plot = plotClass(pathToOutput, sizePerPlot=(20, 20))
     axs = plot.axs
     plotter = clusterPlotter(dataFile, excludeCrossTalk=excludeCrossTalk)
-    clusters = dataFile.get_clusters(layer=layer, excludeCrossTalk=excludeCrossTalk)
+    clusters = dataFile.get_clusters(excludeCrossTalk=excludeCrossTalk)
     dataFile.init_cluster_voltages()
-    firstTS = clusters[1000].getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0]
+    #firstTS = clusters[1000].getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0]
     # firstTS = dataFile.get_base_attr("ext_TS", excludeCrossTalk=excludeCrossTalk)[50000]
-    lastTS = firstTS + 300 / (25 / 1000000)
+    #lastTS = firstTS + 300 / (25 / 1000000)
     firstTS = 130000
-    lastTS = 131000
+    lastTS = 130200
 
-    TSs = np.array([cluster.getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
-    TSs = TSs-np.min(TSs)
-    TSs = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)[0]
-    clusters = clusters[(TSs <= lastTS) & (TSs >= firstTS)]
-    print(len(clusters))
+    #TSs = np.array([cluster.getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
+    #TSs = TSs-np.min(TSs)
+    TSs,indexes = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk,returnIndexes=True)
+    usedClusters = clusters[indexes[(TSs <= lastTS) & (TSs >= firstTS)]]
+    print(len(usedClusters))
     # clusters = dataFile.get_clusters(layer=layer,excludeCrossTalk=excludeCrossTalk)[:40]
-    im = plotter.plotClusters(axs, clusters, z=z)
+    im = plotter.plotClusters(axs, usedClusters, z=z)
     plot.set_config(axs, title="Clusters", legend=False, xlabel="Row [px]", ylabel="Column [px]")
     axs.xaxis.set_major_locator(MultipleLocator(10))
     axs.xaxis.set_major_formatter("{x:.0f}")
@@ -51,7 +55,8 @@ def Clusters(
     cbar.ax.set_ylabel(f"{z}", rotation=270, fontsize="large")
     if saveToPDF:
         plot.saveToPDF(
-            f"Clusters_"
+            f"Clusters/"
+            + f"Clusters_"
             + f"{dataFile.fileName}"
             + f"{f"_{layer}" if layer is not None else ""}{"_cut" if excludeCrossTalk else ""}"
             +f"{f"_{name}" if name != "" else ""}"
@@ -61,6 +66,7 @@ def Clusters(
 
 
 config = configLoader.loadConfig()
+config["pathToOutput"] = "/home/atlas/rballard/AtlasDataAnalysis/output/TimeTests/"
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
     Clusters(dataFile, config["pathToOutput"], z="EXT_TSs", layer=4, excludeCrossTalk=True,name="EXT_TSs")

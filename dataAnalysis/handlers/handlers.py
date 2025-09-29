@@ -14,9 +14,12 @@ from ._clusterClass import clusterClass
 
 
 class dataHandler:
-    def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None):
-        self.fileName, self.voltage, self.angle, self.telescope = readFileName(pathToData)
-        self.baseAttrNames = [
+    def __init__(
+        self,
+        pathToData: str,
+        pathToCalcData: str,
+        maxLine: Optional[int] = None,
+        baseAttrNames: list[str] = [
             "PackageID",
             "Layer",
             "Column",
@@ -29,7 +32,10 @@ class dataHandler:
             "ext_TS",
             "ext_TS2",
             "FIFO_overflow",
-        ]
+        ],
+    ):
+        self.fileName, self.voltage, self.angle, self.telescope = readFileName(pathToData)
+        self.baseAttrNames = baseAttrNames
         self.dataFrameHandler = dataFrameHandler(
             pathToData, self.baseAttrNames, maxLine=maxLine, telescope=self.telescope
         )
@@ -194,10 +200,13 @@ class dataHandler:
             self.getCrossTalk(), path, name, self.getClusters()
         )
 
-    def getFlatClusters(self,width, excludeCrossTalk: bool = False,**kwargs) -> clusterArray:
+    def getFlatClusters(self, width, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
             self.getCrossTalk(**kwargs)
-        return self.clusterHandler.getFlatClusters(width, excludeCrossTalk = excludeCrossTalk,**kwargs)
+        return self.clusterHandler.getFlatClusters(
+            width, excludeCrossTalk=excludeCrossTalk, **kwargs
+        )
+
 
 class dataFrameHandler:
     # Stores the data frame
@@ -288,7 +297,7 @@ class clusterHandler:
     def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
         clusters = self._loadOrCalculateClusters(recalc)
         if layers is not None:
-            filter = self.layerFilter(self.clusters, layers=layers)
+            filter = self.layerFilter(clusters, layers=layers)
             return clusters[filter]
         return clusters
 
@@ -407,14 +416,14 @@ class clusterHandler:
             filter = self.layerFilter(self._clusters, layers=layers) & (toBeReturned > 0)
         elif attribute == "TSs":
             toBeReturned = np.array(
-                [np.min(cluster.getTSs(excludeCrossTalk)) for cluster in self._clusters]
+                [np.min(cluster.getEXT_TSs(excludeCrossTalk)) for cluster in self._clusters]
             )
             filter = self.layerFilter(self._clusters, layers=layers)
         elif attribute == "Times":
             toBeReturned = np.array(
-                [np.min([cluster.getTSs(excludeCrossTalk)]) for cluster in self._clusters]
+                [np.min([cluster.getEXT_TSs(excludeCrossTalk)]) for cluster in self._clusters]
             )
-            toBeReturned = TStoMS(toBeReturned.astype(int) - int(np.min(toBeReturned)))
+            toBeReturned = TStoMS(toBeReturned.astype(int) - np.min(toBeReturned).astype(int))
             filter = self.layerFilter(self._clusters, layers=layers)
         if returnIndexes:
             indexes = np.arange(len(self._clusters))
@@ -430,12 +439,15 @@ class clusterHandler:
         else:
             return np.isin([cluster.layer for cluster in clusters], layers)
 
-    def getFlatClusters(self,width,excludeCrossTalk:bool = False, layers:Optional[list[int]] = None) -> clusterArray:
+    def getFlatClusters(
+        self, width, excludeCrossTalk: bool = False, layers: Optional[list[int]] = None
+    ) -> clusterArray:
         self._widthDict = self._loadOrMakeWidthDict(excludeCrossTalk)
         clusters = self.getClusters()
         filter = self.layerFilter(self._clusters, layers=layers)
         return clusters[self._widthDict[width]][filter[self._widthDict[width]]]
-    def _loadOrMakeWidthDict(self,excludeCrossTalk:bool = False):
+
+    def _loadOrMakeWidthDict(self, excludeCrossTalk: bool = False):
         if "_widthDict" in self.__dict__:
             return self._widthDict
         clusters = self.getClusters()
@@ -445,8 +457,8 @@ class clusterHandler:
             width = cluster.getRowWidth(excludeCrossTalk)
             if (
                 cluster.getColumnWidth(excludeCrossTalk) != 1
-                or cluster.getSize(excludeCrossTalk) < width/3
-                ):
+                or cluster.getSize(excludeCrossTalk) < width / 3
+            ):
                 continue
             if width in self._widthDict:
                 self._widthDict[width].append(cluster.getIndex())

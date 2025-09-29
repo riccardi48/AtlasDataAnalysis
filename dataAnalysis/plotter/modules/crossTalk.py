@@ -4,8 +4,6 @@ from ._genericModule import plotModule
 from ._plot import plotClass
 from dataAnalysis._dependencies import (
     np,
-    npt,
-    PdfPages,
 )
 
 class crossTalkModule(plotModule):
@@ -50,7 +48,7 @@ class crossTalkModule(plotModule):
             xlabel="Row Width [px]",
         )
         plot.fig.suptitle(
-            f"{self.dataFile.fileName} removed cross talk comparison", fontsize="x-large"
+            f"{self.dataFile.fileName} removed cross talk comparison layer {config["layers"]}", fontsize="x-large"
         )
         if self.saveToSharedPdf:
             plot.addToPDF(self.pdf)

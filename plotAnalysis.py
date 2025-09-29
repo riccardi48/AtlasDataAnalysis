@@ -1,11 +1,9 @@
-from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, calcDataFileManager, crossTalkFinder, clusterClass
-from AtlasDataAnalysis.Code.lowLevelFunctions import (
+from dataAnalysis import dataAnalysis, clusterClass
+from lowLevelFunctions import (
     calcHit_VoltageByPixel,
     histogramErrors,
     neg_log_likelihood_truncated,
     landauFunc,
-    print_mem_usage,
-    TStoMS,
     fitVoltageDepth,
     chargeCollectionEfficiencyFunc,
     calcDepth,
@@ -20,6 +18,13 @@ import numpy.typing as npt
 from landau import landau
 
 clusterArray: TypeAlias = npt.NDArray[np.object_]
+
+def TStoMS(TS: npt.NDArray[np.int_]) -> npt.NDArray[np.float64]:
+    return TS * 25 / 1000000
+
+
+def MStoTS(Time: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
+    return np.round(Time * 1000000 / 25).astype(np.int_)
 
 
 class depthAnalysis:
@@ -596,7 +601,6 @@ class plotClass:
         self.fig.savefig(f"{out_put_file_name}")
         plt.close()
         print(f"Saved Plot: {out_put_file_name}")
-        print_mem_usage()
 
 
 class clusterPlotter:
@@ -605,7 +609,7 @@ class clusterPlotter:
         self.buffer = buffer
         self.excludeCrossTalk = excludeCrossTalk
         self.cmap = "plasma"
-        self.crossTalkFinder = crossTalkFinder()
+        #self.crossTalkFinder = crossTalkFinder()
 
     def plotClusters(self, ax: Any, clusters: clusterArray, z: str = "Hit_Voltages") -> Any:
         numberOfPoints = sum(
@@ -637,12 +641,12 @@ class clusterPlotter:
             display - np.nanmin(display),
             extent,
             vmin=0,
-            vmax=2,
-            #vmax=float(np.nanmax(display[display]) - np.nanmin(display) + 1),
+            #vmax=2,
+            vmax=float(np.nanmax(display) - np.nanmin(display) + 1),
         )
         minTS = np.average(clusters[0].getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk))
         for cluster in clusters:
-            ang = np.random.uniform(0, 2)
+            ang = np.random.uniform(-1, 2)
             value = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
             value = np.reshape(value, np.size(value))[0]
             time = f"{TStoMS(np.average(cluster.getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk)) - minTS):.2f} ms"

@@ -1,6 +1,6 @@
 from plotAnalysis import depthAnalysis, plotClass, fit_dataFile
-from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, initDataFiles
-from AtlasDataAnalysis.Code.lowLevelFunctions import (
+from dataAnalysis import dataAnalysis, initDataFiles
+from lowLevelFunctions import (
     chargeCollectionEfficiencyFunc,
     depletionWidthFunc,
 )
@@ -43,7 +43,7 @@ def Comparison_RowWidthDistribution(
             minTime = minTimes[i]
             maxTime = maxTimes[i]
         if maxTime > np.max(times):
-            print(dataFile.get_fileName())
+            print(dataFile.fileName)
         rowsWidths = rowsWidths[(times > minTime) & (times < maxTime)]
         height, x = np.histogram(rowsWidths, bins=bins, range=range)
         axs.stairs(
@@ -51,7 +51,7 @@ def Comparison_RowWidthDistribution(
             x - 0.5,
             baseline=None,
             color=cmap(1/len(dataFiles)*i),
-            label=f"{dataFile.get_fileName()}",
+            label=f"{dataFile.fileName}",
         )
     plot.set_config(
         axs,
@@ -99,7 +99,7 @@ def Comparison_RowWidthDistribution_2(
             np.append(x[0] - 0.5,x + 0.5),
             baseline=None,
             color=cmap(1/len(dataFiles)*i),
-            label=f"{dataFile.get_fileName()}",
+            label=f"{dataFile.fileName}",
         )
     plot.set_config(
         axs,
@@ -137,16 +137,15 @@ def Comparison_ClustersCountOverTime(
     for i, dataFile in enumerate(dataFiles):
         times = (
             dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)[0]
-            / 1000
-        )
+        )/1000
         maxTime = np.max(times)
-        maxTime = 10000
+        maxTime = 1000
         minTime = 10
         range = (minTime, maxTime)
         bins = int(np.ptp(range) / 1)
         height, x = np.histogram(times, bins=bins, range=range)
         axs.stairs(
-            height, x, baseline=None, color=cmap(1/len(dataFiles)*i), label=f"{dataFile.get_fileName()}"
+            height, x, baseline=None, color=cmap(1/len(dataFiles)*i), label=f"{dataFile.fileName}"
         )
         try:
             firstPeaks.append(x[np.where(height > 200)][0] * 1000)
@@ -211,7 +210,7 @@ def Comparison_AngleDistribution(
         axs.stairs(
             heights,
             np.rad2deg(bins),
-            label=f"{d*50:.2f} μm - {dataFile.get_fileName()}",
+            label=f"{d*50:.2f} μm - {dataFile.fileName}",
             baseline=None,
             color=cmap(1/len(dataFiles)*i),
         )
@@ -225,12 +224,12 @@ def Comparison_AngleDistribution(
         ylabel="Frequency",
     )
     axs.vlines(
-        dataFile.get_angle(), 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
+        dataFile.angle, 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
     )
     axs.text(
-        dataFile.get_angle(),
+        dataFile.angle,
         axs.get_ylim()[1],
-        dataFile.get_angle(),
+        dataFile.angle,
         color=plot.textColor,
         fontweight="bold",
         horizontalalignment="right",
@@ -277,11 +276,11 @@ def Comparison_CCE_Vs_Depth(
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
-            GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
+            GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
         y = chargeCollectionEfficiencyFunc(
-            x, *popt, GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6
+            x, *popt, GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6
         )
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
@@ -290,7 +289,7 @@ def Comparison_CCE_Vs_Depth(
         )
         label = f"{dataFile.get_voltage()}V"
         if dataFile.get_voltage() == 48:
-            if dataFile.get_fileName() == "angle6_4Gev_kit_2":
+            if dataFile.fileName == "angle6_4Gev_kit_2":
                 label = f"{label} 4Gev"
             else:
                 label = f"{label} 6Gev"
@@ -298,7 +297,7 @@ def Comparison_CCE_Vs_Depth(
         color: Union[tuple[float, ...], str] = tuple(
             map(float, cmap((1 / 48 * dataFile.get_voltage())))
         )
-        if dataFile.get_fileName() == "angle6_4Gev_kit_2":
+        if dataFile.fileName == "angle6_4Gev_kit_2":
             color = "r"
         axs.plot(x, y, linestyle="dashed", label=label, color=color)
     plot.set_config(axs, legend=True, loc="upper right", ncols=2)
@@ -380,11 +379,11 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
             hideLowWidths=hideLowWidths,
             fitting=fitting,
             measuredAttribute=measuredAttribute,
-            GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
+            GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6,
         )
         x = np.linspace(0, np.max(x), 1000)
         y = chargeCollectionEfficiencyFunc(
-            x, *popt, GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6
+            x, *popt, GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6
         )
         (V_0, t_epi, edl) = popt
         (V_0_e, t_epi_e, edl_e) = np.sqrt(np.diag(pcov))
@@ -392,7 +391,7 @@ def Scatter_Epi_Thickness_Vs_Bias_Voltage(
         color: Union[tuple[float, ...], str] = tuple(
             map(float, cmap((1 / 48 * dataFile.get_voltage())))
         )
-        if dataFile.get_fileName() == "angle6_4Gev_kit_2":
+        if dataFile.fileName == "angle6_4Gev_kit_2":
             color = "r"
         axs.scatter(dataFile.get_voltage(), t_epi, color=color, marker="x", s=15)
         axs.errorbar(
@@ -568,10 +567,10 @@ def Comparison_CrosstalkScatter(
     for dataFile in dataFiles:
         if attribute == "Bias Voltage":
             x = dataFile.get_voltage()
-            check = dataFile.get_angle() == attributeDict["Angle"]
+            check = dataFile.angle == attributeDict["Angle"]
             label = f"{x}V"
         elif attribute == "Angle":
-            x = dataFile.get_angle()
+            x = dataFile.angle
             check = dataFile.get_voltage() == attributeDict["Bias Voltage"]
             label = f"{x} Degrees"
         if check:
@@ -615,7 +614,7 @@ def Comparison_CrosstalkScatter(
 
 
 if __name__ == "__main__":
-    import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
+    import dataAnalysis.configLoader as configLoader
 
     config = configLoader.loadConfig()
     #config["maxClusterWidth"] = 29

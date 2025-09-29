@@ -27,7 +27,23 @@ def _isFiltered(dataFile: dataAnalysis, filter_dict: dict = {}) -> bool:
 class dataAnalysis:
     def __init__(self, pathToData: str, pathToCalcData: str, maxLine: Optional[int] = None) -> None:
         self.fileName, self.voltage, self.angle, self.telescope = readFileName(pathToData)
-        self.dataHandler = dataHandler(pathToData, pathToCalcData, maxLine=maxLine)
+        self.baseAttrNames = [
+            "PackageID",
+            "Layer",
+            "Column",
+            "Row",
+            "TS",
+            "TS1",
+            "TS2",
+            "TriggerTS",
+            "TriggerID",
+            "ext_TS",
+            "ext_TS2",
+            "FIFO_overflow",
+        ]
+        self.dataHandler = dataHandler(
+            pathToData, pathToCalcData, maxLine=maxLine, baseAttrNames=self.baseAttrNames
+        )
         self.pathToData = pathToData
 
     def check_if_filtered(self, filterDict) -> bool:
@@ -88,7 +104,7 @@ class dataAnalysis:
     def save_nonCrossTalk_to_csv(self, path) -> None:
         self.dataHandler.save_nonCrossTalk_to_csv(path, self.fileName)
 
-    def get_flatClusters(self,width,**kwargs) -> clusterArray:
+    def get_flatClusters(self, width, **kwargs) -> clusterArray:
         if "layer" in kwargs:
             if kwargs["layer"] is None:
                 kwargs["layers"] = None
@@ -96,4 +112,4 @@ class dataAnalysis:
             else:
                 kwargs["layers"] = [kwargs["layer"]]
                 kwargs.pop("layer")
-        return self.dataHandler.getFlatClusters(width,**kwargs)
+        return self.dataHandler.getFlatClusters(width, **kwargs)

@@ -6,7 +6,7 @@ from dataAnalysis._dependencies import (
     npt,
     PdfPages,
 )
-from .modules import crossTalkModule
+from .modules import crossTalkModule,simpleModule
 
 class plotterClass:
     def __init__(self, dataFile: dataAnalysis, config: dict, pathToOutput, saveToSharedPdf: bool = False):
@@ -31,6 +31,14 @@ class plotterClass:
             if self.saveToSharedPdf:
                 self._crossTalk.pdf = self.pdf
         return self._crossTalk
+    
+    def simple(self):
+        if "_simple" not in self.__dict__:
+            self._simple = simpleModule(self.dataFile, self.config, f"{self.pathToOutput}Simple/", saveToSharedPdf = self.saveToSharedPdf)
+            if self.saveToSharedPdf:
+                self._simple.pdf = self.pdf
+        return self._simple
+    
     def savePDF(self):
         self.pdf.savefig()
         self.pdf.close()
