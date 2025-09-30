@@ -19,7 +19,10 @@ class crossTalkFinder:
         ToTs = cluster.getToTs()
         columns = cluster.getColumns()
         rows = cluster.getRows()
-
+        if shortIndexes.size > 1000:
+            temp = np.full(shortIndexes.shape, True, dtype=bool)
+            temp[0] = False
+            return temp
         # Use JIT-compiled function for the heavy lifting
         return self._find_crosstalk_jit(
             np.ascontiguousarray(ToTs, dtype=np.int32),

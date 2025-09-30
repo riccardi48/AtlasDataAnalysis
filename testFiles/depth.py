@@ -1,13 +1,19 @@
+import sys
+sys.path.append("..")
 from dataAnalysis import initDataFiles,configLoader
 import numpy as np
 from plotAnalysis import plotClass
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
 
 def linearLine(a,b,x):
     m = 1/(a-b)
     y = m*(x-a)
     return y
 def calcDepthsFromTSs(cluster,excludeCrossTalk=True,residual=1/np.sqrt(12)):
-    residual=1/np.sqrt(12)
+    residual=0.4
     rows = cluster.getRows(excludeCrossTalk)
     sortArray = np.argsort(rows)
     rows = rows[sortArray]
@@ -121,7 +127,7 @@ for dataFile in dataFiles:
     )
     plot.saveToPDF(f"AngleDistribution_{dataFile.fileName}")
 
-    testDepths = np.linspace(0,100,1000)
+    testDepths = np.linspace(0,100,10000)
     depths = np.zeros(testDepths.shape)
     clusters = dataFile.get_clusters(excludeCrossTalk=True)
     angle = 86.5
@@ -132,14 +138,19 @@ for dataFile in dataFiles:
             dMin = lastAbove*50/(np.tan(np.deg2rad(angle))*(cluster.minDepth[0]-cluster.maxDepth[lastAbove]))
             #dMax = lastAbove*50/np.tan(np.deg2rad(angle))
             #dMin = (lastAbove+1)*50/np.tan(np.deg2rad(angle))
-            depths[(testDepths>=dMax) & (testDepths<=dMin)] += 1/np.sum([(testDepths>=dMax) & (testDepths<=dMin)])
+            if dMin > dMax:
+                dMin,dMax = dMax,dMin
+            if np.sum([(testDepths>=dMax) & (testDepths<=dMin)]) == 0:
+                depths[find_nearest(testDepths,dMax)] += 1
+            else:
+                depths[(testDepths>=dMax) & (testDepths<=dMin)] += 1/np.sum([(testDepths>=dMax) & (testDepths<=dMin)])
 
     plot = plotClass(config["pathToOutput"] + "AngleTest/")
     axs = plot.axs
     #hist, binEdges = np.histogram(angles,bins=50,range=(75,90))
     axs.stairs(
             depths,
-            np.linspace(-0.05,100.05,1001),
+            np.linspace(-0.005,100.005,10001),
             label=f"{d:.0f} μm",
             baseline=None,
             color=plot.colorPalette[3],

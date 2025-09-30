@@ -23,7 +23,7 @@ class clusterChecker:
         elif abs(TriggerID - self.maxTriggerID) > triggerVariance and abs(TriggerID - self.minTriggerID) > triggerVariance:
             return False
         if TS <= self.maxTS and TS >= self.minTS:
-            pass
+            return True
         elif abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance:
             return False
         return True

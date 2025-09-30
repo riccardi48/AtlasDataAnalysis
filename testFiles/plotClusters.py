@@ -33,13 +33,15 @@ def Clusters(
     #firstTS = clusters[1000].getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0]
     # firstTS = dataFile.get_base_attr("ext_TS", excludeCrossTalk=excludeCrossTalk)[50000]
     #lastTS = firstTS + 300 / (25 / 1000000)
-    firstTS = 130000
-    lastTS = 130200
+    firstTS = 135000
+    lastTS = 135300
 
     #TSs = np.array([cluster.getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
     #TSs = TSs-np.min(TSs)
     TSs,indexes = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk,returnIndexes=True)
     usedClusters = clusters[indexes[(TSs <= lastTS) & (TSs >= firstTS)]]
+    if len(usedClusters) == 0:
+        return
     print(len(usedClusters))
     # clusters = dataFile.get_clusters(layer=layer,excludeCrossTalk=excludeCrossTalk)[:40]
     im = plotter.plotClusters(axs, usedClusters, z=z)
@@ -69,6 +71,7 @@ config = configLoader.loadConfig()
 config["pathToOutput"] = "/home/atlas/rballard/AtlasDataAnalysis/output/TimeTests/"
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
+    Clusters(dataFile, config["pathToOutput"], z="TSs", layer=4, excludeCrossTalk=True,name="TSs")
     Clusters(dataFile, config["pathToOutput"], z="EXT_TSs", layer=4, excludeCrossTalk=True,name="EXT_TSs")
     Clusters(dataFile, config["pathToOutput"], z="Hit_Voltages", layer=4, excludeCrossTalk=True,name="Hit_Voltages")
     Clusters(dataFile, config["pathToOutput"], z="Index", layer=4, excludeCrossTalk=True,name="Index")

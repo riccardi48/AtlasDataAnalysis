@@ -1,3 +1,5 @@
+import sys
+sys.path.append("..")
 from dataAnalysis import initDataFiles,printMemUsage,configLoader
 import time
 printMemUsage()
