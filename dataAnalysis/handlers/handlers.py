@@ -196,6 +196,7 @@ class dataHandler:
         return array, indexes
 
     def save_nonCrossTalk_to_csv(self, path, name) -> None:
+        self.getCrossTalk(recalc=True)
         self.dataFrameHandler.saveNonCrossTalkToCSV(
             self.getCrossTalk(), path, name, self.getClusters()
         )

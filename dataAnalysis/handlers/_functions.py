@@ -57,11 +57,10 @@ def calcToT(TS: npt.NDArray[np.int_], TS2: npt.NDArray[np.int_]) -> npt.NDArray[
 def trueTimeStamps(clusters: clusterArray, ext_TS: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     new_ext_TS = np.zeros(ext_TS.size)
     for cluster in clusters:
-        firstTS = np.min(cluster.getTSs(excludeCrossTalk=True))
+        firstTS = np.min(cluster.getEXT_TSs(excludeCrossTalk=True))
         firstTS1024 = firstTS % 1024
-        new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getTSs() % 1024) - firstTS1024)
+        new_ext_TS[cluster.getIndexes()] = firstTS + ((cluster.getEXT_TSs() % 1024) - firstTS1024)
     return new_ext_TS.astype(np.int_)
-
 
 def TStoMS(TS: npt.NDArray[np.int_]) -> npt.NDArray[np.float64]:
     return TS * 25 / 1000000

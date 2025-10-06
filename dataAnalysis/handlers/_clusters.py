@@ -24,7 +24,7 @@ class clusterChecker:
             return False
         if TS <= self.maxTS and TS >= self.minTS:
             return True
-        elif abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance:
+        elif (abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance) and (abs((TS + 512) - (self.maxTS + 512)) > timeVariance and abs((TS + 512) - (self.minTS + 512)) > timeVariance):
             return False
         return True
     def addHit(self,index,TS,TriggerID):
