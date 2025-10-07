@@ -19,7 +19,7 @@ class crossTalkFinder:
         ToTs = cluster.getToTs()
         columns = cluster.getColumns()
         rows = cluster.getRows()
-        if shortIndexes.size > 1000:
+        if shortIndexes.size > 200:
             temp = np.full(shortIndexes.shape, True, dtype=bool)
             temp[0] = False
             return temp
