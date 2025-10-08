@@ -22,10 +22,10 @@ def getPixelResponseSlope(rows,chargeCollected):
     return popt[0]
 
 for dataFile in dataFiles:
-    for _range in ((-1,1),(-0.1,0.1),(-0.05,0.05),(-0.01,0.01),(-0.002,0.002)):
+    dataFile.init_cluster_voltages()
+    for _range in []:#((-5,5),(-1,1),(-0.1,0.1),(-0.05,0.05),(-0.01,0.01)):
         plot = plotClass(config["pathToOutput"] + "PixelResponseSLope/")
         axs = plot.axs
-        dataFile.init_cluster_voltages()
         PRS = np.array([getPixelResponseSlope(cluster.getRows(excludeCrossTalk=True),cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=4)])
         PRS = PRS[~np.isnan(PRS)]
         height, x = np.histogram(PRS, bins=210, range=_range)
@@ -38,4 +38,23 @@ for dataFile in dataFiles:
             xlabel="Pixel Response Slope",
             ylabel="Frequency",
             )
-        plot.saveToPDF(f"PixelResponseSlope_Long_{dataFile.fileName}_{_range}")
+        plot.saveToPDF(f"PixelResponseSlope_Short_{dataFile.fileName}_{_range}")
+
+
+    plot = plotClass(config["pathToOutput"] + "PixelResponseSLope/ScatterTest/")
+    axs = plot.axs
+    PRS = np.array([getPixelResponseSlope(cluster.getRows(excludeCrossTalk=True),cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=4)])
+    Columns = np.array([np.mean(cluster.getColumns(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=4)])
+    Columns = Columns[~np.isnan(PRS)]
+    PRS = PRS[~np.isnan(PRS)]
+    _range = (-0.1,0.1)
+    axs.hist2d(Columns,PRS,bins=(135,210),range=((0,135),_range),cmin=1)
+    plot.set_config(
+        axs,
+        ylim=_range,
+        xlim=(0, None),
+        title=f"Pixel Response Slope Histogram {dataFile.fileName}",
+        xlabel="Column",
+        ylabel="Pixel Response Slope",
+        )
+    plot.saveToPDF(f"PixelResponseSlope_Scatter_{dataFile.fileName}")
