@@ -16,7 +16,7 @@ from typing import Optional, Any, TypeAlias
 import numpy as np
 import numpy.typing as npt
 from landau import landau
-
+from dataAnalysis._fileReader import calcDataFileManager
 clusterArray: TypeAlias = npt.NDArray[np.object_]
 
 def TStoMS(TS: npt.NDArray[np.int_]) -> npt.NDArray[np.float64]:
@@ -46,7 +46,7 @@ class depthAnalysis:
     ) -> None:
         fileCheck = True
         attribute = f"{measuredAttribute}ByPixel"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/hist/"
+        file = f"{dataFile.fileName}/depthAnalysis/hist/"
 
         for i in range(self.maxClusterWidth - 1):
             calcFileName = self.calcFileManager.generateFileName(
@@ -113,7 +113,7 @@ class depthAnalysis:
         if error:
             attribute = f"{attribute}Error"
         name = f"_{clusterWidth}"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/hist/"
+        file = f"{dataFile.fileName}/depthAnalysis/hist/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name=name, file=file, layers=self.layers
         )
@@ -142,7 +142,7 @@ class depthAnalysis:
         elif fitting == "nnlf":
             attribute = f"{measuredAttribute}Peaks_nnlf"
         name = f"_{clusterWidth}"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/peaks/"
+        file = f"{dataFile.fileName}/depthAnalysis/peaks/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name=name, file=file, layers=self.layers
         )
@@ -172,7 +172,7 @@ class depthAnalysis:
             hitPositionErrorArray=hitPositionErrorArray[:,remove]
             hitPositionArray=hitPositionArray[:,remove]
             if measuredAttribute == "Hit_Voltage":
-                _range = (0.162, 2)
+                _range = (0.162, 3)
             elif measuredAttribute == "ToT":
                 _range = (40, 256)
             if fitting == "histogram":
@@ -514,7 +514,7 @@ class depthAnalysis:
                         + shift
                     ]
                 )
-            - dataFile.get_angle()
+            - dataFile.angle
             ) ** 2
             )
 
@@ -543,13 +543,13 @@ class plotClass:
         self.axs = gs.subplots(sharex=sharex, sharey=sharey)
         self.colorPalette = [
             "#CC3F0C",
-            "#9A6D38",
+            "#8896AB",
             "#33673B",
             "#333745",
-            "#8896AB",
             "#EDB0E4",
             "#CC8A8A",
             "#239A7E",
+            "#9A6D38",
         ]
         self.textColor = self.colorPalette[-1]
 
@@ -749,7 +749,7 @@ class correlationPlotter:
         self, dataFile: dataAnalysis, recalc: bool = False
     ) -> npt.NDArray[np.float64]:
         attribute = f"RowRowCorrelation"
-        file = f"{dataFile.get_fileName()}/"
+        file = f"{dataFile.fileName}/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name="", file=file, layers=self.layers
         )
@@ -892,14 +892,14 @@ def fit_dataFile(
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
-            upTwo=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+            upTwo=True if dataFile.fileName == "angle6_4Gev_kit_2" else False,
         )
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
             upTwo=False,
         )

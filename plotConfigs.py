@@ -1,13 +1,11 @@
 from plotAnalysis import depthAnalysis, plotClass, correlationPlotter, fitAndPlotCCE, fit_dataFile
-from AtlasDataAnalysis.Code.dataAnalysis.dataAnalysis import dataAnalysis, crossTalkFinder, initDataFiles
-from AtlasDataAnalysis.Code.lowLevelFunctions import (
+from dataAnalysis import dataAnalysis, initDataFiles, configLoader
+from lowLevelFunctions import (
     calcDepth,
     adjustPeakVoltage,
     histogramErrors,
     landauFunc,
-    lambert_W_ToT_to_u,
     chargeCollectionEfficiencyFunc,
-    print_mem_usage,
 )
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -17,12 +15,14 @@ import numpy as np
 from typing import Optional
 from landau import landau
 import scipy as scipy
+from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
+
 
 def AngleDistribution(
     dataFile: dataAnalysis, depth: depthAnalysis, pathToOutput: str, saveToPDF: bool = True
 ):
     dList = np.linspace(1.2, 2.0, 5)
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     for i in range(len(dList)):
         bins, values = depth.findClusterAngleDistribution(dataFile, dList[i])
@@ -43,12 +43,12 @@ def AngleDistribution(
         ylabel="Frequency",
     )
     axs.vlines(
-        dataFile.get_angle(), 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
+        dataFile.angle, 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
     )
     axs.text(
-        dataFile.get_angle(),
+        dataFile.angle,
         axs.get_ylim()[1],
-        dataFile.get_angle(),
+        dataFile.angle,
         color=plot.textColor,
         fontweight="bold",
         horizontalalignment="right",
@@ -70,7 +70,7 @@ def AngleDistribution_2(
     dataFile: dataAnalysis, depth: depthAnalysis, pathToOutput: str, saveToPDF: bool = True
 ):
     d = depth.find_d_value(dataFile)
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     bins, values = depth.findClusterAngleDistribution(dataFile, d)
     axs.stairs(
@@ -86,12 +86,12 @@ def AngleDistribution_2(
         ylabel="Frequency",
     )
     axs.vlines(
-        dataFile.get_angle(), 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
+        dataFile.angle, 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
     )
     axs.text(
-        dataFile.get_angle(),
+        dataFile.angle,
         axs.get_ylim()[1],
-        dataFile.get_angle(),
+        dataFile.angle,
         color=plot.textColor,
         fontweight="bold",
         horizontalalignment="right",
@@ -113,7 +113,7 @@ def WidthDistribution(
     dataFile: dataAnalysis, depth: depthAnalysis, pathToOutput: str, saveToPDF: bool = True
 ):
     x, y = depth.findClusterWidthDistribution(dataFile)
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     axs.bar(x, y, width=1, color=plot.colorPalette[3])
     plot.set_config(
@@ -138,7 +138,7 @@ def WidthDistribution(
 
 
 def ColumnWidthDistribution(dataFile, pathToOutput, layer=4, saveToPDF=True):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     bins = 30
     range = (0, 30)
@@ -172,7 +172,7 @@ def ColumnWidthDistribution(dataFile, pathToOutput, layer=4, saveToPDF=True):
 def RowWidthDistribution(
     dataFile: dataAnalysis, pathToOutput: str, layer: int = 4, saveToPDF: bool = True
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     bins = 60
     range = (0, 60)
@@ -209,7 +209,7 @@ def VoltageDepthScatter(
     saveToPDF: bool = True,
 ):
     d = depth.find_d_value(dataFile)
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     cmap = plt.get_cmap("hsv")
     allXValues: list[float] = []
@@ -219,14 +219,14 @@ def VoltageDepthScatter(
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
-            upTwo=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+            upTwo=True if dataFile.fileName == "angle6_4Gev_kit_2" else False,
         )
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
             upTwo=False,
         )
@@ -261,7 +261,7 @@ def VoltageDepthScatter(
     yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
     x = allXValues_np[np.argsort(allXValues_np)]
     cut = (y>0.10) & (x < d*50*0.9)
-    fitAndPlotCCE(axs, plot, x[cut], y[cut], yerr[cut],GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
+    fitAndPlotCCE(axs, plot, x[cut], y[cut], yerr[cut],GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6)
     
     plot.set_config(
         axs,
@@ -280,7 +280,7 @@ def VoltageDepthScatter(
         axs.hlines(0.162, 0, rightSide, colors=plot.colorPalette[1], linestyles="dashed")
         plot.set_config(
             axs,
-            ylim=(0, 0.64),
+            ylim=(0, 0.6),
             xlim=(0, rightSide),
             title="Voltage change withing a Cluster",
             xlabel="Depth [μm]",
@@ -335,7 +335,7 @@ def Hit_VoltageDistributionByPixel(
     saveToPDF: bool = True,
 ):
     plot = plotClass(
-        pathToOutput + f"{dataFile.get_fileName()}/",
+        pathToOutput + f"{dataFile.fileName}/",
         shape=(1, clusterWidth),
         sharex=True,
         sizePerPlot=(10, 2),
@@ -443,15 +443,15 @@ def HitDistributionInCluster(
     pathToOutput: str,
     saveToPDF: bool = True,
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     hitPositionArray = np.flip(depth.loadOneLength(dataFile, clusterWidth)[0])
     d = depth.find_d_value(dataFile)
     heights = np.zeros((clusterWidth))
     x = np.linspace(0, 1 - (0.5 / clusterWidth), clusterWidth + 1) * d * 50
 
-    if clusterWidth > (d * np.tan(np.deg2rad(dataFile.get_angle()))):
-        x = x * (clusterWidth / (d * np.tan(np.deg2rad(dataFile.get_angle()))))
+    if clusterWidth > (d * np.tan(np.deg2rad(dataFile.angle))):
+        x = x * (clusterWidth / (d * np.tan(np.deg2rad(dataFile.angle))))
     for j in range(clusterWidth):
         heights[j] = np.sum(hitPositionArray[j] > 0)
     axs.stairs(heights, x, color=plot.colorPalette[3], label="Original")
@@ -506,7 +506,7 @@ def HitDistributionInClusterAllOnOne(
     cutting: bool = False,
     saveToPDF: bool = True,
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     cmap = plt.get_cmap("hsv")
     d = depth.find_d_value(dataFile)
@@ -516,8 +516,8 @@ def HitDistributionInClusterAllOnOne(
         x = calcDepth(
             d,
             clusterWidth,
-            dataFile.get_angle(),
-            depthCorrection=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+            dataFile.angle,
+            depthCorrection=True if dataFile.fileName == "angle6_4Gev_kit_2" else False,
             upTwo=False,
         )
         x = np.sort(x)
@@ -545,15 +545,15 @@ def HitDistributionInClusterAllOnOne(
     popt, pcov, _, __, ___ = fit_dataFile(
             dataFile,
             depth,
-            depthCorrection=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+            depthCorrection=True if dataFile.fileName == "angle6_4Gev_kit_2" else False,
             hideLowWidths=True,
             fitting="histogram",
             measuredAttribute="Hit_Voltage",
-            GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6,
+            GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6,
             maxClusterWidth=29,
         )
     x = np.linspace(0, np.max(x), 1000)
-    MPVs = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.get_fileName() == "angle6_4Gev_kit_2" else 6)
+    MPVs = chargeCollectionEfficiencyFunc(x, *popt,GeV=4 if dataFile.fileName == "angle6_4Gev_kit_2" else 6)
     y = np.zeros(x.size)
     def func(x,m,c):
         return m*x+c
@@ -605,7 +605,7 @@ def HitDistributionInClusterAllOnOne(
 def CuttingComparison(
     dataFile: dataAnalysis, pathToOutput: str, layers: Optional[int] = None, saveToPDF: bool = True
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", shape=(2, 2), sizePerPlot=(5, 4))
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/", shape=(2, 2), sizePerPlot=(5, 4))
     axs = plot.axs
     bins = 128
     range = (0, 256)
@@ -637,12 +637,12 @@ def CuttingComparison(
         title="Time over threshold distribution",
         legend=True,
     )
-    if dataFile.get_fileName() in ["angle6_6Gev_kit_4", "angle6_4Gev_kit_2"]:
+    if dataFile.fileName in ["angle6_6Gev_kit_4", "angle6_4Gev_kit_2"]:
         axs[0, 0].set_ylim(0, 200000)
         axs[0, 0].yaxis.set_major_locator(MultipleLocator(10000))
         axs[0, 0].yaxis.set_major_formatter("{x:.0f}")
         axs[0, 0].yaxis.set_minor_locator(MultipleLocator(2000))
-    elif dataFile.get_fileName() == "6Gev_kit_0":
+    elif dataFile.fileName == "6Gev_kit_0":
         axs[0, 0].set_ylim(0, 200000)
         axs[0, 0].yaxis.set_major_locator(MultipleLocator(10000))
         axs[0, 0].yaxis.set_major_formatter("{x:.0f}")
@@ -783,11 +783,11 @@ def CuttingComparison(
         legend=True,
     )
 
-    if dataFile.get_fileName() == "angle6_6Gev_kit_4":
+    if dataFile.fileName == "angle6_6Gev_kit_4":
         axs[0, 1].yaxis.set_major_locator(MultipleLocator(5000))
         axs[0, 1].yaxis.set_major_formatter("{x:.0f}")
         axs[0, 1].yaxis.set_minor_locator(MultipleLocator(1000))
-    elif dataFile.get_fileName() == "6Gev_kit_0":
+    elif dataFile.fileName == "6Gev_kit_0":
         axs[0, 1].yaxis.set_major_locator(MultipleLocator(50000))
         axs[0, 1].yaxis.set_major_formatter("{x:.0f}")
         axs[0, 1].yaxis.set_minor_locator(MultipleLocator(10000))
@@ -801,7 +801,7 @@ def CuttingComparison(
     axs[0, 1].spines["right"].set_visible(False)
     axs[0, 1].spines["top"].set_visible(False)
     plot.fig.suptitle(
-        f"{dataFile.get_fileName()} removed cross talk comparison", fontsize="x-large"
+        f"{dataFile.fileName} removed cross talk comparison", fontsize="x-large"
     )
     if saveToPDF:
         plot.saveToPDF(f"CutComparison{f"_{layers}" if layers is not None else ""}")
@@ -815,11 +815,10 @@ def ClustersCountOverTime(
     layers: list[int] = [1, 2, 3, 4],
     saveToPDF: bool = True,
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     for layer in layers:
         times = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=True)[0] / 1000
-        bins = 60
         maxTime = np.max(times)
         maxTime = 300
         range = (0, maxTime)
@@ -835,6 +834,12 @@ def ClustersCountOverTime(
         xlabel="Time [s]",
         ylabel="Frequency",
     )
+    axs.xaxis.set_major_locator(MultipleLocator(100))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(20))
+    axs.yaxis.set_major_locator(MultipleLocator(100))
+    axs.yaxis.set_major_formatter("{x:.0f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(20))
     if saveToPDF:
         plot.saveToPDF(f"ClustersCountOverTime_{layer}")
     else:
@@ -848,11 +853,13 @@ def RowRowCorrelation(
     layers: list[int] = [1, 2, 3, 4],
     excludeCrossTalk: bool = True,
     recalc: bool = False,
-    log: bool = True,
+    log: bool = False,
     maxLine: Optional[int] = None,
     saveToPDF: bool = True,
+    showFunction: bool = True,
+    name:str = "",
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/", sizePerPlot=(8, 8))
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/", sizePerPlot=(8, 8))
     axs = plot.axs
 
     rowRowPlotter = correlationPlotter(
@@ -880,18 +887,19 @@ def RowRowCorrelation(
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(im, cax=cax, orientation="vertical")
     cbar.set_label("Frequency", rotation=270, labelpad=15)
-    tempCrossTalkFinder = crossTalkFinder()
-    x = []
-    y = []
-    for _x, _y in tempCrossTalkFinder.crossTalkFunction().items():
-        for i, j in _y:
-            x.append(i)
-            y.append(j)
+    if showFunction:
+        tempCrossTalkFinder = crossTalkFinder()
+        x = []
+        y = []
+        for _x, _y in tempCrossTalkFinder.crossTalkFunction().items():
+            for i, j in _y:
+                x.append(i)
+                y.append(j)
 
-    axs.scatter(x, y, c="r", s=1)
+        axs.scatter(x, y, c="r", s=1)
     if saveToPDF:
         plot.saveToPDF(
-            f"RowRowCorrelation{"_cut" if excludeCrossTalk else ""}{"_"+"".join(str(x) for x in layers) if layers is not None else ""}"
+            f"RowRowCorrelation{"_cut" if excludeCrossTalk else ""}{name}{"_"+"".join(str(x) for x in layers) if layers is not None else ""}"
         )
     else:
         return plot.fig
@@ -907,7 +915,7 @@ def LandauMPVWidthScatter(
     hideLowWidths: bool = True,
 ):
     d = depth.find_d_value(dataFile)
-    plot = plotClass(pathToOutput + f"{dataFile.get_fileName()}/")
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/")
     axs = plot.axs
     cmap = plt.get_cmap("hsv")
     allXValues: list[float] = []
@@ -988,9 +996,6 @@ def LandauMPVWidthScatter(
 
 
 if __name__ == "__main__":
-    print_mem_usage()
-    import AtlasDataAnalysis.Code.dataAnalysis.configLoader as configLoader
-
     config = configLoader.loadConfig()
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2"]}
@@ -1012,6 +1017,7 @@ if __name__ == "__main__":
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=4)
         ColumnWidthDistribution(dataFile, config["pathToOutput"], layer=1)
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=1)
+        """
         ClustersCountOverTime(dataFile, config["pathToOutput"])
         VoltageDepthScatter(
             dataFile,
@@ -1083,7 +1089,6 @@ if __name__ == "__main__":
             hideLowWidths=False,
         )
         """
-        """
         LandauMPVWidthScatter(
             dataFile,
             depth,
@@ -1110,11 +1115,12 @@ if __name__ == "__main__":
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
         """
         #CuttingComparison(dataFile,config["pathToOutput"],layers=config["layers"])
-        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
-        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"])
-        #iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"],showFunction = False,name="_noFunction")
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"],showFunction = False)
+        iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
         #iList = [30,35,38,45]
-        #for i in iList:
-            #HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
-            #Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
-            #Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],_range=(0.162, 2))
+        for i in iList:
+            HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
+            Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
+            Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],_range=(0.162, 4))
