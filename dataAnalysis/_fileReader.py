@@ -89,17 +89,17 @@ class rawDataFileManager:
     def readFile(self) -> pd.DataFrame:
         print(f"Opening: {self.pathToData}")
         dtypes = {
-            "PackageID": int,
-            "Layer": int,
-            "Column": int,
-            "Row": int,
-            "TS": int,
-            "TS1": int,
-            "TS2": int,
-            "TriggerTS": int,
-            "TriggerID": int,
-            "ext_TS": int,
-            "ext_TS2": int,
+            "PackageID": np.int32,
+            "Layer": np.int8,
+            "Column": np.int8,
+            "Row": np.int8,
+            "TS": np.int16,
+            "TS1": np.int16,
+            "TS2": np.int16,
+            "TriggerTS": np.int64,
+            "TriggerID": np.int64,
+            "ext_TS": np.int64,
+            "ext_TS2": np.int64,
             "FIFO_overflow": bool,
         }
         return pd.read_csv(
