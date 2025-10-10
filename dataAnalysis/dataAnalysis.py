@@ -15,7 +15,7 @@ def _isFiltered(dataFile: dataAnalysis, filter_dict: dict = {}) -> bool:
     # Returns filtered list sorted by angle and then by voltage
     for f in filter_dict.keys():
         attr = getattr(dataFile, f"{f}")
-        if isinstance(f, list):
+        if isinstance(filter_dict[f], list):
             if not np.isin(attr, filter_dict[f]):
                 return False
         else:
