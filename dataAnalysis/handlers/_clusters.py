@@ -15,7 +15,7 @@ class clusterChecker:
         self.maxTS = TS
         self.minTriggerID = TriggerID
         self.maxTriggerID = TriggerID
-    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 80, triggerVariance = 1):
+    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 40, triggerVariance = 1):
         if self.layer != layer:
             return False
         if TriggerID <= self.maxTriggerID and TriggerID >= self.minTriggerID:

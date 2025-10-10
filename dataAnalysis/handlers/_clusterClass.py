@@ -125,6 +125,8 @@ class clusterClass:
 
     def getEXT_TSs(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
+            if np.sum(self.notCrossTalk) == 0:
+                return np.array([np.nan])
             return self.TSs[self.notCrossTalk]
         else:
             return self.TSs

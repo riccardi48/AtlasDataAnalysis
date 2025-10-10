@@ -38,7 +38,7 @@ def calcHit_Voltage(
 ) -> npt.NDArray[np.float64]:
     hit_voltage = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
+        calibration_array = tryLoadCalibrationData(k)
         calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
@@ -55,8 +55,8 @@ def calcHit_VoltageError(
 ) -> npt.NDArray[np.float64]:
     hit_voltage = np.empty(len(rows), dtype=float)
     hit_voltageError = np.empty(len(rows), dtype=float)
-    for k in range(1, 5):
-        calibration_array = np.load(f"/home/atlas/rballard/Code/tot_calibration/data_{5-k}.npy")
+    for k in np.unique(Layers):
+        calibration_array = tryLoadCalibrationData(k)
         calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
@@ -69,3 +69,44 @@ def calcHit_VoltageError(
         lowerError = hit_voltage[Layers == k] - lower
         hit_voltageError[Layers == k] = np.max([upperError, lowerError], axis=0)
     return hit_voltageError
+
+def tryLoadCalibrationData(k):
+    import os
+    file = f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_{k}.npy"
+    if os.path.isfile(file):
+        return np.load(file)
+    else:
+        calibrate(k)
+        return np.load(file)
+    
+def calibrate(k):
+    import re
+    from scipy.optimize import curve_fit
+    from dataAnalysis._memCheck import usage
+    dataFile = f"/home/atlas/rballard/for_magda/data/Calibration_data/ToT_Calibration_L{5-k}_20220509.dat"
+    array = np.zeros((132, 372, 4), dtype=float)
+    with open(dataFile, "r") as inp:
+        inp_string = inp.read()
+    sections = np.array(inp_string.split("#"))[2::2]
+    sections = np.array([i.split("Error")[-1].replace("\n\n", "")[1:] for i in sections])
+    for i in range(np.size(sections)):
+        section = np.array(re.split("\n|\t", sections[i]))
+        section = np.reshape(section, (section.size // 3, 3)).astype(float)
+        section[:, 2][section[:, 2] == 0] = 0.001
+        u = section[:, 0]
+        ToT = section[:, 1]
+        error = section[:, 2]
+        index = np.invert(((ToT < 5) & (u > 0.3)) | (ToT < -5))
+        u = u[index]
+        ToT = ToT[index]
+        error = error[index]
+        bounds = ([0.160, 0.5, 1, 1], [0.161, 20, 200, 200])
+        popt, pcov = curve_fit(
+            _lambert_W_u_to_ToT, u, ToT, p0=[0.16, 6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
+        )
+        (u_0, a, b, c) = popt
+        array[i % 132, i // 132] = [u_0, a, b, c]
+        if i % 132 == 0:
+            print(f"{i//132}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m", end="\r")
+    print(f"{372}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m")
+    np.save(f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_{k}.npy", array)
