@@ -12,9 +12,9 @@ dataFiles = initDataFiles(config)
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
-    times4,indexes = dataFile.get_cluster_attr("Times", layer=4, excludeCrossTalk=True,returnIndexes=True)
+    times4,indexes = dataFile.get_cluster_attr("Times", excludeCrossTalk=True,returnIndexes=True)
     minTime = 135000
-    maxTime = 135300
+    maxTime = 135500
     range = (minTime, maxTime)
     bins = int(np.ptp(range) / 1)
     height, x = np.histogram(times4, bins=bins, range=range)
@@ -26,14 +26,14 @@ for i, dataFile in enumerate(dataFiles):
         title="Clusters Count Over Time",
         legend=False,
         xlabel="Time [ms]",
-        ylabel="Frequency [hz]",
+        ylabel="Count",
     )
     plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}")
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
     timesDiff4 = np.diff(times4)
     minTime = 135000
-    maxTime = 135300
+    maxTime = 140000
     range = (minTime, maxTime)
     axs.scatter(
         times4[1:],

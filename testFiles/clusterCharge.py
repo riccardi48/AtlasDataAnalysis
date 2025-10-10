@@ -21,9 +21,8 @@ def landauFunc(
 
 
 config = configLoader.loadConfig()
-config["filterDict"] = {"telescope":"kit","fileName":"6Gev_kit_0"}
+config["filterDict"] = {"telescope":"kit","fileName":["6Gev_kit_0","4Gev_kit_1"]}
 dataFiles = initDataFiles(config)
-
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
     axs = plot.axs

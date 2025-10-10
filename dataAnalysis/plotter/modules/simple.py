@@ -18,6 +18,11 @@ class simpleModule(plotModule):
         config = self.configCheck(config)
         return self._genericAttributeHistogram(config, attribute="ToT", excludeCrossTalk=excludeCrossTalk, bins=128, _range=(0, 256))
 
+    def Hit_VoltageHistogram(self, config: Optional[dict] = None,excludeCrossTalk:bool=False):
+        config = self.configCheck(config)
+        self.dataFile.init_cluster_voltages()
+        return self._genericAttributeHistogram(config, attribute="Hit_Voltage", excludeCrossTalk=excludeCrossTalk, bins=200, _range=(0, 6))
+
     def _genericAttributeHistogram(self, config: Optional[dict] = None, attribute: str = "ToT",excludeCrossTalk:bool=False, bins:int=128, _range:tuple[int,int]=(0, 256)):
         config = self.configCheck(config)
         plot = plotClass(self.pathToOutput, shape=(1, 1), sizePerPlot=(7, 7))

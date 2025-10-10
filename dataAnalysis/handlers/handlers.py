@@ -43,6 +43,8 @@ class dataHandler:
         self.clusterHandler = clusterHandler(self.calcFileManager, self.dataFrameHandler)
 
     def getDataFrame(self) -> pd.DataFrame:
+        if "data" not in self.dataFrameHandler.__dict__:
+            self.dataFrameHandler.loadDataIfNotLoaded()
         return self.dataFrameHandler.data
 
     def baseAttr(
