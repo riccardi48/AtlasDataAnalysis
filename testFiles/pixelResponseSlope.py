@@ -24,10 +24,10 @@ def getPixelResponseSlope(rows,chargeCollected):
 
 for dataFile in dataFiles:
     dataFile.init_cluster_voltages()
-    for _range in ((-5,5),(-20,20)):
+    for _range in ((-1,1),(-0.1,0.1),(-0.05,0.05)):
         plot = plotClass(config["pathToOutput"] + "PixelResponseSlope/")
         axs = plot.axs
-        PRS = np.array([getPixelResponseSlope(cluster.getRows(excludeCrossTalk=True),cluster.getToTs(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=4)])
+        PRS = np.array([getPixelResponseSlope(cluster.getRows(excludeCrossTalk=True),cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=4)])
         PRS = PRS[~np.isnan(PRS)]
         height, x = np.histogram(PRS, bins=210, range=_range)
         axs.stairs(height, x, baseline=None, color=plot.colorPalette[0])
@@ -39,7 +39,7 @@ for dataFile in dataFiles:
             xlabel="Pixel Response Slope",
             ylabel="Frequency",
             )
-        plot.saveToPDF(f"PixelResponseSlope_{dataFile.fileName}_{_range}")
+        plot.saveToPDF(f"PixelResponseSlope_{dataFile.fileName}_{_range[0]}_{_range[1]}")
 
 """
     plot = plotClass(config["pathToOutput"] + "PixelResponseSlope/ScatterTest/")

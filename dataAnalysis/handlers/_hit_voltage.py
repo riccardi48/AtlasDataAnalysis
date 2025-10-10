@@ -62,9 +62,13 @@ def calcHit_VoltageError(
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
+        u_0_e = calibration_array_indexes[:, 4]
+        a_e = calibration_array_indexes[:, 5]
+        b_e = calibration_array_indexes[:, 6]
+        c_e = calibration_array_indexes[:, 7]
         hit_voltage[Layers == k] = np.real(_lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
-        upper = _lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0, a, b, c)
-        lower = _lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0, a, b, c)
+        upper = _lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0+u_0_e, a+a_e, b+b_e, c+c_e)
+        lower = _lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0-u_0_e, a-a_e, b-b_e, c-c_e)
         upperError = upper - hit_voltage[Layers == k]
         lowerError = hit_voltage[Layers == k] - lower
         hit_voltageError[Layers == k] = np.max([upperError, lowerError], axis=0)
@@ -84,7 +88,7 @@ def calibrate(k):
     from scipy.optimize import curve_fit
     from dataAnalysis._memCheck import usage
     dataFile = f"/home/atlas/rballard/for_magda/data/Calibration_data/ToT_Calibration_L{5-k}_20220509.dat"
-    array = np.zeros((132, 372, 4), dtype=float)
+    array = np.zeros((132, 372, 8), dtype=float)
     with open(dataFile, "r") as inp:
         inp_string = inp.read()
     sections = np.array(inp_string.split("#"))[2::2]
@@ -100,12 +104,16 @@ def calibrate(k):
         u = u[index]
         ToT = ToT[index]
         error = error[index]
-        bounds = ([0.160, 0.5, 1, 1], [0.161, 20, 200, 200])
+        bounds = ([0.5, 1, 1], [20, 200, 200])
+        u_0 = 0.161
+        u_0_e = 0.001
+        func = lambda x,a,b,c: _lambert_W_u_to_ToT(x,u_0,a,b,c)
         popt, pcov = curve_fit(
-            _lambert_W_u_to_ToT, u, ToT, p0=[0.16, 6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
+            func, u, ToT, p0=[6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
         )
-        (u_0, a, b, c) = popt
-        array[i % 132, i // 132] = [u_0, a, b, c]
+        (a, b, c) = popt
+        (a_e, b_e, c_e) = np.sqrt(np.diag(pcov))
+        array[i % 132, i // 132] = [u_0, a, b, c, u_0_e, a_e, b_e, c_e]
         if i % 132 == 0:
             print(f"{i//132}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m", end="\r")
     print(f"{372}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m")

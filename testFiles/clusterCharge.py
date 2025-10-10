@@ -1,10 +1,10 @@
 import sys
 sys.path.append("..")
-from dataAnalysis import initDataFiles,configLoader
+from dataAnalysis import initDataFiles,configLoader,printMemUsage
 from plotAnalysis import plotClass
 import numpy as np
 import numpy.typing as npt
-from landau import landau
+from landau import landau,langauss
 import scipy
 
 def landauFunc(
@@ -12,43 +12,94 @@ def landauFunc(
     x_mpv: npt.NDArray[np.float64],
     xi: npt.NDArray[np.float64],
     scaler: npt.NDArray[np.float64],
-    threshold: float = 0.16,
+    #threshold: float = 0.16,
 ) -> npt.NDArray[np.float64]:
     y = landau.pdf(x, x_mpv, xi) * scaler
     y = np.reshape(y, np.size(y))
-    y[x < threshold] = 0
+    #y[x < threshold] = 0
+    return y
+
+def langaussFunc(
+    x: npt.NDArray[np.float64],
+    x_mpv: npt.NDArray[np.float64],
+    xi: npt.NDArray[np.float64],
+    scaler: npt.NDArray[np.float64],
+    sigma: npt.NDArray[np.float64],
+    #threshold: float = 0.16,
+) -> npt.NDArray[np.float64]:
+    y = langauss.pdf(x, x_mpv, xi,sigma) * scaler
+    y = np.reshape(y, np.size(y))
+    #y[x < threshold] = 0
     return y
 
 
 config = configLoader.loadConfig()
-config["filterDict"] = {"telescope":"kit","fileName":["6Gev_kit_0","4Gev_kit_1"]}
+config["filterDict"] = {"telescope":"kit","fileName":["6Gev_kit_0"]}
 dataFiles = initDataFiles(config)
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
     axs = plot.axs
     dataFile.init_cluster_voltages()
-    clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=config["layers"][0])])
+    printMemUsage()
+    layer = 3
+    clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
+    printMemUsage()
     clusterCharges = clusterCharges[clusterCharges > 0]
-    height, x = np.histogram(clusterCharges, bins=150, range=(0, 30))
+    height, x = np.histogram(clusterCharges, bins=1000, range=(0, 20))
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
-    plot.set_config(
-        axs,
-        ylim=(0, None),
-        xlim=(0, 60),
-        title=f"Cluster Charge Distribution {dataFile.fileName}",
-        xlabel="Charge [V]",
-        ylabel="Frequency",
-        )
-    plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}")
     binCentres = (x[:-1] + x[1:]) / 2
     popt, pcov = scipy.optimize.curve_fit(
             landauFunc,
             binCentres,
             height,
-            maxfev=500000,
-        )
+       )
+    x = np.linspace(0,5,1000)
+    y = landauFunc(x, *popt)
+    axs.plot(x,y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V")
     averageCharge = popt[0]
     print(averageCharge,np.mean(clusterCharges))
+    print(popt)
+    plot.set_config(
+        axs,
+        ylim=(0, None),
+        xlim=(0, 5),
+        title=f"Cluster Charge Distribution {dataFile.fileName}",
+        xlabel="Charge [V]",
+        ylabel="Frequency",
+        legend=True,
+        )
+    plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}_{layer}")
+
+    plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
+    axs = plot.axs
+    printMemUsage()
+    clusterCharges = np.array([np.sum(cluster.getToTs(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
+    printMemUsage()
+    clusterCharges = clusterCharges[clusterCharges > 0]
+    height, x = np.histogram(clusterCharges, bins=1001, range=(0, 1000))
+    axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
+   
+    
+    binCentres = (x[:-1] + x[1:]) / 2
+    popt, pcov = scipy.optimize.curve_fit(
+            landauFunc,
+            binCentres,
+            height,
+        )
+    x = np.linspace(0,500,1000)
+    y = landauFunc(x, *popt)
+    axs.plot(x, y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V")
+    plot.set_config(
+        axs,
+        ylim=(0, None),
+        xlim=(0, 500),
+        title=f"Cluster Charge Distribution {dataFile.fileName}",
+        xlabel="ToT [TS]",
+        ylabel="Frequency",
+        legend=True,
+        )
+    plot.saveToPDF(f"ClusterCharges_ToT_{dataFile.fileName}_{layer}")
+
 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
