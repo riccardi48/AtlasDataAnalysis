@@ -30,6 +30,17 @@ def _lambert_W_u_to_ToT(
     ToT[ToT < 0] = 0
     return ToT
 
+def jacobian_inverse(u, a, b, c, u0=0.161):
+    D = a / (u - u0) + b
+    J = np.array([
+        -np.log((u - u0) / u0) / D,   # ∂u/∂a
+        -u / D,                       # ∂u/∂b
+        -1.0 / D                      # ∂u/∂c
+    ])
+    return J
+
+
+
 def calcHit_Voltage(
     rows: npt.NDArray[np.int_],
     columns: npt.NDArray[np.int_],
@@ -38,14 +49,16 @@ def calcHit_Voltage(
 ) -> npt.NDArray[np.float64]:
     hit_voltage = np.empty(len(rows), dtype=float)
     for k in range(1, 5):
-        calibration_array = tryLoadCalibrationData(k)
-        calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
+        calibration_array = tryLoadCalibrationData(k) # (132, 372, 8) shape. Corresponding to (column,row,parameter). Parameters in order: u_0,a,b,c,u_0_e,a_e,b_e,c_e
+        calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]] # (num of hits on layer,8) shape. Gives parameter for each hit.
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
         hit_voltage[Layers == k] = np.real(_lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
     return hit_voltage
+
+
 
 def calcHit_VoltageError(
     rows: npt.NDArray[np.int_],
@@ -57,21 +70,18 @@ def calcHit_VoltageError(
     hit_voltageError = np.empty(len(rows), dtype=float)
     for k in np.unique(Layers):
         calibration_array = tryLoadCalibrationData(k)
+        covArray = np.load(f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_covariance_{k}.npy")
         calibration_array_indexes = calibration_array[columns[Layers == k], rows[Layers == k]]
+        covArray_indexes = covArray[columns[Layers == k], rows[Layers == k]]
         u_0 = calibration_array_indexes[:, 0]
         a = calibration_array_indexes[:, 1]
         b = calibration_array_indexes[:, 2]
         c = calibration_array_indexes[:, 3]
-        u_0_e = calibration_array_indexes[:, 4]
-        a_e = calibration_array_indexes[:, 5]
-        b_e = calibration_array_indexes[:, 6]
-        c_e = calibration_array_indexes[:, 7]
         hit_voltage[Layers == k] = np.real(_lambert_W_ToT_to_u(ToTs[Layers == k], u_0, a, b, c))
-        upper = _lambert_W_ToT_to_u(ToTs[Layers == k] + 2, u_0+u_0_e, a+a_e, b+b_e, c+c_e)
-        lower = _lambert_W_ToT_to_u(ToTs[Layers == k] - 2, u_0-u_0_e, a-a_e, b-b_e, c-c_e)
-        upperError = upper - hit_voltage[Layers == k]
-        lowerError = hit_voltage[Layers == k] - lower
-        hit_voltageError[Layers == k] = np.max([upperError, lowerError], axis=0)
+        jacobians = jacobian_inverse(hit_voltage[Layers == k], a, b, c, u0=u_0)
+        jacobians = np.flip(np.rot90(jacobians,k=3),axis=1)
+        hit_voltageError[Layers == k] = [np.sqrt(J @ pcov @ J.T) for J,pcov in zip(jacobians,covArray_indexes)]
+    hit_voltageError[hit_voltageError>hit_voltage] = hit_voltage[hit_voltageError>hit_voltage]
     return hit_voltageError
 
 def tryLoadCalibrationData(k):
@@ -89,6 +99,7 @@ def calibrate(k):
     from dataAnalysis._memCheck import usage
     dataFile = f"/home/atlas/rballard/for_magda/data/Calibration_data/ToT_Calibration_L{5-k}_20220509.dat"
     array = np.zeros((132, 372, 8), dtype=float)
+    covArray = np.zeros((132, 372, 3,3), dtype=float)
     with open(dataFile, "r") as inp:
         inp_string = inp.read()
     sections = np.array(inp_string.split("#"))[2::2]
@@ -111,6 +122,7 @@ def calibrate(k):
         popt, pcov = curve_fit(
             func, u, ToT, p0=[6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
         )
+        covArray[i % 132, i // 132] = pcov
         (a, b, c) = popt
         (a_e, b_e, c_e) = np.sqrt(np.diag(pcov))
         array[i % 132, i // 132] = [u_0, a, b, c, u_0_e, a_e, b_e, c_e]
@@ -118,3 +130,4 @@ def calibrate(k):
             print(f"{i//132}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m", end="\r")
     print(f"{372}/{372}\t\033[93mCurrent Mem Usage:{usage()}Mb\033[0m")
     np.save(f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_{k}.npy", array)
+    np.save(f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_covariance_{k}.npy", covArray)
