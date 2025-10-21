@@ -32,74 +32,82 @@ def langaussFunc(
     #y[x < threshold] = 0
     return y
 
+def chiSquared(expected,observed):
+    chiArray = (observed-expected)**2/expected
+    chiArray[expected<1] = 0
+    chiArray[np.isnan(chiArray)|np.isinf(chiArray)] = 0
+    print(observed[100:110])
+    print(expected[100:110])
+    print(chiArray[100:110])
+    return np.sum(chiArray)
 
 config = configLoader.loadConfig()
-config["filterDict"] = {"telescope":"kit","fileName":["6Gev_kit_0"]}
+config["filterDict"] = {"telescope":"kit","fileName":["4Gev_kit_1"]}
 dataFiles = initDataFiles(config)
 for i, dataFile in enumerate(dataFiles):
-    plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
-    axs = plot.axs
-    dataFile.init_cluster_voltages()
-    printMemUsage()
-    layer = 3
-    clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
-    printMemUsage()
-    clusterCharges = clusterCharges[clusterCharges > 0]
-    height, x = np.histogram(clusterCharges, bins=1000, range=(0, 20))
-    axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
-    binCentres = (x[:-1] + x[1:]) / 2
-    popt, pcov = scipy.optimize.curve_fit(
-            landauFunc,
-            binCentres,
-            height,
-       )
-    x = np.linspace(0,5,1000)
-    y = landauFunc(x, *popt)
-    axs.plot(x,y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V")
-    averageCharge = popt[0]
-    print(averageCharge,np.mean(clusterCharges))
-    print(popt)
-    plot.set_config(
-        axs,
-        ylim=(0, None),
-        xlim=(0, 5),
-        title=f"Cluster Charge Distribution {dataFile.fileName}",
-        xlabel="Charge [V]",
-        ylabel="Frequency",
-        legend=True,
+    for layer in [1,2,3,4]:
+        plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
+        axs = plot.axs
+        dataFile.init_cluster_voltages()
+        printMemUsage()
+        clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
+        printMemUsage()
+        clusterCharges = clusterCharges[clusterCharges > 0]
+        height, x = np.histogram(clusterCharges, bins=1000, range=(0, 20))
+        axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
+        binCentres = (x[:-1] + x[1:]) / 2
+        popt, pcov = scipy.optimize.curve_fit(
+                landauFunc,
+                binCentres,
+                height,
         )
-    plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}_{layer}")
-
-    plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
-    axs = plot.axs
-    printMemUsage()
-    clusterCharges = np.array([np.sum(cluster.getToTs(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
-    printMemUsage()
-    clusterCharges = clusterCharges[clusterCharges > 0]
-    height, x = np.histogram(clusterCharges, bins=1001, range=(0, 1000))
-    axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
-   
+        _x = np.linspace(0,5,1000)
+        y = landauFunc(_x, *popt)
+        axs.plot(_x,y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V\n$\\chi^{2}$={chiSquared(landauFunc(binCentres, *popt),height):.2f}")
+        averageCharge = popt[0]
+        print(averageCharge,np.mean(clusterCharges))
+        print(popt)
+        plot.set_config(
+            axs,
+            ylim=(0, None),
+            xlim=(0, 5),
+            title=f"Cluster Charge Distribution {dataFile.fileName}\nLayer {layer}",
+            xlabel="Charge [V]",
+            ylabel="Count",
+            legend=True,
+            )
+        plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}_{layer}")
+        print(chiSquared(landauFunc(binCentres[binCentres>0.2], *popt),height[binCentres>0.2]))
+        plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
+        axs = plot.axs
+        printMemUsage()
+        clusterCharges = np.array([np.sum(cluster.getToTs(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
+        printMemUsage()
+        clusterCharges = clusterCharges[clusterCharges > 0]
+        height, x = np.histogram(clusterCharges, bins=1001, range=(-0.5, 1000.5))
+        axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
     
-    binCentres = (x[:-1] + x[1:]) / 2
-    popt, pcov = scipy.optimize.curve_fit(
-            landauFunc,
-            binCentres,
-            height,
-        )
-    x = np.linspace(0,500,1000)
-    y = landauFunc(x, *popt)
-    axs.plot(x, y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V")
-    plot.set_config(
-        axs,
-        ylim=(0, None),
-        xlim=(0, 500),
-        title=f"Cluster Charge Distribution {dataFile.fileName}",
-        xlabel="ToT [TS]",
-        ylabel="Frequency",
-        legend=True,
-        )
-    plot.saveToPDF(f"ClusterCharges_ToT_{dataFile.fileName}_{layer}")
-
+        
+        binCentres = (x[:-1] + x[1:]) / 2
+        popt, pcov = scipy.optimize.curve_fit(
+                landauFunc,
+                binCentres,
+                height,
+            )
+        _x = np.linspace(0,1000,1000)
+        y = landauFunc(_x, *popt)
+        axs.plot(_x, y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V\n$\\chi^{2}$={chiSquared(landauFunc(binCentres, *popt),height):.2f}")
+        plot.set_config(
+            axs,
+            ylim=(0, None),
+            xlim=(0, 600),
+            title=f"Cluster Charge Distribution {dataFile.fileName}\nLayer {layer}",
+            xlabel="ToT [TS]",
+            ylabel="Count",
+            legend=True,
+            )
+        plot.saveToPDF(f"ClusterCharges_ToT_{dataFile.fileName}_{layer}")
+        print(chiSquared(landauFunc(binCentres, *popt),height))
 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
@@ -109,8 +117,9 @@ for i, dataFile in enumerate(dataFiles):
     axs = plot.axs
     dataFile.init_cluster_voltages()
     clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=config["layers"][0])])
-    longClusters = np.array([cluster.getIndexes().size for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=config["layers"][0])])>15
-    clusterCharges = clusterCharges[longClusters]
+    printMemUsage()
+    #longClusters = np.array([cluster.getIndexes().size for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=config["layers"][0])])>15
+    #clusterCharges = clusterCharges[longClusters]
     clusterCharges = clusterCharges[clusterCharges > 0]
     height, x = np.histogram(clusterCharges, bins=150, range=(0, 30))
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
@@ -120,24 +129,28 @@ for i, dataFile in enumerate(dataFiles):
         xlim=(0, 30),
         title=f"Cluster Charge Distribution {dataFile.fileName}",
         xlabel="Charge [V]",
-        ylabel="Frequency",
+        ylabel="Count",
         )
     plot.saveToPDF(f"ClusterCharges_Long_{dataFile.fileName}")
     plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
     axs = plot.axs
     angles = np.rad2deg(np.arcsin(averageCharge/clusterCharges))
     angles = angles[~np.isnan(angles) & ~np.isinf(angles) & (angles>=0) & (angles<=90)]
-    height, x = np.histogram(90-angles, bins=150, range=(50, 90))
+    height, x = np.histogram(90-angles, bins=181, range=(0, 90))
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
     plot.set_config(
         axs,
         ylim=(0, None),
-        xlim=(0, None),
+        xlim=(0, 90),
         title=f"Cluster Charge Distribution {dataFile.fileName}",
         xlabel="Angle [degrees]",
-        ylabel="Frequency",
+        ylabel="Count",
         )
     axs.vlines(
         dataFile.angle, 0, axs.get_ylim()[1], colors=plot.textColor, linestyles="dashed"
     )
-    plot.saveToPDF(f"ClusterAngles_Long_{dataFile.fileName}")
+    plot.saveToPDF(f"ClusterAngles_{dataFile.fileName}")
+
+
+
+    
