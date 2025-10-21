@@ -14,12 +14,12 @@ class crossTalkFinder:
         # Convert to numba-compatible format for JIT compilation
         self.crossTalkDict = self._convert_to_numba_dict(raw_dict)
 
-    def findCrossTalk_OneCluster(self, cluster:clusterClass) -> npt.NDArray[np.bool_]:
+    def findCrossTalk_OneCluster(self, cluster: clusterClass) -> npt.NDArray[np.bool_]:
         shortIndexes = cluster.getShortIndexes()
         ToTs = cluster.getToTs()
         columns = cluster.getColumns()
         rows = cluster.getRows()
-        return ToTs<30
+        return ((ToTs<30)|(ToTs>=254))
         if shortIndexes.size > 200:
             temp = np.full(shortIndexes.shape, True, dtype=bool)
             temp[0] = False
@@ -232,3 +232,6 @@ class crossTalkFinder:
         for key in self.crossTalkDict:
             result[key] = np.array(self.crossTalkDict[key])
         return result
+
+
+

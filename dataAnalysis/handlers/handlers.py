@@ -6,6 +6,7 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
 )
 from dataAnalysis._fileReader import rawDataFileManager, calcDataFileManager
+from dataAnalysis._memCheck import usage
 from ._functions import readFileName, calcToT, trueTimeStamps, TStoMS
 from ._hit_voltage import calcHit_Voltage, calcHit_VoltageError
 from ._crossTalkFinder import crossTalkFinder
@@ -147,7 +148,7 @@ class dataHandler:
         return np.invert(self.getCrossTalk())
 
     def getCrossTalk(
-        self, recalc: bool = False, layers: Optional[list[int]] = None, initClusters: bool = True
+        self, recalc: bool = False, layers: Optional[list[int]] = None, initClusters: bool = True,returnIndexes:bool = False,
     ) -> npt.NDArray[np.bool_]:
         if "crossTalk" in self.__dict__ and not recalc:
             toBeReturned = self.crossTalk
@@ -163,7 +164,10 @@ class dataHandler:
             self.calcFileManager.saveFile(self.crossTalk, attribute="crossTalk")
             toBeReturned = self.crossTalk
         toBeReturned, indexes = self.layerCrosstalkFilter(toBeReturned, False, layers)
-        return toBeReturned
+        if returnIndexes:
+            return (toBeReturned, indexes)
+        else:
+            return toBeReturned
 
     def cutArrayCrossTalkFilter(
         self, array: npt.NDArray[Any], excludeCrossTalk: bool = True
@@ -229,6 +233,11 @@ class dataFrameHandler:
             self.data = self.dataFileManager.readFile()
             self.dataLength: int = len(self.data)
 
+    def dropDataIfRamUsageHigh(self,ramLimit:int = 10000) -> bool:
+        if usage() > ramLimit:
+            del self.data
+            return True
+        return False
     def checkLoadedData(self) -> bool:
         if "data" in self.__dict__.keys():
             return True
@@ -297,12 +306,18 @@ class clusterHandler:
         self.dataFrameHandler = dataFrameHandler
         self._clusters: clusterArray = None
 
-    def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False) -> clusterArray:
+    def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False,returnIndexes:bool = False) -> clusterArray:
         clusters = self._loadOrCalculateClusters(recalc)
+        indexes = np.arange(len(clusters))
         if layers is not None:
             filter = self.layerFilter(clusters, layers=layers)
+        else:
+            filter = np.full(clusters.size,True)
+        if returnIndexes:
+            return (clusters[filter], indexes[filter])
+        else:
             return clusters[filter]
-        return clusters
+
 
     def _loadOrCalculateClusters(self, recalc: bool = False) -> clusterArray:
         if not recalc and self._clusters is not None:
@@ -364,6 +379,7 @@ class clusterHandler:
                 TSs[clusters[i]],
             )
         self.haveClusters = True
+        self.dataFrameHandler.dropDataIfRamUsageHigh()
         return self._clusters
 
     def initClusterVoltages(
@@ -375,6 +391,7 @@ class clusterHandler:
             cluster.setHit_Voltage(
                 Hit_Voltages[cluster.indexes], Hit_VoltageErrors[cluster.indexes]
             )
+        self.dataFrameHandler.dropDataIfRamUsageHigh()
 
     def setCalcCrossTalk(self, crosstalk: npt.NDArray[np.bool_]) -> None:
         clusters = self.getClusters()
@@ -407,17 +424,17 @@ class clusterHandler:
             toBeReturned = np.array(
                 [cluster.getSize(excludeCrossTalk) for cluster in self._clusters]
             )
-            filter = self.layerFilter(self._clusters, layers=layers) & (toBeReturned > 0)
+            filter = self.layerFilter(self._clusters, layers=layers)
         elif attribute == "ColumnWidths":
             toBeReturned = np.array(
                 [cluster.getColumnWidth(excludeCrossTalk) for cluster in self._clusters]
             )
-            filter = self.layerFilter(self._clusters, layers=layers) & (toBeReturned > 0)
+            filter = self.layerFilter(self._clusters, layers=layers)
         elif attribute == "RowWidths":
             toBeReturned = np.array(
                 [cluster.getRowWidth(excludeCrossTalk) for cluster in self._clusters]
             )
-            filter = self.layerFilter(self._clusters, layers=layers) & (toBeReturned > 0)
+            filter = self.layerFilter(self._clusters, layers=layers)
         elif attribute == "TSs":
             toBeReturned = np.array(
                 [np.min(cluster.getEXT_TSs(excludeCrossTalk)) for cluster in self._clusters]
@@ -427,7 +444,7 @@ class clusterHandler:
             toBeReturned = np.array(
                 [np.min([cluster.getEXT_TSs(excludeCrossTalk)]) for cluster in self._clusters]
             )
-            toBeReturned = TStoMS(toBeReturned.astype(int) - np.min(toBeReturned).astype(int))
+            toBeReturned = TStoMS(toBeReturned - np.min(toBeReturned[toBeReturned>0]))
             filter = self.layerFilter(self._clusters, layers=layers)
         if returnIndexes:
             indexes = np.arange(len(self._clusters))

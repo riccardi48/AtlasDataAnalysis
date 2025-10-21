@@ -16,7 +16,6 @@ for i, dataFile in enumerate(dataFiles):
     max_freq = 1 / 10
     min_freq = 1 / 100000
     freqs = np.linspace(min_freq, max_freq, 100000)
-
     power = LombScargle(times, values).power(freqs)
     sortIndex = np.argsort(power)[::-1]
     minTime = 135000
