@@ -15,29 +15,15 @@ def MStoTS(Time: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
 def Clusters(
     dataFile: dataAnalysis,
     pathToOutput,
-    excludeCrossTalk=True,
+    clusters,
     z="Hit_Voltages",
     layer=4,
     saveToPDF=True,
     name = "",
 ):
-    plot = plotClass(pathToOutput, sizePerPlot=(20, 20))
+    plot = plotClass(pathToOutput+"ClusterPlot/", sizePerPlot=(20, 20))
     axs = plot.axs
-    plotter = clusterPlotter(dataFile, excludeCrossTalk=excludeCrossTalk)
-    clusters = dataFile.get_clusters(layer=layer, excludeCrossTalk=excludeCrossTalk)
-    dataFile.init_cluster_voltages()
-    firstTS = clusters[1000].getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0]
-    # firstTS = dataFile.get_base_attr("ext_TS", excludeCrossTalk=excludeCrossTalk)[50000]
-    lastTS = firstTS + 300 / (25 / 1000000)
-    firstTS = 130000
-    lastTS = 131000
-
-    TSs = np.array([cluster.getEXT_TSs(excludeCrossTalk=excludeCrossTalk)[0] for cluster in clusters])
-    TSs = TSs-np.min(TSs)
-    TSs = dataFile.get_cluster_attr("Times", layer=layer, excludeCrossTalk=excludeCrossTalk)[0]
-    clusters = clusters[(TSs <= lastTS) & (TSs >= firstTS)]
-    print(len(clusters))
-    # clusters = dataFile.get_clusters(layer=layer,excludeCrossTalk=excludeCrossTalk)[:40]
+    plotter = clusterPlotter(dataFile, excludeCrossTalk=True)
     im = plotter.plotClusters(axs, clusters, z=z)
     plot.set_config(axs, title="Clusters", legend=False, xlabel="Row [px]", ylabel="Column [px]")
     axs.xaxis.set_major_locator(MultipleLocator(10))
@@ -53,16 +39,22 @@ def Clusters(
         plot.saveToPDF(
             f"Clusters_"
             + f"{dataFile.fileName}"
-            + f"{f"_{layer}" if layer is not None else ""}{"_cut" if excludeCrossTalk else ""}"
+            + f"{f"_{layer}" if layer is not None else ""}"
             +f"{f"_{name}" if name != "" else ""}"
         )
     else:
         return plot.fig
 
+def checkClusterLength(cluster):
+    return cluster.getRowWidth(True)>22&cluster.getRowWidth(True)<28
 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
-    Clusters(dataFile, config["pathToOutput"], z="EXT_TSs", layer=4, excludeCrossTalk=True,name="EXT_TSs")
-    Clusters(dataFile, config["pathToOutput"], z="Hit_Voltages", layer=4, excludeCrossTalk=True,name="Hit_Voltages")
-    Clusters(dataFile, config["pathToOutput"], z="Index", layer=4, excludeCrossTalk=True,name="Index")
+    layer = 4
+    dataFile.init_cluster_voltages()
+    clusters = dataFile.get_clusters(excludeCrossTalk=True,layer=layer)
+    clusters = clusters[[checkClusterLength(cluster) for cluster in clusters]]
+    Clusters(dataFile, config["pathToOutput"],clusters[:50], z="EXT_TSs",layer=layer,name="long_EXT_TSs")
+    Clusters(dataFile, config["pathToOutput"],clusters[:50], z="Hit_Voltages",layer=layer,name="long_Hit_Voltages")
+    Clusters(dataFile, config["pathToOutput"],clusters[:50], z="Index",layer=layer,name="long_Index")
