@@ -90,9 +90,9 @@ class rawDataFileManager:
         print(f"Opening: {self.pathToData}")
         dtypes = {
             "PackageID": np.int32,
-            "Layer": np.int8,
-            "Column": np.int8,
-            "Row": np.int8,
+            "Layer": np.int16,
+            "Column": np.int16,
+            "Row": np.int16,
             "TS": np.int16,
             "TS1": np.int16,
             "TS2": np.int16,
