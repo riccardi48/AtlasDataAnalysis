@@ -42,39 +42,71 @@ def checkCorrelationType(ToT1, ToT2):
 
 
 def findCorrelatedToT(pixelDF1, pixelDF2):
+    # Pre-extract columns as numpy arrays for faster access
+    layer1 = pixelDF1["Layer"].values
+    ts1 = pixelDF1["TS"].values
+    ts2_1 = pixelDF1["TS2"].values
+    trigger1 = pixelDF1["TriggerID"].values
+    
+    layer2 = pixelDF2["Layer"].values
+    ts2 = pixelDF2["TS"].values
+    ts2_2 = pixelDF2["TS2"].values
+    trigger2 = pixelDF2["TriggerID"].values
+    
     pixel1ToT = []
     pixel2ToT = []
-    for i, pixelDFRow1 in pixelDF1.iterrows():
-        for j, pixelDFRow2 in pixelDF2.iterrows():
-            if checkHit(
-                pixelDFRow1["Layer"],
-                pixelDFRow1["TS"],
-                pixelDFRow1["TriggerID"],
-                pixelDFRow2["Layer"],
-                pixelDFRow2["TS"],
-                pixelDFRow2["TriggerID"],
-            ):
-                pixel1ToT.append(calcToT(pixelDFRow1["TS"], pixelDFRow1["TS2"]))
-                pixel2ToT.append(calcToT(pixelDFRow2["TS"], pixelDFRow2["TS2"]))
-                pixelDF1.drop(i)
-                pixelDF2.drop(j)
-    pixel1ToT = np.array(pixel1ToT)
-    pixel2ToT = np.array(pixel2ToT)
-    return pixel1ToT, pixel2ToT
+    used_idx1 = set()
+    used_idx2 = set()
+    
+    # Use numpy arrays instead of iterrows
+    for i in range(len(pixelDF1)):
+        if i in used_idx1:
+            continue
+        for j in range(len(pixelDF2)):
+            if j in used_idx2:
+                continue
+            if checkHit(layer1[i], ts1[i], trigger1[i], 
+                       layer2[j], ts2[j], trigger2[j]):
+                pixel1ToT.append(calcToT(ts1[i], ts2_1[i]))
+                pixel2ToT.append(calcToT(ts2[j], ts2_2[j]))
+                used_idx1.add(i)
+                used_idx2.add(j)
+                break  # Move to next i since this one is matched
+    
+    return np.array(pixel1ToT), np.array(pixel2ToT)
 
 def calcCorrelation(df):
     correlationArray = np.zeros((372, 372, 7), dtype=int)
+    
+    # Pre-group by Row for faster filtering
+    grouped = df.groupby("Row")
+    row_data = {row: group for row, group in grouped}
+    
     for row1 in range(372):
+        if row1 not in row_data:
+            continue
+        df_row1 = row_data[row1]
+        
         for row2 in range(372):
-            pixel1ToT, pixel2ToT = findCorrelatedToT(
-                df[(df["Row"] == row1)], df[(df["Row"] == row2)]
-            )
-            correlationTypes = np.array(
-                [checkCorrelationType(pixel1ToT[i], pixel2ToT[i]) for i in range(len(pixel1ToT))]
-            )
-            correlationTypesSummed = np.unique(correlationTypes, return_counts=True)
-            if correlationTypesSummed[0].size != 0:
-                correlationArray[row1, row2, correlationTypesSummed[0]] += correlationTypesSummed[1]
+            if row2 not in row_data:
+                continue
+            df_row2 = row_data[row2]
+            
+            pixel1ToT, pixel2ToT = findCorrelatedToT(df_row1, df_row2)
+            
+            if len(pixel1ToT) == 0:
+                continue
+            
+            # Vectorize correlation type checking
+            correlationTypes = np.array([
+                checkCorrelationType(pixel1ToT[i], pixel2ToT[i]) 
+                for i in range(len(pixel1ToT))
+            ])
+            
+            # Count occurrences
+            unique_types, counts = np.unique(correlationTypes, return_counts=True)
+            correlationArray[row1, row2, unique_types] += counts
+    
     return correlationArray
 
 def loadOrCalcCorrelation(dataFile,config,column = 60):
