@@ -17,8 +17,9 @@ for dataFile in dataFiles:
     xlim = (-0.1,0.1)
     PRS = loadOrCalcPRS(dataFile,config)
     clusters,indexes = dataFile.get_clusters(excludeCrossTalk=True,returnIndexes=True,layer=4)
-    indexes = indexes[dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=4)[0]>0]
-    clusters = clusters[dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=4)[0]>0]
+    filter = (dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=4)[0]>0)&(dataFile.get_cluster_attr("ColumnWidths",excludeCrossTalk=True,layer=4)[0]<=2)
+    indexes = indexes[filter]
+    clusters = clusters[filter]
     minRows = np.array([np.min(cluster.getRows(True)) for cluster in clusters])
     maxRows = np.array([np.max(cluster.getRows(True)) for cluster in clusters])
     height, x = np.histogram(PRS[indexes], bins=bins, range=_range)

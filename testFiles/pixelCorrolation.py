@@ -1,0 +1,95 @@
+import sys
+
+sys.path.append("..")
+
+from dataAnalysis import initDataFiles, configLoader
+from plotAnalysis import plotClass
+import numpy as np
+
+from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
+
+def checkHit(layer1,TS1,TriggerID1,layer2,TS2,TriggerID2,timeVariance = 100, triggerVariance = 1):
+    if layer1 != layer2:
+        return False
+    elif abs(TriggerID1 - TriggerID2) > triggerVariance:
+        return False
+    elif abs(TS1 - TS2) > timeVariance and abs((TS1 + 512) - (TS2 + 512)) > timeVariance:
+        return False
+    return True
+
+def calcToT(TS, TS2):
+    return (TS2 * 2 - TS) % 256
+
+def checkCorrelationType(ToT1,ToT2):
+    if ToT1<30 and ToT2<30:
+        return 1
+    if ToT1<30 and ToT2>=30 and ToT2<255:
+        return 2
+    if ToT1>=30 and ToT2<30 and ToT1<255:
+        return 3
+    if ToT1>=30 and ToT1<255 and ToT2>=30 and ToT2<255:
+        return 4
+    if ToT1>=255:
+        return 5
+    if ToT2>=255:
+        return 6
+    return 0
+
+victimPixel = (45,60)
+
+ctf = crossTalkFinder()
+crosstalkRows = ctf.crossTalkDict[victimPixel[0]]
+
+crosstalkPixels = [(int(crosstalkRows[i,0]),victimPixel[1]) for i in range(len(crosstalkRows))]
+crosstalkPixels.append((200,victimPixel[1]))
+crosstalkPixels.append((victimPixel[0]+1,victimPixel[1]))
+
+
+config = configLoader.loadConfig()
+dataFiles = initDataFiles(config)
+
+for dataFile in dataFiles:
+    df = dataFile.get_dataFrame()
+    for crosstalkPixel in crosstalkPixels:
+        victimPixelDF = df[(df['Row'] == victimPixel[0])&(df['Column'] == victimPixel[1])]
+        victimPixelToT = []
+        crosstalkPixelToT = []
+        referencePixelDF = df[(df['Row'] == crosstalkPixel[0])&(df['Column'] == crosstalkPixel[1])]
+        for i,victimRow in victimPixelDF.iterrows():
+            for j,referenceRow in referencePixelDF.iterrows():
+                if checkHit(victimRow["Layer"],victimRow["TS"],victimRow["TriggerID"],referenceRow["Layer"],referenceRow["TS"],referenceRow["TriggerID"]):
+                    victimPixelToT.append(calcToT(victimRow["TS"], victimRow["TS2"]))
+                    crosstalkPixelToT.append(calcToT(referenceRow["TS"], referenceRow["TS2"]))
+                    victimPixelDF.drop(i)
+                    referencePixelDF.drop(j)
+        victimPixelToT = np.array(victimPixelToT)
+        crosstalkPixelToT = np.array(crosstalkPixelToT)
+        plot = plotClass(config["pathToOutput"] + f"Correlations/singlePixel/{dataFile.fileName}/")
+        axs = plot.axs
+        correlationTypes = np.array([checkCorrelationType(victimPixelToT[i],crosstalkPixelToT[i]) for i in range(len(victimPixelToT))])
+        for i in range(7):
+            index = np.where(correlationTypes==i)
+            axs.scatter(victimPixelToT[index],crosstalkPixelToT[index],color=plot.colorPalette[i],marker="x",label=f"Type {i}")
+        #axs.scatter(victimPixelToT,crosstalkPixelToT,color=plot.colorPalette[0],marker="x",)
+        if len(victimPixelToT) > 0:
+            victimPercent = len(victimPixelToT)/(len(victimPixelDF)+len(victimPixelToT))*100
+        else:
+            victimPercent=0
+        if len(crosstalkPixelToT) > 0:
+            crosstalkPercent = len(crosstalkPixelToT)/(len(referencePixelDF)+len(crosstalkPixelToT))*100
+        else:
+            crosstalkPercent = 0
+        hlines = [29.5,254.5]
+        vlines = [29.5,254.5]
+        axs.hlines(hlines,0,256,color=plot.textColor,linestyle="dashed")
+        axs.vlines(vlines,0,256,color=plot.textColor,linestyle="dashed")
+        plot.set_config(        
+            axs,
+            ylim=(0, 256),
+            xlim=(0, 256),
+            title=f"Pixel Correlation {dataFile.fileName} {victimPixel} {crosstalkPixel}\n{victimPercent:.2f}% of victim hits and {crosstalkPercent:.2f}% of reference hits are correlated",
+            xlabel=f"{victimPixel} ToT",
+            ylabel=f"{crosstalkPixel} ToT",
+            legend=True,
+            )       
+        plot.saveToPDF(f"{victimPixel[0]}-{victimPixel[1]}_{crosstalkPixel[0]}-{crosstalkPixel[1]}")

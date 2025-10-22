@@ -6,7 +6,7 @@ from ._dependencies import (
 from glob import glob
 
 
-def initDataFiles(config: dict = {}) -> list[dataAnalysis]:
+def initDataFiles(config: dict = {},printNames=False) -> list[dataAnalysis]:
     if config == {}:
         import configLoader
 
@@ -20,6 +20,9 @@ def initDataFiles(config: dict = {}) -> list[dataAnalysis]:
         allDataFiles,
         filterDict=config["filterDict"],
     )
+    if printNames:
+        for dataFile in allDataFiles:
+            print(dataFile.fileName)
     return dataFiles
 
 

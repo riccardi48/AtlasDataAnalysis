@@ -11,7 +11,12 @@ def linearLine(x,m,c):
     return m*x + c
 
 def getPixelResponseSlope(rows,chargeCollected,chargeCollected_e):
-    valid = (chargeCollected>0) & (chargeCollected_e>0)
+    if len(rows) <1:
+        return np.nan
+    valid = (chargeCollected>0)
+    valid[-1] = False
+    valid[0] = False
+    #valid[rows<np.max(rows)-15] = False
     rows = rows[valid]
     chargeCollected_e = chargeCollected_e[valid]
     chargeCollected = chargeCollected[valid]
@@ -26,8 +31,8 @@ def getPixelResponseSlope(rows,chargeCollected,chargeCollected_e):
 def cauchyFunc(x,gamma,scale):
     return 1/np.pi * (gamma / (x**2 + gamma**2)) * scale
 
-def sumOfCauchyFunc(x,gamma1,gamma2,gamma3,gamma4,scale1,scale2,scale3,scale4):
-    return cauchyFunc(x,gamma1,scale1) + cauchyFunc(x,gamma2,scale2) + cauchyFunc(x,gamma3,scale3) + cauchyFunc(x,gamma4,scale4)
+def sumOfCauchyFunc(x,gamma1,gamma2,gamma3,scale1,scale2,scale3):
+    return cauchyFunc(x,gamma1,scale1) + cauchyFunc(x,gamma2,scale2) + cauchyFunc(x,gamma3,scale3)
 
 def loadOrCalcPRS(dataFile,config):
     calcFileManager = calcDataFileManager(config["pathToCalcData"], "PRS", config["maxLine"])

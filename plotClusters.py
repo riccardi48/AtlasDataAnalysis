@@ -46,7 +46,7 @@ def Clusters(
         return plot.fig
 
 def checkClusterLength(cluster):
-    return cluster.getRowWidth(True)>22&cluster.getRowWidth(True)<28
+    return (cluster.getRowWidth(True)>22)&(cluster.getRowWidth(True)<28)
 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
