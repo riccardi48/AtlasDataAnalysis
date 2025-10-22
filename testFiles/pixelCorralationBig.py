@@ -11,38 +11,64 @@ from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
 import matplotlib.pyplot as plt
 from dataAnalysis._fileReader import calcDataFileManager
 
-def checkHit(layer1, TS1, TriggerID1, layer2, TS2, TriggerID2, timeVariance=100, triggerVariance=1):
-    if layer1 != layer2:
-        return False
-    elif abs(TriggerID1 - TriggerID2) > triggerVariance:
-        return False
-    elif abs(TS1 - TS2) > timeVariance and abs((TS1 + 512) - (TS2 + 512)) > timeVariance:
-        return False
-    return True
+def checkHit_vectorized(layer1, ts1, trigger1, layer2, ts2, trigger2, 
+                        timeVariance=100, triggerVariance=1):
+    """Vectorized version that works on arrays with broadcasting.
+    
+    Args:
+        layer1, ts1, trigger1: shape (N, 1)
+        layer2, ts2, trigger2: shape (1, M)
+    Returns:
+        Boolean array of shape (N, M)
+    """
+    layer_match = (layer1 == layer2)
+    trigger_match = np.abs(trigger1 - trigger2) <= triggerVariance
+    
+    time_diff = np.abs(ts1 - ts2)
+    time_diff_wrapped = np.abs((ts1 + 512) - (ts2 + 512))
+    time_match = (time_diff <= timeVariance) | (time_diff_wrapped <= timeVariance)
+    
+    return layer_match & trigger_match & time_match
 
 
-def calcToT(TS, TS2):
-    return (TS2 * 2 - TS) % 256
+def calcToT_vectorized(ts, ts2):
+    """Vectorized ToT calculation."""
+    return (ts2 * 2 - ts) % 256
 
 
-def checkCorrelationType(ToT1, ToT2):
-    if ToT1 < 30 and ToT2 < 30:
-        return 1
-    elif ToT1 < 30 and ToT2 >= 30 and ToT2 < 255:
-        return 2
-    elif ToT1 >= 30 and ToT2 < 30 and ToT1 < 255:
-        return 3
-    elif ToT1 >= 30 and ToT1 < 255 and ToT2 >= 30 and ToT2 < 255:
-        return 4
-    elif ToT1 >= 255:
-        return 5
-    elif ToT2 >= 255:
-        return 6
-    return 0
+def checkCorrelationType_vectorized(tot1, tot2):
+    """Vectorized correlation type checking.
+    
+    Returns integer array with values 0-6 based on ToT thresholds.
+    """
+    result = np.zeros(tot1.shape, dtype=int)
+    
+    # Boolean masks for conditions
+    tot1_low = tot1 < 30
+    tot1_mid = (tot1 >= 30) & (tot1 < 255)
+    tot1_high = tot1 >= 255
+    
+    tot2_low = tot2 < 30
+    tot2_mid = (tot2 >= 30) & (tot2 < 255)
+    tot2_high = tot2 >= 255
+    
+    # Apply rules in order (later assignments override earlier ones)
+    result[tot1_low & tot2_low] = 1
+    result[tot1_low & tot2_mid] = 2
+    result[tot1_mid & tot2_low] = 3
+    result[tot1_mid & tot2_mid] = 4
+    result[tot1_high] = 5
+    result[tot2_high] = 6  # This overrides rule 5 if tot2 >= 255
+    
+    return result
 
 
-def findCorrelatedToT(pixelDF1, pixelDF2):
-    # Pre-extract columns as numpy arrays for faster access
+def findCorrelatedToT_vectorized(pixelDF1, pixelDF2, timeVariance=100, triggerVariance=1):
+    """Fully vectorized version using numpy broadcasting."""
+    if len(pixelDF1) == 0 or len(pixelDF2) == 0:
+        return np.array([]), np.array([])
+    
+    # Extract columns as numpy arrays
     layer1 = pixelDF1["Layer"].values
     ts1 = pixelDF1["TS"].values
     ts2_1 = pixelDF1["TS2"].values
@@ -53,55 +79,59 @@ def findCorrelatedToT(pixelDF1, pixelDF2):
     ts2_2 = pixelDF2["TS2"].values
     trigger2 = pixelDF2["TriggerID"].values
     
+    # Reshape for broadcasting: (N, 1) vs (1, M)
+    matches = checkHit_vectorized(
+        layer1[:, None], ts1[:, None], trigger1[:, None],
+        layer2[None, :], ts2[None, :], trigger2[None, :],
+        timeVariance, triggerVariance
+    )
+    
+    # Find matching pairs (greedy: first match for each pixel1)
     pixel1ToT = []
     pixel2ToT = []
-    used_idx1 = set()
-    used_idx2 = set()
+    used_j = set()
     
-    # Use numpy arrays instead of iterrows
     for i in range(len(pixelDF1)):
-        if i in used_idx1:
-            continue
-        for j in range(len(pixelDF2)):
-            if j in used_idx2:
-                continue
-            if checkHit(layer1[i], ts1[i], trigger1[i], 
-                       layer2[j], ts2[j], trigger2[j]):
-                pixel1ToT.append(calcToT(ts1[i], ts2_1[i]))
-                pixel2ToT.append(calcToT(ts2[j], ts2_2[j]))
-                used_idx1.add(i)
-                used_idx2.add(j)
-                break  # Move to next i since this one is matched
+        # Find all matches for this pixel1
+        match_indices = np.where(matches[i, :])[0]
+        
+        # Take the first unused match
+        for j in match_indices:
+            if j not in used_j:
+                pixel1ToT.append(calcToT_vectorized(ts1[i], ts2_1[i]))
+                pixel2ToT.append(calcToT_vectorized(ts2[j], ts2_2[j]))
+                used_j.add(j)
+                break
     
     return np.array(pixel1ToT), np.array(pixel2ToT)
 
-def calcCorrelation(df):
+
+def calcCorrelation(df, timeVariance=100, triggerVariance=1):
+    """Optimized correlation calculation with full vectorization."""
     correlationArray = np.zeros((372, 372, 7), dtype=int)
     
-    # Pre-group by Row for faster filtering
-    grouped = df.groupby("Row")
+    # Pre-group by Row for O(1) lookup
+    grouped = df.groupby("Row", sort=False)
     row_data = {row: group for row, group in grouped}
     
-    for row1 in range(372):
-        if row1 not in row_data:
-            continue
+    # Get all rows that actually exist in the data
+    existing_rows = sorted(row_data.keys())
+    
+    for row1 in existing_rows:
         df_row1 = row_data[row1]
         
-        for row2 in range(372):
-            if row2 not in row_data:
-                continue
+        for row2 in existing_rows:
             df_row2 = row_data[row2]
             
-            pixel1ToT, pixel2ToT = findCorrelatedToT(df_row1, df_row2)
+            pixel1ToT, pixel2ToT = findCorrelatedToT_vectorized(
+                df_row1, df_row2, timeVariance, triggerVariance
+            )
             
             if len(pixel1ToT) == 0:
                 continue
             
-            # Vectorize correlation type checking
-            correlationTypes = np.array([
-                checkCorrelationType(pixel1ToT[i], pixel2ToT[i]) 
-                for i in range(len(pixel1ToT))
-            ])
+            # Fully vectorized correlation type checking
+            correlationTypes = checkCorrelationType_vectorized(pixel1ToT, pixel2ToT)
             
             # Count occurrences
             unique_types, counts = np.unique(correlationTypes, return_counts=True)
@@ -117,7 +147,7 @@ def loadOrCalcCorrelation(dataFile,config,column = 60):
     fileCheck = calcFileManager.fileExists(calcFileName=calcFileName)
     if not fileCheck:
         df = dataFile.get_dataFrame()
-        shortDF = df[(df["Column"] == column) & (df["Layer"] == 4)][:1000]
+        shortDF = df[(df["Column"] == column) & (df["Layer"] == 4)]
         correlationArray = calcCorrelation(shortDF)
         calcFileManager.saveFile(calcFileName=calcFileName,array=correlationArray)
     else:
