@@ -2,6 +2,7 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     np,  # numpy
 )
+from ._functions import TStoMS
 
 
 class clusterClass:
@@ -130,3 +131,11 @@ class clusterClass:
             return self.TSs[self.notCrossTalk]
         else:
             return self.TSs
+
+    def getTimes(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
+        if excludeCrossTalk:
+            if np.sum(self.notCrossTalk) == 0:
+                return np.array([np.nan])
+            return TStoMS(self.TSs)[self.notCrossTalk]
+        else:
+            return TStoMS(self.TSs)
