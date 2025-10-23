@@ -81,7 +81,7 @@ class dataHandler:
     def getClusters(self, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
             self.getCrossTalk(**kwargs)
-        return self.clusterHandler.getClusters(**kwargs)
+        return self.clusterHandler.getClusters(excludeCrossTalk = excludeCrossTalk,**kwargs)
 
     def getClustersAttr(
         self,
@@ -306,13 +306,15 @@ class clusterHandler:
         self.dataFrameHandler = dataFrameHandler
         self._clusters: clusterArray = None
 
-    def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False,returnIndexes:bool = False) -> clusterArray:
+    def getClusters(self, layers: Optional[list[int]] = None, recalc: bool = False,returnIndexes:bool = False,excludeCrossTalk: bool = False) -> clusterArray:
         clusters = self._loadOrCalculateClusters(recalc)
         indexes = np.arange(len(clusters))
         if layers is not None:
             filter = self.layerFilter(clusters, layers=layers)
         else:
             filter = np.full(clusters.size,True)
+        if excludeCrossTalk:
+            filter &= [cluster.getSize(excludeCrossTalk=True)>0 for cluster in clusters]
         if returnIndexes:
             return (clusters[filter], indexes[filter])
         else:
