@@ -36,37 +36,36 @@ def chiSquared(expected,observed):
     chiArray = (observed-expected)**2/expected
     chiArray[expected<1] = 0
     chiArray[np.isnan(chiArray)|np.isinf(chiArray)] = 0
-    print(observed[100:110])
-    print(expected[100:110])
-    print(chiArray[100:110])
     return np.sum(chiArray)
 
 config = configLoader.loadConfig()
-config["filterDict"] = {"telescope":"kit","fileName":["4Gev_kit_1"]}
+config["filterDict"] = {"telescope":"kit","fileName":["long_term_6Gev_kit_01"]}
 dataFiles = initDataFiles(config)
 for i, dataFile in enumerate(dataFiles):
-    for layer in [1,2,3,4]:
+    for layer in [4]:
         plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
         axs = plot.axs
         dataFile.init_cluster_voltages()
-        printMemUsage()
         clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in dataFile.get_clusters(excludeCrossTalk=True,layer=layer)])
+        sizes = dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=layer)[0]
+        #clusterCharges = clusterCharges[sizes[sizes>0]>1]
         printMemUsage()
         clusterCharges = clusterCharges[clusterCharges > 0]
-        height, x = np.histogram(clusterCharges, bins=1000, range=(0, 20))
+        height, x = np.histogram(clusterCharges, bins=1000, range=(0, 5))
         axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
         binCentres = (x[:-1] + x[1:]) / 2
+        cutOff = 1
         popt, pcov = scipy.optimize.curve_fit(
                 landauFunc,
-                binCentres,
-                height,
+                binCentres[(binCentres<cutOff)&(binCentres>0.161)],
+                height[(binCentres<cutOff)&(binCentres>0.161)],
         )
         _x = np.linspace(0,5,1000)
         y = landauFunc(_x, *popt)
-        axs.plot(_x,y, color=plot.colorPalette[2], label=f"Fit: $x_{{mpv}}$={popt[0]:.2f} V, $\\xi$={popt[1]:.2f} V\n$\\chi^{2}$={chiSquared(landauFunc(binCentres, *popt),height):.2f}")
+        errors = np.sqrt(np.diag(pcov))
+        axs.plot(_x[_x<cutOff],y[_x<cutOff], color=plot.colorPalette[2], label=f"Fit:\n$x_{{mpv}}$={popt[0]:.2f}±{errors[0]:.2} V\n$\\xi$={popt[1]:.2f}±{errors[1]:.2} V\n$\\chi^{2}$={chiSquared(landauFunc(binCentres, *popt),height):.2f}")
+        axs.plot(_x[_x>cutOff],y[_x>cutOff], color=plot.colorPalette[2], linestyle="dashed")
         averageCharge = popt[0]
-        print(averageCharge,np.mean(clusterCharges))
-        print(popt)
         plot.set_config(
             axs,
             ylim=(0, None),
@@ -77,7 +76,35 @@ for i, dataFile in enumerate(dataFiles):
             legend=True,
             )
         plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}_{layer}")
-        print(chiSquared(landauFunc(binCentres[binCentres>0.2], *popt),height[binCentres>0.2]))
+
+        plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
+        axs = plot.axs
+        height = height - landauFunc(binCentres, *popt)
+        axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
+        cutOff = 1
+        popt, pcov = scipy.optimize.curve_fit(
+                landauFunc,
+                binCentres[(binCentres>cutOff)],
+                height[(binCentres>cutOff)],
+        )
+        _x = np.linspace(0,5,1000)
+        y = landauFunc(_x, *popt)
+        errors = np.sqrt(np.diag(pcov))
+        axs.plot(_x[_x>cutOff],y[_x>cutOff], color=plot.colorPalette[2], label=f"Fit:\n$x_{{mpv}}$={popt[0]:.2f}±{errors[0]:.2} V\n$\\xi$={popt[1]:.2f}±{errors[1]:.2} V\n$\\chi^{2}$={chiSquared(landauFunc(binCentres, *popt),height):.2f}")
+        axs.plot(_x[_x<cutOff],y[_x<cutOff], color=plot.colorPalette[2], linestyle="dashed")
+        plot.set_config(
+            axs,
+            ylim=(None, None),
+            xlim=(0, 5),
+            title=f"Cluster Charge Distribution {dataFile.fileName}\nLayer {layer}",
+            xlabel="Charge [V]",
+            ylabel="Count",
+            legend=True,
+            )
+        plot.saveToPDF(f"ClusterCharges_{dataFile.fileName}_{layer}_removed")
+        #averageCharge = popt[0]
+        continue
+        
         plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
         axs = plot.axs
         printMemUsage()
@@ -107,7 +134,6 @@ for i, dataFile in enumerate(dataFiles):
             legend=True,
             )
         plot.saveToPDF(f"ClusterCharges_ToT_{dataFile.fileName}_{layer}")
-        print(chiSquared(landauFunc(binCentres, *popt),height))
 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
@@ -136,12 +162,13 @@ for i, dataFile in enumerate(dataFiles):
     axs = plot.axs
     angles = np.rad2deg(np.arcsin(averageCharge/clusterCharges))
     angles = angles[~np.isnan(angles) & ~np.isinf(angles) & (angles>=0) & (angles<=90)]
-    height, x = np.histogram(90-angles, bins=181, range=(0, 90))
+    xlim = (70,90)
+    height, x = np.histogram(90-angles, bins=200, range=xlim)
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
     plot.set_config(
         axs,
         ylim=(0, None),
-        xlim=(0, 90),
+        xlim=xlim,
         title=f"Cluster Charge Distribution {dataFile.fileName}",
         xlabel="Angle [degrees]",
         ylabel="Count",

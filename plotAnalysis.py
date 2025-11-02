@@ -550,6 +550,10 @@ class plotClass:
             "#CC8A8A",
             "#239A7E",
             "#9A6D38",
+            "#7B4173",
+            "#525252",
+            "#000000",
+            "#AAAAAA",
         ]
         self.textColor = self.colorPalette[-1]
 

@@ -139,3 +139,15 @@ class clusterClass:
             return TStoMS(self.TSs)[self.notCrossTalk]
         else:
             return TStoMS(self.TSs)
+
+    def getClusterCharge(self, excludeCrossTalk: bool = False) -> float:
+        if excludeCrossTalk:
+            return np.sum(self.Hit_Voltages[self.notCrossTalk])
+        else:
+            return np.sum(self.Hit_Voltages)
+        
+    def getClusterChargeError(self, excludeCrossTalk: bool = False) -> float:
+        if excludeCrossTalk:
+            return np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk] ** 2))
+        else:
+            return np.sqrt(np.sum(self.Hit_VoltageErrors ** 2))

@@ -8,6 +8,7 @@ from dataAnalysis._dependencies import (
     lambertw,  # scipy
 )
 from plotAnalysis import plotClass
+from dataAnalysis._memCheck import usage
 
 def _lambert_W_ToT_to_u(
     ToT: Union[npt.NDArray[np.int_] | npt.NDArray[np.float64] | float | int],
@@ -48,23 +49,26 @@ def calibrate(k):
     sections = np.array(inp_string.split("#"))[2::2]
     sections = np.array([i.split("Error")[-1].replace("\n\n", "")[1:] for i in sections])
     for i in range(np.size(sections)):
-        section = np.array(re.split("\n|\t", sections[i]))
-        section = np.reshape(section, (section.size // 3, 3)).astype(float)
-        section[:, 2][section[:, 2] == 0] = 0.001
-        u = section[:, 0]
-        ToT = section[:, 1]
-        error = section[:, 2]
-        index = np.invert(((ToT < 5) & (u > 0.3)) | (ToT < -5))
-        u = u[index]
-        ToT = ToT[index] / 2
-        error = error[index]
-        bounds = ([0.160, 0.5, 1, 1], [0.161, 20, 200, 200])
-        popt, pcov = curve_fit(
-            _lambert_W_u_to_ToT, u, ToT, p0=[0.16, 6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
-        )
-        (u_0, a, b, c) = popt
-        array[i % 132, i // 132] = [u_0, a, b, c]
-        if i % 100 == 0:
+        if i == 230*132+103:
+            section = np.array(re.split("\n|\t", sections[i]))
+            section = np.reshape(section, (section.size // 3, 3)).astype(float)
+            section[:, 2][section[:, 2] == 0] = 0.001
+            u = section[:, 0]
+            ToT = section[:, 1]
+            error = section[:, 2]
+            index = np.invert(((ToT < 5) & (u > 0.3)) | (ToT < -5))
+            u = u[index]
+            ToT = ToT[index] / 2
+            error = error[index]
+            bounds = ([0.05, 0.0001, 0.0001], [200, 2000, 2000])
+            u_0 = 0.161
+            u_0_e = 0.001
+            func = lambda x,a,b,c: _lambert_W_u_to_ToT(x,u_0,a,b,c)
+            popt, pcov = curve_fit(
+                func, u, ToT, p0=[6, 45, 60], sigma=error, absolute_sigma=True, bounds=bounds, maxfev=100000
+            )
+            (a, b, c) = popt
+            array[i % 132, i // 132] = [u_0, a, b, c]
             plot = plotClass("/home/atlas/rballard/AtlasDataAnalysis/output/VoltageCalibration/")
             axs = plot.axs
             axs.scatter(u, ToT, marker="x", s=3, color=plot.colorPalette[0])
@@ -83,6 +87,8 @@ def calibrate(k):
             )
             plot.saveToPDF(f"VoltageCalibration_Layer{k}_Pixel_{i % 132}_{i // 132}")
             input()
+        else:
+            continue
     #np.save(f"/home/atlas/rballard/for_magda/data/Calibration_data/calibration/data_{5-k}.npy", array)
 
 calibrate(4)

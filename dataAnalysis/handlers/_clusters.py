@@ -15,7 +15,7 @@ class clusterChecker:
         self.maxTS = TS
         self.minTriggerID = TriggerID
         self.maxTriggerID = TriggerID
-    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 100, triggerVariance = 1):
+    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 40, triggerVariance = 1):
         if self.layer != layer:
             return False
         if TriggerID <= self.maxTriggerID and TriggerID >= self.minTriggerID:
@@ -64,6 +64,9 @@ def calcClusters(
             activeClusters.append(clusterChecker(layer,index,ts,triggerID))
         finishedClusters += [np.array(cluster.indexes) for cluster in activeClusters if not cluster.checkActive(triggerID)]
         activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
+        if i % 10000 == 0:
+                print(f"{i/len(Layers)*100:.2f}%", end="\r")
+    print("100.00%")
     return np.array(finishedClusters, dtype=object)
 
 def __calcClusters(

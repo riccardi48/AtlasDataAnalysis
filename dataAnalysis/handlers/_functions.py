@@ -25,7 +25,7 @@ def readFileName(path: str) -> tuple[str, int, float, str]:
             angle = angle_dict[k]
             break
     voltage_dict = {
-        "V48": 48,
+        "V48": 48.6,
         "V30": 30,
         "V20": 20,
         "V15": 15,
@@ -36,7 +36,7 @@ def readFileName(path: str) -> tuple[str, int, float, str]:
         "V2": 2,
         "V0": 0,
     }
-    voltage: int = 48
+    voltage: int = voltage_dict["V48"]
     for k in voltage_dict.keys():
         if k in file_name:
             voltage = voltage_dict[k]

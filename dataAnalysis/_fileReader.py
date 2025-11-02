@@ -118,7 +118,7 @@ class rawDataFileManager:
                 "# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n"
             )
             dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
-            print(f"Save to csv: {path}{name}_decode.dat")
+            print(f"Saved to csv: {path}{name}_decode.dat")
 
     def makeDirIfNeeded(self, fileName: str) -> None:
         dirName = "/".join(fileName.split("/")[:-1])

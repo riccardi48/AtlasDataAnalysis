@@ -34,6 +34,7 @@ dataFiles = initDataFiles(config)
 
 
 for i, dataFile in enumerate(dataFiles):
+    break
     layer = 4
     plot = plotClass(config["pathToOutput"] + "ClusterCharges/")
     axs = plot.axs
@@ -105,7 +106,7 @@ for i, dataFile in enumerate(dataFiles):
             height,
     )
     averageCharge = popt[0]
-
+averageCharge = 1.87 
 config = configLoader.loadConfig()
 dataFiles = initDataFiles(config)
 
@@ -116,8 +117,6 @@ for dataFile in dataFiles:
     bins = 201
     xlim = (-0.1,0.1)
     PRS = loadOrCalcPRS(dataFile,config)
-    indexes = indexes[dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=4)[0]>0]
-    clusters = clusters[dataFile.get_cluster_attr("Sizes",excludeCrossTalk=True,layer=4)[0]>0]
     clusterCharges = np.array([np.sum(cluster.getHit_Voltages(excludeCrossTalk=True)) for cluster in clusters])
     clusterRowWidths = np.array([cluster.getRowWidth(excludeCrossTalk=True) for cluster in clusters])
     clusterAngle = 90-np.rad2deg(np.arcsin(averageCharge/clusterCharges))
@@ -135,7 +134,7 @@ for dataFile in dataFiles:
         xlabel="PRS",
         ylabel="Angle",
         )
-    plot.saveToPDF(f"PRS_Angle_Scatter_{dataFile.fileName}")
+    plot.saveToPDF(f"PRS_Angle_Scatter_{dataFile.fileName}_")
     
     plot = plotClass(config["pathToOutput"] + "PixelResponseSlope/ClusterCharge/")
     axs = plot.axs
@@ -152,11 +151,13 @@ for dataFile in dataFiles:
         ylabel="Angle",
         )
     plot.saveToPDF(f"PRS_Angle_Scatter_{dataFile.fileName}_norm")
-   
-    array, yedges, xedges = np.histogram2d(clusterCharges,PRS,bins=(40,401),range=((0,20),_range))
+    
+    array, yedges, xedges = np.histogram2d(clusterCharges,PRS,bins=(40,300),range=((0,35),_range))
     plot = plotClass(config["pathToOutput"] + "PixelResponseSlope/ClusterCharge/")
     axs = plot.axs
     axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
+    hlines = [13.72,30.63]
+    axs.hlines(hlines, xedges[0], xedges[-1], colors=plot.textColor, linestyles="dashed")
     plot.set_config(
         axs,
         title=f"PRS vs ClusterAngle from charge {dataFile.fileName}",

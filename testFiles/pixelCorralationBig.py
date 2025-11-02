@@ -11,7 +11,7 @@ from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
 import matplotlib.pyplot as plt
 from dataAnalysis._fileReader import calcDataFileManager
 
-def checkHit_vectorized(layer1, ts1, trigger1, layer2, ts2, trigger2, 
+def checkHit_vectorized(layer1, ts1, trigger1,column1, layer2, ts2, trigger2, column2,
                         timeVariance=100, triggerVariance=1):
     """Vectorized version that works on arrays with broadcasting.
     
@@ -22,13 +22,14 @@ def checkHit_vectorized(layer1, ts1, trigger1, layer2, ts2, trigger2,
         Boolean array of shape (N, M)
     """
     layer_match = (layer1 == layer2)
+    column_match = (column1 == column2)
     trigger_match = np.abs(trigger1 - trigger2) <= triggerVariance
     
     time_diff = np.abs(ts1 - ts2)
     time_diff_wrapped = np.abs((ts1 + 512) - (ts2 + 512))
     time_match = (time_diff <= timeVariance) | (time_diff_wrapped <= timeVariance)
     
-    return layer_match & trigger_match & time_match
+    return layer_match & trigger_match & time_match & column_match
 
 
 def calcToT_vectorized(ts, ts2):
@@ -44,12 +45,13 @@ def checkCorrelationType_vectorized(tot1, tot2):
     result = np.zeros(tot1.shape, dtype=int)
     
     # Boolean masks for conditions
-    tot1_low = tot1 < 30
-    tot1_mid = (tot1 >= 30) & (tot1 < 255)
+    cutOff = 30
+    tot1_low = tot1 < cutOff
+    tot1_mid = (tot1 >= cutOff) & (tot1 < 255)
     tot1_high = tot1 >= 255
     
-    tot2_low = tot2 < 30
-    tot2_mid = (tot2 >= 30) & (tot2 < 255)
+    tot2_low = tot2 < cutOff
+    tot2_mid = (tot2 >= cutOff) & (tot2 < 255)
     tot2_high = tot2 >= 255
     
     # Apply rules in order (later assignments override earlier ones)
@@ -73,16 +75,18 @@ def findCorrelatedToT_vectorized(pixelDF1, pixelDF2, timeVariance=100, triggerVa
     ts1 = pixelDF1["TS"].values
     ts2_1 = pixelDF1["TS2"].values
     trigger1 = pixelDF1["TriggerID"].values
-    
+    column1 = pixelDF1["Column"].values
+
     layer2 = pixelDF2["Layer"].values
     ts2 = pixelDF2["TS"].values
     ts2_2 = pixelDF2["TS2"].values
     trigger2 = pixelDF2["TriggerID"].values
-    
+    column2 = pixelDF2["Column"].values
+
     # Reshape for broadcasting: (N, 1) vs (1, M)
     matches = checkHit_vectorized(
-        layer1[:, None], ts1[:, None], trigger1[:, None],
-        layer2[None, :], ts2[None, :], trigger2[None, :],
+        layer1[:, None], ts1[:, None], trigger1[:, None],column1[:, None],
+        layer2[None, :], ts2[None, :], trigger2[None, :],column2[None, :],
         timeVariance, triggerVariance
     )
     
@@ -136,18 +140,22 @@ def calcCorrelation(df, timeVariance=100, triggerVariance=1):
             # Count occurrences
             unique_types, counts = np.unique(correlationTypes, return_counts=True)
             correlationArray[row1, row2, unique_types] += counts
-    
+        print(f"{row1}/371",end="\r")
+    print("")
+    for i in range(7):
+        np.fill_diagonal(correlationArray[:,:,i],0)
     return correlationArray
 
-def loadOrCalcCorrelation(dataFile,config,column = 60):
+def loadOrCalcCorrelation(dataFile,config,column = 60,layer=4):
     calcFileManager = calcDataFileManager(config["pathToCalcData"], "correlationArray", config["maxLine"])
     calcFileName = calcFileManager.generateFileName(
         attribute=f"{dataFile.fileName}",
+        name=f"_{column}_{layer}",
     )
     fileCheck = calcFileManager.fileExists(calcFileName=calcFileName)
     if not fileCheck:
         df = dataFile.get_dataFrame()
-        shortDF = df[(df["Column"] == column) & (df["Layer"] == 4)]
+        shortDF = df[(df["Column"]==column)&(df["Layer"] == layer)]
         correlationArray = calcCorrelation(shortDF)
         calcFileManager.saveFile(calcFileName=calcFileName,array=correlationArray)
     else:
@@ -156,12 +164,24 @@ def loadOrCalcCorrelation(dataFile,config,column = 60):
 
 
 config = configLoader.loadConfig()
+config["filterDict"] = {}
 dataFiles = initDataFiles(config)
 
+typesDict = {0:"Blank",
+             1:"BothLow",
+             2:"HighLow1",
+             3:"HighLow2",
+             4:"BothHigh",
+             5:"256&High_1",
+             6:"256&High_2",}
+
+column = 60
+layer = 4
+
 for dataFile in dataFiles:
-    correlationArray = loadOrCalcCorrelation(dataFile,config)
-    for i in range(7):
-        plot = plotClass(config["pathToOutput"] + "Correlations/manyPixel/", sizePerPlot=(12, 12))
+    correlationArray = loadOrCalcCorrelation(dataFile,config,column=column)
+    for i in range(1,7):
+        plot = plotClass(config["pathToOutput"] + f"Correlations/manyPixel/{dataFile.fileName}/", sizePerPlot=(12, 12))
         axs = plot.axs
         extent = (
             0.5,
@@ -186,4 +206,5 @@ for dataFile in dataFiles:
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = plt.colorbar(im, cax=cax, orientation="vertical")
         cbar.set_label("Frequency", rotation=270, labelpad=15)
-        plot.saveToPDF(f"{dataFile.fileName}_Row_Row_correlation_{i}")
+        plot.saveToPDF(f"{dataFile.fileName}_Layer_{layer}_Column_{column}_{typesDict[i]}")
+    

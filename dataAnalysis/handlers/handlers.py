@@ -202,7 +202,7 @@ class dataHandler:
         return array, indexes
 
     def save_nonCrossTalk_to_csv(self, path, name) -> None:
-        self.getCrossTalk(recalc=True)
+        #self.getCrossTalk(recalc=True)
         self.dataFrameHandler.saveNonCrossTalkToCSV(
             self.getCrossTalk(), path, name, self.getClusters()
         )
@@ -290,10 +290,13 @@ class dataFrameHandler:
         self, crosstalk: npt.NDArray[np.bool_], path: str, name: str, clusters: clusterArray
     ) -> None:
         outputDF = self.data
+        print("Fixing ext_TS for non-CrossTalk hits")
         outputDF["ext_TS"] = trueTimeStamps(clusters, outputDF["ext_TS"].to_numpy())
         positions = np.where(crosstalk)[0]
         index_labels = self.data.index[positions]
+        print("Removing CrossTalk hits from DataFrame")
         outputDF = outputDF.drop(index=index_labels)
+        print("Saving non-CrossTalk hits to CSV")
         self.dataFileManager.saveFile(outputDF, path, name)
 
 
@@ -338,10 +341,10 @@ class clusterHandler:
         return self._clusters
 
     def _calculateNewClusters(self) -> clusterArray:
-        print(f"Calculating Clusters")
         Layers = self.dataFrameHandler.readDataFrameAttr("Layer")
         TriggerIDs = self.dataFrameHandler.readDataFrameAttr("TriggerID")
         TSs = self.dataFrameHandler.readDataFrameAttr("TS")
+        print(f"Calculating Clusters")
         rawClusters = calcClusters(Layers, TriggerIDs, TSs)
         print(f"{len(rawClusters)} clusters found")
         self.calcFileManager.saveFile(rawClusters, attribute="clusters")
@@ -381,7 +384,7 @@ class clusterHandler:
                 TSs[clusters[i]],
             )
         self.haveClusters = True
-        self.dataFrameHandler.dropDataIfRamUsageHigh()
+        #self.dataFrameHandler.dropDataIfRamUsageHigh()
         return self._clusters
 
     def initClusterVoltages(
@@ -393,7 +396,7 @@ class clusterHandler:
             cluster.setHit_Voltage(
                 Hit_Voltages[cluster.indexes], Hit_VoltageErrors[cluster.indexes]
             )
-        self.dataFrameHandler.dropDataIfRamUsageHigh()
+        #self.dataFrameHandler.dropDataIfRamUsageHigh()
 
     def setCalcCrossTalk(self, crosstalk: npt.NDArray[np.bool_]) -> None:
         clusters = self.getClusters()
@@ -412,6 +415,7 @@ class clusterHandler:
                 print(f"{i/len(clusters)*100:.2f}%", end="\r")
         print("100.00%")
         self.haveCrossTalk = True
+        #self.dataFrameHandler.dropDataIfRamUsageHigh()
         return crossTalk
 
     def getClusterAttr(

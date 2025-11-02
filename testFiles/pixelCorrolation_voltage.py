@@ -51,6 +51,7 @@ dataFiles = initDataFiles(config)
 
 for dataFile in dataFiles:
     df = dataFile.get_dataFrame()
+    df["Voltage"] = dataFile.get_base_attr("Hit_Voltage")[0]
     for crosstalkPixel in crosstalkPixels:
         victimPixelDF = df[(df['Row'] == victimPixel[0])&(df['Column'] == victimPixel[1])]
         victimPixelToT = []
@@ -59,19 +60,21 @@ for dataFile in dataFiles:
         for i,victimRow in victimPixelDF.iterrows():
             for j,referenceRow in referencePixelDF.iterrows():
                 if checkHit(victimRow["Layer"],victimRow["TS"],victimRow["TriggerID"],referenceRow["Layer"],referenceRow["TS"],referenceRow["TriggerID"]):
-                    victimPixelToT.append(calcToT(victimRow["TS"], victimRow["TS2"]))
-                    crosstalkPixelToT.append(calcToT(referenceRow["TS"], referenceRow["TS2"]))
+                    if victimRow["Voltage"]>=referenceRow["Voltage"]:
+                        victimPixelToT.append(victimRow["Voltage"])
+                        ToT = calcToT(referenceRow["TS"], referenceRow["TS2"])
+                        crosstalkPixelToT.append((ToT+128)%256-128)
+                    #else:
+                    #    victimPixelToT.append(referenceRow["Voltage"])
+                    #    crosstalkPixelToT.append(calcToT(victimRow["TS"], victimRow["TS2"]))
                     victimPixelDF.drop(i)
                     referencePixelDF.drop(j)
         victimPixelToT = np.array(victimPixelToT)
         crosstalkPixelToT = np.array(crosstalkPixelToT)
         plot = plotClass(config["pathToOutput"] + f"Correlations/singlePixel/{dataFile.fileName}/")
         axs = plot.axs
-        correlationTypes = np.array([checkCorrelationType(victimPixelToT[i],crosstalkPixelToT[i]) for i in range(len(victimPixelToT))])
-        for i in range(7):
-            index = np.where(correlationTypes==i)
-            axs.scatter(victimPixelToT[index],crosstalkPixelToT[index],color=plot.colorPalette[i],marker="x",label=f"Type {i}")
-        #axs.scatter(victimPixelToT,crosstalkPixelToT,color=plot.colorPalette[0],marker="x",)
+        axs.scatter(victimPixelToT,crosstalkPixelToT,color=plot.colorPalette[0],marker="x",)
+        axs.scatter(victimPixelDF["Voltage"],[0 for _ in victimPixelDF["Voltage"]],color=plot.colorPalette[1],marker="x",)
         if len(victimPixelToT) > 0:
             victimPercent = len(victimPixelToT)/(len(victimPixelDF)+len(victimPixelToT))*100
         else:
@@ -80,17 +83,12 @@ for dataFile in dataFiles:
             crosstalkPercent = len(crosstalkPixelToT)/(len(referencePixelDF)+len(crosstalkPixelToT))*100
         else:
             crosstalkPercent = 0
-        hlines = [29.5,254.5]
-        vlines = [29.5,254.5]
-        axs.hlines(hlines,0,256,color=plot.textColor,linestyle="dashed")
-        axs.vlines(vlines,0,256,color=plot.textColor,linestyle="dashed")
         plot.set_config(        
             axs,
-            ylim=(0, 30),
-            xlim=(0, 256),
+            ylim=(-5, 30),
+            xlim=(0, 3),
             title=f"Pixel Correlation {dataFile.fileName} {victimPixel} {crosstalkPixel}\n{victimPercent:.2f}% of victim hits and {crosstalkPercent:.2f}% of reference hits are correlated",
-            xlabel=f"{victimPixel} ToT",
+            xlabel=f"{victimPixel} Voltage",
             ylabel=f"{crosstalkPixel} ToT",
-            legend=True,
             )       
-        plot.saveToPDF(f"{victimPixel[0]}-{victimPixel[1]}_{crosstalkPixel[0]}-{crosstalkPixel[1]}_LowYlim")
+        plot.saveToPDF(f"{victimPixel[0]}-{victimPixel[1]}_{crosstalkPixel[0]}-{crosstalkPixel[1]}_Voltage")
