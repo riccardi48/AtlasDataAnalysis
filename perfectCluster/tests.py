@@ -127,6 +127,10 @@ for k, dataFile in enumerate(dataFiles):
             popt,pcov = curve_fit(gaussianBinned,np.arange(x.size)[2:],x[2:],maxfev=5000,bounds=bounds)
         else:
             popt,pcov = curve_fit(gaussianBinned,np.arange(x.size),x,maxfev=5000,bounds=bounds)
+        if popt[1] < 1:
+            popt[1] = 1
+        if popt[0] < 0.5:
+            popt[0] = 0.5
         estimate.append(popt[0])
         spread.append(popt[1])
         if i in [0,8,13,20,25,29]:

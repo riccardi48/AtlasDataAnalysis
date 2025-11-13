@@ -7,7 +7,8 @@ from plotAnalysis import plotClass
 from matplotlib.ticker import MultipleLocator
 from dataAnalysis._fileReader import calcDataFileManager
 from scipy.stats import norm
-
+from scipy.stats import kstest
+from scipy.stats import chi2
 def quad(x,a,b,c):
     return a*x**2+b*x+c
 
@@ -75,9 +76,16 @@ def isOnEdge(cluster):
 def isFlipped(TS):
     return np.all(TS[-4:-2] <= 1) and not np.all(TS[1:3] <= 1)
 
-def residual(x,estimate,spread):
-    y = (x-estimate)/spread
-    return y
+def logLike_gaussian(data, mu0, sigma0):
+    n = len(data)
+    ss = np.sum((data - mu0)**2)
+    return -0.5*n*np.log(2*np.pi) - n*np.log(sigma0) - 0.5*ss/(sigma0**2)
+
+def gaussian_loglike_pval(data):
+    n = len(data)
+    S_obs = np.sum(data**2)
+    pval = 1 - chi2.cdf(S_obs, df=n)  # exact p-value
+    return pval
 
 def gaussianCDFFunc(x,mu,sig):
     return norm.cdf((x-mu)/sig)
@@ -99,7 +107,7 @@ for dataFile in dataFiles:
     clusters, indexes = dataFile.get_clusters(excludeCrossTalk=True, returnIndexes=True, layer=4)
     i = 0
     unFixedFitting = []
-    for cluster in clusters[40000:50000:5]:
+    for cluster in clusters[10000:20000:5]:
         if i > 1000000:
             break
         if not isFlat(cluster):
@@ -121,6 +129,8 @@ for dataFile in dataFiles:
         sectionSizes = np.array([len(section) for section in sections])
         largestSectionIndex = np.argmax(sectionSizes)
         largestSection = sections[largestSectionIndex]
+
+
         if np.all(TS<=1):
             continue
         x = relativeRows[largestSection]
@@ -138,6 +148,15 @@ for dataFile in dataFiles:
             x = x[index]
             x = np.flip(x)
             y = np.flip(y)
+
+        calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
+        calcFileName = calcFileManager.generateFileName(
+            attribute=f"{dataFile.fileName}",
+        )
+        estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+        p = gaussian_loglike_pval((y[x<=30]-estimate[x[x<=30]])/spread[x[x<=30]])
+        print(f"p = {p}")
+
         #bounds = [(0,0,0),(5,30,10)]
         p0 = [1,16 if np.ptp(relativeRows) > 16 else np.ptp(relativeRows)-2,2]
         try:
@@ -165,20 +184,22 @@ for dataFile in dataFiles:
         rowsForFunc = rowsForFunc[sortIndexes]
         relativeRows = relativeRows[sortIndexes]
         axs.plot(relativeRows, perfectClusterTSFunc(rowsForFunc,*popt), color=plot.colorPalette[0],label="Fit")
-        
+        plot.set_config(axs,
+            title="Row vs RelativeTS",
+            xlabel="Relative Row",
+            ylabel="Relative TS",
+            legend=True,
+        )  
+        plot.saveToPDF(f"Cluster_{cluster.getIndex()}_Row_vs_RelativeTS_Fit")
+
         plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Clusters/" + f"Cluster_{cluster.getIndex()}/")
         axs = plot.axs
-        calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
-        calcFileName = calcFileManager.generateFileName(
-            attribute=f"{dataFile.fileName}",
-        )
-        estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+        
+        y = y[x<=30]
         x = x[x<=30]
-        estimate = estimate[x]
-        spread = spread[x]
-        axs.scatter(np.zeros(x.size)+0.1,residual(x,estimate,spread), color=plot.colorPalette[2], marker="x",label="Cluster TS")
-        axs.plot(np.linspace(-1,1,100),gaussianFunc(np.linspace(-1,1,100),0,1,1), color=plot.colorPalette[0],label="Normal")
-
+        axs.scatter((y-estimate[x])/spread[x], np.zeros(x.size)+0.1, color=plot.colorPalette[2], marker="x",label="Cluster TS")
+        axs.plot(np.linspace(-4,4,100),gaussianFunc(np.linspace(-4,4,100),0,1,1), color=plot.colorPalette[0],label="Normal")
+        
         plot.set_config(axs,
             title="Distrobution of TS",
             xlabel="Relative TS to gaussian",
@@ -186,6 +207,33 @@ for dataFile in dataFiles:
             legend=True,
         )  
         plot.saveToPDF(f"Cluster_{cluster.getIndex()}_Gauss_Test")
+
+        plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Clusters/" + f"Cluster_{cluster.getIndex()}/")
+        axs = plot.axs
+        axs.scatter(cluster.getRows(True)-np.min(cluster.getRows(True)), TS, color=plot.colorPalette[2], marker="x",label="Cluster TS")
+        
+      
+        indexes = (np.argwhere(rowsForFunc<=30)).flatten()
+        rowsForFunc = rowsForFunc[rowsForFunc<=30]
+        axs.plot(relativeRows[indexes],estimate[rowsForFunc],color=plot.colorPalette[0],linestyle="dashed",label="Expected TS")
+        axs.fill_between(relativeRows[indexes],estimate[rowsForFunc]-spread[rowsForFunc],estimate[rowsForFunc]+spread[rowsForFunc], alpha=0.2,color=plot.colorPalette[0])
+        plot.set_config(axs,
+            title="Relative TS in cluster",
+            xlabel="Relative Row",
+            ylabel="Relative TS",
+            legend=True,
+            ylim=(-0.5,np.max(TS)+5),
+        )  
+        axs.xaxis.set_major_locator(MultipleLocator(5))
+        axs.xaxis.set_major_formatter("{x:.0f}")
+        axs.xaxis.set_minor_locator(MultipleLocator(1))
+        axs.yaxis.set_major_locator(MultipleLocator(5))
+        axs.yaxis.set_major_formatter("{x:.0f}")
+        axs.yaxis.set_minor_locator(MultipleLocator(1))
+        plot.saveToPDF(f"Cluster_{cluster.getIndex()}_Row_vs_RelativeTS")
+
+
+
         input("Press Any Key")
 
     unFixedFitting = np.array(unFixedFitting)
