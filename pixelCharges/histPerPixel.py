@@ -1,6 +1,6 @@
 from plotCluster import plotCluster, clusterPlotter
 from orthClusterCharge import getOrthClusterCharge
-from funcs import angle_with_error_mc,isTrack
+#from funcs import angle_with_error_mc,isTrack,characterizeCluster,isTypes
 import sys
 sys.path.append("..")
 from dataAnalysis import initDataFiles, configLoader
@@ -23,6 +23,19 @@ def landauFunc(
     y = np.reshape(y, np.size(y))
     return y
 
+def landauCDFFunc(x,
+    x_mpv,
+    xi,
+    #threshold: float = 0.16,
+):
+    y = landau.cdf(x, x_mpv, xi)
+    y = np.reshape(y, np.size(y))
+    return y
+
+
+def landauBinned(x, x_mpv, xi, scaler, edges):
+    return (landauCDFFunc(edges[1:],x_mpv,xi)-landauCDFFunc(edges[:-1],x_mpv,xi)) * scaler
+
 
 def histogramHit_Voltage(
     values,
@@ -34,7 +47,7 @@ def histogramHit_Voltage(
     values = values[(values > _range[0]) & (values < _range[1])]
     values = np.sort(values)
     if min_bin_width is None:
-        min_bin_width = (values.max() - values.min()) / 300
+        min_bin_width = (values.max() - values.min()) / 150
     if max_bin_width is None:
         max_bin_width = (values.max() - values.min()) / 10
 
@@ -73,16 +86,18 @@ def histogramHit_Voltage(
     hist = hist / (binEdges[1:] - binEdges[:-1])
     return hist, binEdges, binCentres
 
+def isFlat(cluster):
+    return np.unique(cluster.getColumns(True)).size == 1
 
 config = configLoader.loadConfig()
 # config["filterDict"] = {"telescope":"kit","fileName":"angle1_4Gev_kit_1"}
-# config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
+config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 dataFiles = initDataFiles(config)
 _range = (0.162, 4)
 mpvPlot = plotClass(f"{config["pathToOutput"]}ClusterTracks/Collected/")
 k=0
 for dataFile in dataFiles:
-    base_path = f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Collected_/"
+    base_path = f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Collected0/"
     clusters = dataFile.get_clusters(excludeCrossTalk=True, layer=4)
     dataFile.init_cluster_voltages()
     width = 30
@@ -99,16 +114,44 @@ for dataFile in dataFiles:
     )
     axs = plot.axs
     histLists = [[] for _ in range(width)]
+    lengthInDW = 820
+    rowPitch = 50
+    possibleRows = int(np.ceil(lengthInDW/50))+1
     for cluster in clusters:
-        if not isTrack(cluster,dataFile.voltage):
+        if not isFlat(cluster):
             continue
-        relativeRow = abs(cluster.getRows(excludeCrossTalk=True) - np.max(cluster.getRows(excludeCrossTalk=True)))
+        relativeRows = abs(cluster.getRows(True) - np.max(cluster.getRows(True)))
+        Timestamps = cluster.getTSs(True)
+        relativeTS = Timestamps - np.min(Timestamps)
         voltage = cluster.getHit_Voltages(excludeCrossTalk=True)
-        for i in relativeRow:
+        if np.ptp(relativeRows) < possibleRows-4:
+            continue
+        sortIndexes = np.argsort(relativeRows)
+        relativeRows = relativeRows[sortIndexes]
+        relativeTS = relativeTS[sortIndexes]
+        voltage = voltage[sortIndexes]
+        gaps = np.diff(relativeRows)
+        if np.any(gaps>5):
+            gap = np.where(gaps>5)[0][0] + 1
+            if gap > relativeRows.size/2:
+                relativeTS = relativeTS[:gap]
+                relativeRows = relativeRows[:gap]
+                voltage = voltage[:gap]
+            else:
+                relativeTS = relativeTS[gap:]
+                relativeRows = relativeRows[gap:]
+                voltage = voltage[gap:]
+        if np.all(relativeTS[-5:-1]<=2) and not np.all(relativeTS[1:5]<=2):
+            relativeTS = np.flip(relativeTS)
+            relativeRows = np.flip(relativeRows)
+            voltage = np.flip(voltage)
+        if np.ptp(relativeRows) < possibleRows-2:
+            continue
+        for i in relativeRows:
             if i >= width:
                 break
-            if not np.isnan(voltage[relativeRow == i][0]):
-                histLists[i].append(voltage[relativeRow == i][0])
+            if not np.isnan(voltage[relativeRows == i][0]):
+                histLists[i].append(voltage[relativeRows == i][0])
         print(f"{cluster.getIndex()}", end="\r")
     for i in range(width):
         values = np.array(histLists[i])
@@ -123,22 +166,27 @@ for dataFile in dataFiles:
         values = values[np.invert(np.isnan(values))]
         hist, binEdges, binCentres = histogramHit_Voltage(values, _range=_range)
         x = np.linspace(0, np.max(binEdges) + 0.1, 1000)
-        fitCutOff = 15
+        fitCutOff = 51
         if i < fitCutOff:
-            popt, pcov = curve_fit(
-                    landauFunc,
-                    binCentres,
-                    hist,
-                    maxfev = 12000,
-            )
-        else:
-            ratio = (np.array(paramsList)[1:fitCutOff,1]/np.array(paramsList)[1:fitCutOff,0]).mean()
-            func = lambda x, x_mpv, scaler: landauFunc(x, x_mpv, x_mpv*ratio, scaler)
+            func = lambda x, x_mpv, x_xi, scaler: landauBinned(x, x_mpv, x_xi, scaler, binEdges)
+            p0 = [0.4,0.1,np.sum(hist*(binEdges[1:]-binEdges[:-1]))]
             popt, pcov = curve_fit(
                     func,
                     binCentres,
-                    hist,
+                    hist * (binEdges[1:] - binEdges[:-1]),
+                    maxfev = 12000,
+                    p0=p0,
+            )
+        else:
+            ratio = (np.array(paramsList)[1:fitCutOff,1]/np.array(paramsList)[1:fitCutOff,0]).mean()
+            func = lambda x, x_mpv, scaler: landauBinned(x, x_mpv, x_mpv*ratio, scaler, binEdges)
+            p0 = [0.4,np.sum(hist*(binEdges[1:]-binEdges[:-1]))]
+            popt, pcov = curve_fit(
+                    func,
+                    binCentres,
+                    hist * (binEdges[1:] - binEdges[:-1]),
                     maxfev = 8000,
+                    p0=p0,
             )
             popt = [popt[0], popt[0]*ratio, popt[1]]
             pcov = np.diag([pcov[0,0], (popt[1]*np.sqrt((pcov[0,0]/popt[0])**2)), pcov[1,1]])
@@ -258,6 +306,13 @@ for dataFile in dataFiles:
         ylabel="MPV",
         ylim=(0,paramsList[:,0].max()*1.1),
     )
+    axs.xaxis.set_major_locator(MultipleLocator(5))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(1))
+    axs.yaxis.set_major_locator(MultipleLocator(0.05))
+    axs.yaxis.set_major_formatter("{x:.2f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(0.01))
+    axs.grid(True)
     plot.saveToPDF(f"MPV")
     if k < 7:
         mpvPlot.axs.scatter(x, paramsList[:,0], color=plot.colorPalette[k], marker="x",label=f"{dataFile.fileName}")

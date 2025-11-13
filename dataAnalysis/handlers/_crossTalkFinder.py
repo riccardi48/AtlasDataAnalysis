@@ -19,7 +19,7 @@ class crossTalkFinder:
         ToTs = cluster.getToTs()
         columns = cluster.getColumns()
         rows = cluster.getRows()
-        return ((ToTs<30)|(ToTs>=254))
+        #return ((ToTs<30)|(ToTs>=254))
         if shortIndexes.size > 200:
             temp = np.full(shortIndexes.shape, True, dtype=bool)
             temp[0] = False
@@ -71,9 +71,9 @@ class crossTalkFinder:
                     clash_tot = ToTs[clash_idx]
 
                     # Apply cross-talk detection logic
-                    if not (pixel_tot < 30 and clash_tot < 30):
-                        if (clash_tot >= 255 and 30 <= pixel_tot < 255) or (
-                            pixel_tot >= clash_tot and pixel_tot < 255 and clash_tot < 30
+                    if not (pixel_tot < 45 and clash_tot < 45):
+                        if (clash_tot >= 255 and 45 <= pixel_tot < 255) or (
+                            pixel_tot >= clash_tot and pixel_tot < 255 and clash_tot < 45
                         ):
                             crossTalk[clash_idx] = True
 

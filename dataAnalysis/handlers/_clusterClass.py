@@ -84,15 +84,15 @@ class clusterClass:
 
     def getColumns(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.columns[self.notCrossTalk]
+            return self.columns[self.notCrossTalk].astype(int)
         else:
-            return self.columns
+            return self.columns.astype(int)
 
     def getRows(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.rows[self.notCrossTalk]
+            return self.rows[self.notCrossTalk].astype(int)
         else:
-            return self.rows
+            return self.rows.astype(int)
 
     def getHit_Voltages(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.float64]:
         if excludeCrossTalk:

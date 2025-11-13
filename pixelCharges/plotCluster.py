@@ -54,7 +54,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
         ylabel="Pixel Column",
         xlim=display.xlim,
         ylim=display.ylim,
-        legend=True,
+        #legend=True,
     )
     if np.ptp(x) > 20:
         plot.axs.xaxis.set_major_locator(MultipleLocator(5))

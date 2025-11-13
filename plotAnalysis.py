@@ -572,6 +572,7 @@ class plotClass:
         handletextpad: float = 0.8,
         columnspacing: float = 2,
         legendTitle: str = "",
+        labelcolor: str = None,
     ) -> None:
         if ylim is not None:
             ax.set_ylim(ylim[0], ylim[1])
@@ -588,6 +589,7 @@ class plotClass:
                 handletextpad=handletextpad,
                 columnspacing=columnspacing,
                 title=legendTitle,
+                labelcolor=labelcolor,
             )
         if xlabel is not None:
             ax.set_xlabel(xlabel)

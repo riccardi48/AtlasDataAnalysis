@@ -1,13 +1,25 @@
 from plotCluster import plotCluster, clusterPlotter
 from orthClusterCharge import getOrthClusterCharge
-from funcs import angle_with_error_mc,isTrack
+from funcs import (
+    angle_with_error_mc,
+    characterizeCluster,
+    typeDict,
+    isTypes,
+    calcClusterLength,
+    findBestLine,
+    findValidLines,
+)
 import sys
+
 sys.path.append("..")
 from dataAnalysis import initDataFiles, configLoader
 import numpy as np
 from scipy.stats import linregress
 from landau import landau
 from plotAnalysis import plotClass
+from matplotlib.ticker import MultipleLocator
+from dataAnalysis._fileReader import calcDataFileManager
+
 
 def RowsToMicroMeter(rows):
     return rows * 50  # 50 micrometer per row
@@ -44,6 +56,7 @@ def angleFromCharge(orthCharge, orthCharge_e, charge, charge_e):
     )
     return angle, angle_e
 
+
 def applyTimeWalkCorrection(voltages):
     a = 35
     b = 2000
@@ -52,7 +65,7 @@ def applyTimeWalkCorrection(voltages):
 
 orthCharge, orthCharge_e = getOrthClusterCharge(layer=4)
 orthCharge2, orthCharge_e2 = 1.87, 0.0039
-#print(orthCharge, orthCharge_e)
+# print(orthCharge, orthCharge_e)
 config = configLoader.loadConfig()
 # config["filterDict"] = {"telescope":"kit","fileName":"angle1_4Gev_kit_1"}
 config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
@@ -63,65 +76,110 @@ for dataFile in dataFiles:
     dataFile.init_cluster_voltages()
     clusters, indexes = dataFile.get_clusters(excludeCrossTalk=True, returnIndexes=True, layer=4)
     i = 0
-    for cluster in clusters[20000:]:
-        if i > 20:
+    for cluster in clusters[20000:30000:5]:
+        if i > 100:
             break
+        characterizeCluster(cluster)
+        if not isTypes("2", [cluster.clusterType]) or cluster.getRowWidth(True) < 25:
+            continue
         path = base_path + f"Cluster_{cluster.getIndex()}/"
         Timestamps = cluster.getTSs(True)
         TS = Timestamps - np.min(Timestamps)
-        # clusterPlotter(cluster,path,"Relative TS").finishPlot("Relative TS",TS)
-        # clusterPlotter(cluster,path,"Voltage").finishPlot("Voltage",cluster.getHit_Voltages(True))
-        # clusterPlotter(cluster,path,"Voltage Error").finishPlot("Voltage Error",cluster.getHit_VoltageErrors(True))
-        # clusterPlotter(cluster,path,"ToT").finishPlot("ToT",cluster.getToTs(True))
         Rows = cluster.getRows(excludeCrossTalk=True)
         Columns = cluster.getColumns(excludeCrossTalk=True)
-        if not isTrack(cluster):
-            continue
-        result = linregress(RowsToMicroMeter(Rows), ColumnsToMicroMeter(Columns))
+        #result = linregress(RowsToMicroMeter(Rows), ColumnsToMicroMeter(Columns))
+        slope,intercept = findBestLine(cluster,findValidLines(Rows,Columns))
         x = np.linspace(0, 372, 372)
-        y = MicroMeterToColumns(line(RowsToMicroMeter(x), result.slope, result.intercept))
-        CP = clusterPlotter(cluster, path, "Cluster Map")
+        y = MicroMeterToColumns(line(RowsToMicroMeter(x), slope, intercept))
         angle, angle_e = angleFromCharge(
             orthCharge,
             orthCharge_e,
             cluster.getClusterCharge(True),
             cluster.getClusterChargeError(True),
         )
-        #CP.plot.axs.plot(
-        #    x,
-        #    y,
-        #    color=CP.plot.colorPalette[5],
-        #    label=f"Slope: {result.slope:.2f}\nAngle: {angle:.2f} ± {angle_e:.2f} Degrees\nLandau CDF: {landau.cdf(cluster.getClusterCharge(True), 13, 1):.2}\nCharge: {cluster.getClusterCharge(True):.2f} ± {cluster.getClusterChargeError(True):.2f} V",
-        #)
-        CP.finishPlot("Voltage", cluster.getHit_Voltages(True),textLabels=True)
+        string = "".join(
+            [value if key in cluster.clusterType else "" for key, value in typeDict.items()]
+        )
+        if isTypes("369~4", [cluster.clusterType]):
+            string += "Perfect Cluster\n"
+        label = f"Slope: {slope:.2f}\nAngle: {angle:.2f} ± {angle_e:.2f} Degrees\nCharge: {cluster.getClusterCharge(True):.2f} ± {cluster.getClusterChargeError(True):.2f} V\nLength: {calcClusterLength(cluster.getRows(True),slope,intercept):.2f} µm"
+
+        CP = clusterPlotter(cluster, path, "Cluster Map")
+        CP.plot.axs.plot(
+            x,
+            y,
+            color=CP.plot.colorPalette[5],
+            label=label,
+        )
+        """
+        CP.plot.axs.text(
+            0.01,
+            0.99,
+            string,
+            horizontalalignment="left",
+            verticalalignment="top",
+            transform=CP.plot.axs.transAxes,
+            fontsize="small",
+        )
+        """
+        CP.finishPlot("Voltage", cluster.getHit_Voltages(True), textLabels=True)
+
         CP = clusterPlotter(cluster, path, "Relative TS")
         CP.plot.axs.plot(
             x,
             y,
             color=CP.plot.colorPalette[5],
-            label=f"Slope: {result.slope:.2f}\nAngle: {angle:.2f} ± {angle_e:.2f} Degrees\nLandau CDF: {landau.cdf(cluster.getClusterCharge(True), 13, 1):.2}\nCharge: {cluster.getClusterCharge(True):.2f} ± {cluster.getClusterChargeError(True):.2f} V",
+            label=label,
         )
-        CP.finishPlot("Relative TS", TS)
         """
-        Timestamps = Timestamps - applyTimeWalkCorrection(cluster.getHit_Voltages(True))
-        TS = Timestamps - np.min(Timestamps)
-        CP = clusterPlotter(cluster, path, "Relative TS Time walk corrected")
-        CP.plot.axs.plot(
-            x,
-            y,
-            color=CP.plot.colorPalette[5],
-            label=f"Slope: {result.slope:.2f}\nAngle 1: {angle:.2f} ± {angle_e:.2f} Degrees\nLandau CDF: {landau.cdf(cluster.getClusterCharge(True), 13, 1):.2}\nCharge: {cluster.getClusterCharge(True):.2f} ± {cluster.getClusterChargeError(True):.2f} V",
+        CP.plot.axs.text(
+            0.01,
+            0.99,
+            string,
+            horizontalalignment="left",
+            verticalalignment="top",
+            transform=CP.plot.axs.transAxes,
+            fontsize="small",
         )
-        CP.finishPlot("Relative TS", TS)
         """
-        # print(angleFromCharge(orthCharge,orthCharge_e,cluster.getClusterCharge(True),cluster.getClusterChargeError(True)))
-        # print(orthCharge,orthCharge_e,cluster.getClusterCharge(True),cluster.getClusterChargeError(True))
+        CP.finishPlot("Relative TS", TS)
+
         plot = plotClass(path)
         axs = plot.axs
-        axs.scatter(cluster.getRows(True),TS,color=plot.colorPalette[0],marker="x")
-        plot.saveToPDF(f"Cluster_{indexes[i]}_Row_vs_RelativeTS")
-        
+        axs.scatter(cluster.getRows(True)-np.min(cluster.getRows(True)), TS, color=plot.colorPalette[2], marker="x",label="Cluster TS")
+        try:
+            calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
+            calcFileName = calcFileManager.generateFileName(
+                attribute=f"{dataFile.fileName}",
+            )
+            estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+            x = np.arange(np.max(cluster.getRows(True)-np.min(cluster.getRows(True)))+1)
+            index = -x+x[-1]
+            x = x[index<=30]
+            index = index[index<=30]
+            spread = spread[index]
+            estimate = estimate[index]-0.5
+            axs.plot(x,estimate,color=plot.colorPalette[0],linestyle="dashed",label="Expected TS")
+            axs.fill_between(x,estimate-spread,estimate+spread, alpha=0.2,color=plot.colorPalette[0])
+        except:
+            pass
+        plot.set_config(axs,
+            title="Relative TS in cluster",
+            xlabel="Relative Row",
+            ylabel="Relative TS",
+            legend=True,
+            ylim=(-0.5,np.max(TS)+5),
+        )  
+        axs.xaxis.set_major_locator(MultipleLocator(5))
+        axs.xaxis.set_major_formatter("{x:.0f}")
+        axs.xaxis.set_minor_locator(MultipleLocator(1))
+        axs.yaxis.set_major_locator(MultipleLocator(5))
+        axs.yaxis.set_major_formatter("{x:.0f}")
+        axs.yaxis.set_minor_locator(MultipleLocator(1))
+        plot.saveToPDF(f"Cluster_{cluster.getIndex()}_Row_vs_RelativeTS")
+
         print(
             f"Expected Charge 1: {orthCharge/np.sin(np.deg2rad(90-dataFile.angle)):.2f} ± {orthCharge_e/np.sin(np.deg2rad(90-dataFile.angle)):.2f}V"
         )
+        input()
         i += 1
