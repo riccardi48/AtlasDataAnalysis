@@ -31,17 +31,22 @@ class displayClass():
                 y[i] - np.min(y) + int((self.buffer - 1) / 2),
                 x[i] - np.min(x) + int((self.buffer - 1) / 2),
             ] = value[i]
-    def showDisplay(self,ax,):
+    def showDisplay(self,ax,vmax=None):
         im = ax.imshow(
-            self.display, cmap=self.cmap, extent=self.extent, aspect=3, origin="lower", vmin = 0
+            self.display, cmap=self.cmap, extent=self.extent, aspect=3, origin="lower", vmin = 0, vmax=vmax
         )
         return im 
-def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,textLabels=False):
-    x = cluster.getRows(excludeCrossTalk=True)
-    y = cluster.getColumns(excludeCrossTalk=True)
-    display = displayClass(x,y)
+def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
+    x = cluster.getRows(excludeCrossTalk=excludeCrossTalk)
+    y = cluster.getColumns(excludeCrossTalk=excludeCrossTalk)
+    display = displayClass(x,y, cmap = cmap)
     display.addToDisplay(x,y,values)
-    im = display.showDisplay(plot.axs)
+    vmax = None
+    if colorbarName == "Relative TS":
+        vmax = 20
+    elif colorbarName == "Voltage":
+        vmax = 2
+    im = display.showDisplay(plot.axs,vmax=vmax)
     #divider = make_axes_locatable(axs)
     #cax = divider.append_axes("right", size="5%", pad=0.05)
     #cbar = plt.colorbar(im, cax=cax, orientation="vertical")
@@ -85,7 +90,7 @@ class clusterPlotter():
         self.cluster = cluster
         self.plot = plotClass(path,sizePerPlot=(10,5))
         self.name = name
-    def finishPlot(self,colorbarName, values, textLabels=False):
-        plotCluster(self.plot,self.cluster, values,self.name,colorbarName, textLabels=textLabels)
+    def finishPlot(self,colorbarName, values, textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
+        plotCluster(self.plot,self.cluster, values,self.name,colorbarName, textLabels=textLabels,excludeCrossTalk=excludeCrossTalk, cmap = cmap)
         self.plot.saveToPDF(f"{self.cluster.getIndex()}_{self.name.replace(' ','_')}")
         

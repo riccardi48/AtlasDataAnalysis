@@ -117,7 +117,9 @@ for k, dataFile in enumerate(dataFiles):
         xlim = (0,30),
         )  
     plot2.saveToPDF("Last_Low")
-    array, yedges, xedges = np.histogram2d(plot3List2,plot3List1,range=((-0.5,30.5),(-0.5,30.5)),bins=(31,31))
+    TSRange = 40
+    RowRange = 30
+    array, yedges, xedges = np.histogram2d(plot3List2,plot3List1,range=((-0.5,TSRange+0.5),(-0.5,RowRange+0.5)),bins=(TSRange+1,RowRange+1))
     plot3.axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
     estimate = []
     spread = []
@@ -131,19 +133,21 @@ for k, dataFile in enumerate(dataFiles):
             popt[1] = 1
         if popt[0] < 0.5:
             popt[0] = 0.5
+        if i == 0:
+            popt[1] = 5
         estimate.append(popt[0])
         spread.append(popt[1])
         if i in [0,8,13,20,25,29]:
             plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
             axs = plot.axs
-            _x = np.linspace(0,x.size,300)
+            _x = np.linspace(0,x.size,TSRange*10)
             axs.plot(_x,gaussianFunc(_x,*popt), color=plot.colorPalette[0])
             axs.stairs(x,yedges, baseline=None, color=plot.colorPalette[2],label = f"Slice of Row {i}")
             plot.set_config(axs,
                 title=f"Relative TS distribution at row {i}",
                 xlabel="Relative TS",
                 ylabel="Count",
-                xlim = (-0.5,30.5),
+                xlim = (-0.5,TSRange+0.5),
                 ylim = (0,None),
                 legend=True,
                 )  
@@ -176,12 +180,12 @@ for k, dataFile in enumerate(dataFiles):
         title="Row vs TS",
         xlabel="Relative Row",
         ylabel="TS",
-        xlim = (-0.5,30.5),
-        ylim = (-0.5,30.5),
+        xlim = (-0.5,RowRange+0.5),
+        ylim = (-0.5,TSRange+0.5),
         legend=True,
         labelcolor="w",
         )
-    x = np.linspace(0,30,100)
+    x = np.linspace(0,RowRange,100)
     estimate = np.array(estimate)
     if dataFile.fileName == "angle6_4Gev_kit_2":
         z = np.polyfit(np.arange(estimate.size)[12:25],estimate[12:25],2)
@@ -196,16 +200,16 @@ for k, dataFile in enumerate(dataFiles):
     plot3.saveToPDF("Row_TS") 
     plot1List = np.array(plot1List)
     plot2List = np.array(plot2List)
-    height, x = np.histogram(plot2List[plot1List<=1],bins=31,range=(-0.5,30.5))
+    height, x = np.histogram(plot2List[plot1List<=1],bins=TSRange+1,range=(-0.5,TSRange+0.5))
     plot5.axs.stairs(height/np.sum(height), x, baseline=None, color=plot5.colorPalette[0],label = "Low First Pixel")
-    height, x = np.histogram(plot2List[plot1List>1],bins=31,range=(-0.5,30.5))
+    height, x = np.histogram(plot2List[plot1List>1],bins=TSRange+1,range=(-0.5,TSRange+0.5))
     plot5.axs.stairs(height/np.sum(height), x, baseline=None, color=plot5.colorPalette[1],label = "High First Pixel")
     #plot5.axs.hist([plot2List[plot1List<=1],plot2List[plot1List>1]],bins=31,range=(-0.5,30.5), stacked=True,color = [plot5.colorPalette[0],plot5.colorPalette[1]],label=["Low First Pixel","High First Pixel"])
     plot5.set_config(plot5.axs,
         title="First Pixel TS",
         xlabel="Relative TS",
         ylabel="Count",
-        xlim = (0,30),
+        xlim = (0,TSRange),
         legend = True,
         )  
     plot5.saveToPDF("First_Pixel_Split")

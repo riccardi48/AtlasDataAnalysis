@@ -11,7 +11,8 @@ from matplotlib.ticker import MultipleLocator
 from plotAnalysis import plotClass
 from landau import landau
 from scipy.optimize import curve_fit
-
+from perfectCluster.findPerfectCluster import isPerfectCluster
+from dataAnalysis._fileReader import calcDataFileManager
 def landauFunc(
     x,
     x_mpv,
@@ -36,6 +37,14 @@ def landauCDFFunc(x,
 def landauBinned(x, x_mpv, xi, scaler, edges):
     return (landauCDFFunc(edges[1:],x_mpv,xi)-landauCDFFunc(edges[:-1],x_mpv,xi)) * scaler
 
+from scipy.stats import norm
+
+def gaussianCDFFunc(x,mu,sig):
+    return norm.cdf((x-mu)/sig)
+
+def gaussianBinned(mu, sigma, scaler, edges):
+    return (gaussianCDFFunc(edges[1:],mu,sigma)-gaussianCDFFunc(edges[:-1],mu,sigma))*scaler
+
 
 def histogramHit_Voltage(
     values,
@@ -47,7 +56,7 @@ def histogramHit_Voltage(
     values = values[(values > _range[0]) & (values < _range[1])]
     values = np.sort(values)
     if min_bin_width is None:
-        min_bin_width = (values.max() - values.min()) / 150
+        min_bin_width = (values.max() - values.min()) / 80
     if max_bin_width is None:
         max_bin_width = (values.max() - values.min()) / 10
 
@@ -86,6 +95,60 @@ def histogramHit_Voltage(
     hist = hist / (binEdges[1:] - binEdges[:-1])
     return hist, binEdges, binCentres
 
+def histogramHit_Voltage_Errors(
+    values,
+    valuesErrors,
+    _range = (0.162, 2),
+    points_per_bin = 100,
+    min_bin_width = None,
+    max_bin_width = None,
+    ):
+    valuesErrors = valuesErrors[(values > _range[0]) & (values < _range[1])]
+    values = values[(values > _range[0]) & (values < _range[1])]
+    sortIndex = np.argsort(values)
+    valuesErrors = valuesErrors[sortIndex]
+    values = values[sortIndex]
+    if min_bin_width is None:
+        min_bin_width = (values.max() - values.min()) / 80
+    if max_bin_width is None:
+        max_bin_width = (values.max() - values.min()) / 10
+
+    n = len(values)
+    n_bins = n // points_per_bin
+
+    if n_bins < 1:
+        points_per_bin = 10
+        n_bins = n // points_per_bin
+        if n_bins < 1:
+            points_per_bin = 1
+            n_bins = n // points_per_bin
+            if n_bins < 1:
+                raise ValueError("Too few data points for the desired points per bin.")
+
+    edges = np.interp(np.linspace(0, n, n_bins + 1), np.arange(n), values)
+
+    new_edges = [edges[0]]
+    for i in range(1, len(edges)):
+        proposed_edge = edges[i]
+        last_edge = new_edges[-1]
+        width = proposed_edge - last_edge
+
+        if width < min_bin_width:
+            continue
+        elif width > max_bin_width:
+            num_subbins = int(np.ceil(width / max_bin_width))
+            sub_edges = np.linspace(last_edge, proposed_edge, num_subbins + 1)[1:]
+            new_edges.extend(sub_edges)
+        else:
+            new_edges.append(proposed_edge)
+    binEdges = np.array(new_edges)
+    hist = np.zeros(binEdges.size-1,dtype=float)
+    for i in range(values.size):
+        hist += gaussianBinned(values[i], valuesErrors[i], 1, binEdges)
+    binCentres = (binEdges[:-1] + binEdges[1:]) / 2
+    hist = hist / (binEdges[1:] - binEdges[:-1])
+    return hist, binEdges, binCentres
+
 def isFlat(cluster):
     return np.unique(cluster.getColumns(True)).size == 1
 
@@ -93,18 +156,19 @@ config = configLoader.loadConfig()
 # config["filterDict"] = {"telescope":"kit","fileName":"angle1_4Gev_kit_1"}
 config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 dataFiles = initDataFiles(config)
-_range = (0.162, 4)
+_range = (0.161001, 2)
 mpvPlot = plotClass(f"{config["pathToOutput"]}ClusterTracks/Collected/")
 k=0
 for dataFile in dataFiles:
     base_path = f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Collected0/"
-    clusters = dataFile.get_clusters(excludeCrossTalk=True, layer=4)
+    clusters = dataFile.get_clusters(excludeCrossTalk=True,layer=4)
     dataFile.init_cluster_voltages()
     width = 30
     landauAreaList = []
     CountsList = []
     paramsList = []
     chargeList = []
+    chargeErrorList = []
     plot = plotClass(
         base_path,
         shape=(1, width),
@@ -114,57 +178,60 @@ for dataFile in dataFiles:
     )
     axs = plot.axs
     histLists = [[] for _ in range(width)]
+    histErrorsLists = [[] for _ in range(width)]
     lengthInDW = 820
     rowPitch = 50
     possibleRows = int(np.ceil(lengthInDW/50))+1
-    for cluster in clusters:
-        if not isFlat(cluster):
+    calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
+    calcFileName = calcFileManager.generateFileName(
+        attribute=f"{dataFile.fileName}",
+    )
+    estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+    for l,cluster in enumerate(clusters):
+        if not isPerfectCluster(cluster,estimate,spread,minPval=0.2):
             continue
-        relativeRows = abs(cluster.getRows(True) - np.max(cluster.getRows(True)))
-        Timestamps = cluster.getTSs(True)
+        relativeRows = abs(cluster.getRows(True)[cluster.section] - np.max(cluster.getRows(True)[cluster.section]))
+        Timestamps = cluster.getTSs(True)[cluster.section]
         relativeTS = Timestamps - np.min(Timestamps)
-        voltage = cluster.getHit_Voltages(excludeCrossTalk=True)
-        if np.ptp(relativeRows) < possibleRows-4:
-            continue
+        voltage = cluster.getHit_Voltages(excludeCrossTalk=True)[cluster.section]
+        voltageErrors = cluster.getHit_VoltageErrors(excludeCrossTalk=True)[cluster.section]
         sortIndexes = np.argsort(relativeRows)
         relativeRows = relativeRows[sortIndexes]
         relativeTS = relativeTS[sortIndexes]
         voltage = voltage[sortIndexes]
-        gaps = np.diff(relativeRows)
-        if np.any(gaps>5):
-            gap = np.where(gaps>5)[0][0] + 1
-            if gap > relativeRows.size/2:
-                relativeTS = relativeTS[:gap]
-                relativeRows = relativeRows[:gap]
-                voltage = voltage[:gap]
-            else:
-                relativeTS = relativeTS[gap:]
-                relativeRows = relativeRows[gap:]
-                voltage = voltage[gap:]
-        if np.all(relativeTS[-5:-1]<=2) and not np.all(relativeTS[1:5]<=2):
+        voltageErrors = voltageErrors[sortIndexes]
+        if cluster.flipped:
             relativeTS = np.flip(relativeTS)
             relativeRows = np.flip(relativeRows)
             voltage = np.flip(voltage)
-        if np.ptp(relativeRows) < possibleRows-2:
-            continue
+            voltageErrors = np.flip(voltageErrors)
+        #if np.ptp(relativeRows) < possibleRows-2:
+        #    continue
         for i in relativeRows:
             if i >= width:
                 break
-            if not np.isnan(voltage[relativeRows == i][0]):
+            if not np.isnan(voltage[relativeRows == i][0]) and not np.isinf(voltage[relativeRows == i][0]):
                 histLists[i].append(voltage[relativeRows == i][0])
+                if np.isnan(voltageErrors[relativeRows == i][0]):
+                    voltageErrors[relativeRows == i][0] = voltage[relativeRows == i][0]/5
+                histErrorsLists[i].append(voltageErrors[relativeRows == i][0])
         print(f"{cluster.getIndex()}", end="\r")
+    print("")
     for i in range(width):
         values = np.array(histLists[i])
+        valuesErrors = np.array(histErrorsLists[i])
         if values[(values >= _range[0]) & (values <= _range[1])].size == 0:
             plot.set_config(
                 axs[i],
                 ylim=(0, None),
-                xlim=(float(np.min(binEdges)), float(np.max(binEdges))),
+                xlim=(_range[0], _range[1]),
                 legend=True,
             )
             continue
+        valuesErrors = valuesErrors[np.invert(np.isnan(values))]
         values = values[np.invert(np.isnan(values))]
-        hist, binEdges, binCentres = histogramHit_Voltage(values, _range=_range)
+        #hist, binEdges, binCentres = histogramHit_Voltage(values, _range=_range)
+        hist, binEdges, binCentres = histogramHit_Voltage_Errors(values, valuesErrors, _range=_range)
         x = np.linspace(0, np.max(binEdges) + 0.1, 1000)
         fitCutOff = 51
         if i < fitCutOff:
@@ -205,11 +272,19 @@ for dataFile in dataFiles:
         landauAreaList.append(landau.cdf(_range[1], x_mpv, xi) * scale)
         paramsList.append(list(popt)+list(np.sqrt(np.diag(pcov))))
         chargeList.append(np.sum(hist*(binCentres))/CountsList[0])
+        chargeErrorList.append(np.sqrt(np.sum(valuesErrors[(values>=_range[0])&(values<=_range[1])]**2))/CountsList[0])
         axs[i].plot(
             x,
             y,
             c=plot.colorPalette[0],
             label=f"Mpv:{x_mpv:.3f} ± {x_mpv_e:.3f}\nWidth:{xi:.3f} ± {xi_e:.3f}\nScale:{scale:.3f} ± {scale_e:.3f}",
+        )
+        axs[i].scatter(
+            binCentres,
+            landauBinned(binCentres, *popt, binEdges) / (binEdges[1:] - binEdges[:-1]),
+            c=plot.colorPalette[2],
+            marker = "x",
+            label=f"Landau Binned",
         )
         axs[i].errorbar(
             x[np.argmax(y)],
@@ -224,7 +299,7 @@ for dataFile in dataFiles:
         plot.set_config(
             axs[i],
             ylim=(0, np.max(y) * 1.1),
-            xlim=(0, float(np.max(binEdges))),
+            xlim=(0, _range[1]),
             legend=True,
         )
     axs[-1].set_xlabel("Hit Voltage [V]")
@@ -333,6 +408,15 @@ for dataFile in dataFiles:
     )
     axs = plot.axs
     axs.scatter(np.arange(len(chargeList)), chargeList, color=plot.colorPalette[0], marker="x")
+    axs.errorbar(
+            np.arange(len(chargeList)),
+            chargeList,
+            yerr=chargeErrorList,
+            fmt="none",
+            color=plot.colorPalette[0],
+            elinewidth=1,
+            capsize=3,
+        )
     plot.set_config(
         axs,
         title="Charge per Pixel in Cluster",

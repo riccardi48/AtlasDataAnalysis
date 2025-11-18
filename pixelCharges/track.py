@@ -105,13 +105,13 @@ for dataFile in dataFiles:
         label = f"Slope: {slope:.2f}\nAngle: {angle:.2f} ± {angle_e:.2f} Degrees\nCharge: {cluster.getClusterCharge(True):.2f} ± {cluster.getClusterChargeError(True):.2f} V\nLength: {calcClusterLength(cluster.getRows(True),slope,intercept):.2f} µm"
 
         CP = clusterPlotter(cluster, path, "Cluster Map")
+        """
         CP.plot.axs.plot(
             x,
             y,
             color=CP.plot.colorPalette[5],
             label=label,
         )
-        """
         CP.plot.axs.text(
             0.01,
             0.99,
@@ -122,16 +122,17 @@ for dataFile in dataFiles:
             fontsize="small",
         )
         """
-        CP.finishPlot("Voltage", cluster.getHit_Voltages(True), textLabels=True)
+        CP.finishPlot("Voltage", cluster.getHit_Voltages(True), textLabels=True, cmap="hot")
 
         CP = clusterPlotter(cluster, path, "Relative TS")
+        """
         CP.plot.axs.plot(
             x,
             y,
             color=CP.plot.colorPalette[5],
             label=label,
         )
-        """
+        
         CP.plot.axs.text(
             0.01,
             0.99,
@@ -142,30 +143,28 @@ for dataFile in dataFiles:
             fontsize="small",
         )
         """
-        CP.finishPlot("Relative TS", TS)
+        CP.finishPlot("Relative TS", TS, cmap="plasma_r")
 
         plot = plotClass(path)
         axs = plot.axs
-        axs.scatter(cluster.getRows(True)-np.min(cluster.getRows(True)), TS, color=plot.colorPalette[2], marker="x",label="Cluster TS")
-        try:
-            calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
-            calcFileName = calcFileManager.generateFileName(
-                attribute=f"{dataFile.fileName}",
-            )
-            estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
-            x = np.arange(np.max(cluster.getRows(True)-np.min(cluster.getRows(True)))+1)
-            index = -x+x[-1]
-            x = x[index<=30]
-            index = index[index<=30]
-            spread = spread[index]
-            estimate = estimate[index]-0.5
-            axs.plot(x,estimate,color=plot.colorPalette[0],linestyle="dashed",label="Expected TS")
-            axs.fill_between(x,estimate-spread,estimate+spread, alpha=0.2,color=plot.colorPalette[0])
-        except:
-            pass
+        axs.scatter(abs((Rows-np.min(Rows))-np.max((Rows-np.min(Rows)))), TS, color=plot.colorPalette[2], marker="x",label="Cluster TS")
+        calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
+        calcFileName = calcFileManager.generateFileName(
+            attribute=f"{dataFile.fileName}",
+        )
+        estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+        x = np.arange(np.max(Rows-np.min(Rows))+1)
+        index = x
+        x = x[index<=30]
+        index = index[index<=30]
+        spread = spread[index]
+        estimate = estimate[index]-0.5
+        
+        axs.plot(x,estimate,color=plot.colorPalette[0],linestyle="dashed",label="Expected TS")
+        axs.fill_between(x,estimate-spread,estimate+spread, alpha=0.2,color=plot.colorPalette[0])
         plot.set_config(axs,
             title="Relative TS in cluster",
-            xlabel="Relative Row",
+            xlabel="Relative Row from Seed Pixel",
             ylabel="Relative TS",
             legend=True,
             ylim=(-0.5,np.max(TS)+5),
