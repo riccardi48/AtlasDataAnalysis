@@ -172,7 +172,7 @@ def graphTSonRows(cluster,section,estimate,spread,flipped,path,excludeCrossTalk=
         sortIndexes = np.argsort(relativeRows)
         rowsForFunc = rowsForFunc[sortIndexes]
         relativeRows = relativeRows[sortIndexes]
-        rowsToGraph = np.linspace(relativeRows[rowsForFunc==0][0],relativeRows[rowsForFunc==0][0]+len(estimate)+(len(estimate)*-int(flipped)*2),31)
+        rowsToGraph = np.linspace(relativeRows[rowsForFunc==0][0],relativeRows[rowsForFunc==0][0]+len(estimate)+(len(estimate)*-int(flipped)*2),len(estimate))
         if flipped:
             rowsToGraph = abs(rowsToGraph-np.max(rowsToGraph))
         axs.plot(rowsToGraph,estimate,color=plot.colorPalette[0],linestyle="dashed",label=f"Expected TS\np = {getPvalue(cluster,section,estimate,spread,flipped,excludeCrossTalk=excludeCrossTalk):.4f}")
@@ -285,6 +285,10 @@ def getGoodIndexes(dataFile,config,minPval=0.2):
     return np.array(indexList),sectionList,np.array(flippedList)
 
 def isPerfectCluster(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
+    cluster.pVal = 0.0
+    cluster.flipped = False
+    cluster.perm = ()
+    cluster.section = []
     if not isFlat(cluster):
         return False
     if isOnePixel(cluster):
@@ -293,10 +297,10 @@ def isPerfectCluster(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
         return False
     if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 10:
         return False
+    addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
     relativeTS = abs(cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.max(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)))
     if np.all(relativeTS<=4):
         return False
-    addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
     if cluster.pVal < minPval:
         return False
     if np.all(relativeTS[cluster.section]<=4):
@@ -352,12 +356,15 @@ if __name__ == "__main__":
         columnList = []
         relativeTSList = []
         distFromTemplate = []
-        for cluster in clusters:
+        for cluster in clusters[20000:]:
             print(f"Cluster: {cluster.getIndex()}",end="\r")
             if i > 10000000:
                 break
             #addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
-            if not isPerfectCluster(cluster,estimate,spread,minPval=minPval,excludeCrossTalk=True):
+            #if not isPerfectCluster(cluster,estimate,spread,minPval=minPval,excludeCrossTalk=True):
+            #    continue
+            isPerfectCluster(cluster,estimate,spread,minPval=minPval,excludeCrossTalk=True)
+            if len(cluster.section) == 0:
                 continue
             i += 1
             #if len(section) == 0:
@@ -388,7 +395,7 @@ if __name__ == "__main__":
             columnList.extend(cluster.getColumns(excludeCrossTalk=True)[sortIndexes][index])
             relativeTSList.extend(relativeTS[index])
             distFromTemplate.extend(relativeTS[index]-estimate[rowsForFunc[index]])
-            continue
+            #continue
             print("")
             print(cluster.pVal,cluster.flipped,cluster.perm)
             print(f"p = {getPvalue(cluster,cluster.section,estimate,spread,cluster.flipped,excludeCrossTalk=excludeCrossTalk)}")
@@ -438,6 +445,30 @@ if __name__ == "__main__":
             ylabel="Number of Sections",
         )  
         plot.saveToPDF(f"p_Value__N0_Sections")
+
+        plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/",sizePerPlot=(16,8))
+        axs = plot.axs
+        TSRange=30
+        RowRange=372
+        array, yedges, xedges = np.histogram2d(relativeTSList,rowsList,range=((-0.5,TSRange+0.5),(-0.5,RowRange+0.5)),bins=(TSRange+1,RowRange+1))
+        axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]],norm=LogNorm(vmin=1, vmax=np.max(array)))
+        plot.set_config(axs,
+            title="Row vs Relative TS",
+            xlabel="Row",
+            ylabel="Relative TS",
+        )
+        plot.saveToPDF(f"Row_Relative_TS_log")
+
+        plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/",sizePerPlot=(16,8))
+        axs = plot.axs
+        array, yedges, xedges = np.histogram2d(distFromTemplate,rowsList,range=((-TSRange/2-0.5,TSRange/2+0.5),(-0.5,RowRange+0.5)),bins=(TSRange+1,RowRange+1))
+        axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]],norm=LogNorm(vmin=1, vmax=np.max(array)))
+        plot.set_config(axs,
+            title="Row vs Distance from Template",
+            xlabel="Row",
+            ylabel="Distance from Template",
+        )
+        plot.saveToPDF(f"Row_Distance_from_Template_log")
 
         plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/",sizePerPlot=(16,8))
         axs = plot.axs
