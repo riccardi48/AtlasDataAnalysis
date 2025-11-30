@@ -425,6 +425,12 @@ for dataFile in dataFiles:
         ylim=(0,None),
     )
     plot.saveToPDF(f"Charge")
+    calcFileManager = calcDataFileManager(config["pathToCalcData"], "MPV_Params", config["maxLine"])
+    calcFileName = calcFileManager.generateFileName(
+        attribute=f"{dataFile.fileName}",
+    )
+    calcFileManager.saveFile(calcFileName=calcFileName,array=paramsList)
+
     plot = plotClass(
         base_path,
     )

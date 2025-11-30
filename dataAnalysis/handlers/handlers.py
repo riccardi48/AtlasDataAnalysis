@@ -4,6 +4,7 @@ from dataAnalysis._dependencies import (
     pd,  # pandas
     np,  # numpy
     npt,  # numpy.typing
+    tqdm, # tqdm
 )
 from dataAnalysis._fileReader import rawDataFileManager, calcDataFileManager
 from dataAnalysis._memCheck import usage
@@ -408,12 +409,9 @@ class clusterHandler:
         clusters = self.getClusters(recalc=recalc)
         print(f"Finding Cross Talk")
         crossTalk = np.full(self.dataFrameHandler.getDataLength(), False, dtype=bool)
-        for i, cluster in enumerate(clusters):
+        for cluster in tqdm(clusters,desc="Calculating CrossTalk"):
             cluster.setCrossTalk(self.crossTalkFinder.findCrossTalk_OneCluster(cluster))
             crossTalk[cluster.getIndexes()] = cluster.crossTalk
-            if i % 1000 == 0:
-                print(f"{i/len(clusters)*100:.2f}%", end="\r")
-        print("100.00%")
         self.haveCrossTalk = True
         #self.dataFrameHandler.dropDataIfRamUsageHigh()
         return crossTalk

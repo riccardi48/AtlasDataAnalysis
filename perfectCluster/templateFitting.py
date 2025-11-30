@@ -1,11 +1,13 @@
 import sys
-from funcs import fitTemplate,getTemplate,findSections,getFuncForMinimize,convertRowsForFit,isPerfectCluster,scaleTemplate,isFlat,isOnePixel,isOnEdge
+from funcs import fitTemplate,getTemplate,findSections,gaussian_loglike_pval,convertRowsForFit,scaleOnGaussian,scaleTemplate,isFlat,isOnePixel,isOnEdge,filterForTemplate
 from findPerfectCluster import graphTSonRows
 sys.path.append("..")
 import numpy as np
 from dataAnalysis import initDataFiles, configLoader
 from plotAnalysis import plotClass
 from matplotlib.ticker import MultipleLocator
+import time
+from tqdm import tqdm
 
 def graphTSonRows(axs,cluster,section,estimate,spread,flipped,estimateTemplate,spreadTemplate,excludeCrossTalk=True):
     Timestamps = cluster.getTSs(excludeCrossTalk=excludeCrossTalk)
@@ -64,14 +66,14 @@ dataFiles = initDataFiles(config)
 
 for dataFile in dataFiles:
     base_path = f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/Clusters/"
-    estimate,spread = getTemplate(dataFile,config)
+    estimate,spread = getTemplate(config)
     clusters, indexes = dataFile.get_clusters(excludeCrossTalk=True, returnIndexes=True, layer=4)
     params1List = []
     params2List = []
     firstPixel = []
     i = 0
-    for cluster in clusters[30000:50000]:
-        print(f"Cluster: {cluster.getIndex()}",end="\r")
+    k = 0
+    for cluster in tqdm(clusters, desc='Running over clusters'):
         if not isFlat(cluster):
             continue
         if isOnePixel(cluster):
@@ -80,23 +82,29 @@ for dataFile in dataFiles:
             continue
         if cluster.getSize(excludeCrossTalk=True) <= 4:
             continue
-        relativeTS = abs(cluster.getTSs(excludeCrossTalk=True) - np.max(cluster.getTSs(excludeCrossTalk=True)))
-        if np.all(relativeTS<=6):
-            continue
         #if not isPerfectCluster(cluster,estimate,spread,minPval=0,excludeCrossTalk=True):
         #    continue
-        i += 1
         sections = findSections(cluster,excludeCrossTalk=True)
         section = np.arange(len(cluster.getRows(excludeCrossTalk=True)))
         Timestamps = cluster.getTSs(excludeCrossTalk=True)[section]
         Rows = cluster.getRows(excludeCrossTalk=True)[section]
-        
-        #print(Rows,Timestamps)
-        try:
-            params,flipped = fitTemplate(cluster,section,estimate,spread,excludeCrossTalk=True)
-        except:
+        relativeTS = Timestamps - np.min(Timestamps)
+        if np.all(relativeTS<=6):
             continue
-        if params[0] == 1 and params[1] == 1:
+        if np.sum(relativeTS>6) <= 2:
+            continue
+        i += 1
+        #print(Rows,Timestamps)
+        #start = time.time()
+        params,flipped = fitTemplate(cluster,section,estimate,spread,excludeCrossTalk=True)
+        pVal = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(*convertRowsForFit(Rows,Timestamps,flipped=flipped),*scaleTemplate(estimate,spread,params[0],params[1]))))
+        if pVal < 0.2:
+            k += 1
+            continue
+        #end = time.time()
+        #print(f"{end - start} seconds to fit")
+        if params[0] == 0.5 and params[1] == 0.5:
+            k += 1
             continue
         x,y = convertRowsForFit(Rows,Timestamps,flipped=flipped)
         params1List.append(params[0])
@@ -106,8 +114,8 @@ for dataFile in dataFiles:
         print(params)
         #print(flipped)
         path = base_path + f"Cluster_{cluster.getIndex()}/"
-        print(scaleTemplate(estimate,spread,*params)[0])
-        print(estimate)
+        #print(scaleTemplate(estimate,spread,*params)[0])
+        #print(estimate)
         plot = plotClass(path)
         axs = plot.axs
         graphTSonRows(axs,cluster,section,*scaleTemplate(estimate,spread,*params),flipped,estimate,spread)
@@ -116,13 +124,29 @@ for dataFile in dataFiles:
         input("")
     print("")
     print(f"{len(params1List)/i*100:.2f}% of {i} clusters had fits")
+    print(f"{k/i*100:.2f}% of {i} clusters had failed fits")
     plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
     axs = plot.axs
     array, yedges, xedges = np.histogram2d(params1List,params2List,bins=(100,100),range=((0,2),(0,2)))
     axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
     plot.set_config(axs,
         title="Fitted Params",
-        xlabel="Angle Scaler",
-        ylabel="Flat Scaler",
+        xlabel="Flat Scaler",
+        ylabel="Angle Scaler",
     )  
     plot.saveToPDF(f"Fitting_Params")
+    plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
+    axs = plot.axs
+    params1List = np.array(params1List)
+    params2List = np.array(params2List)
+    ratio = (params1List+params2List)/2
+    angle = np.rad2deg(np.tan(ratio*np.arctan(np.deg2rad(dataFile.angle))))
+    height,x = np.histogram(angle,bins=90,range=(0,90))
+    axs.stairs(height, x, baseline=None, color=plot.colorPalette[0])
+    plot.set_config(axs,
+        title="Angle of clusters",
+        xlabel="Angle",
+        ylabel="Count",
+        #xlim=(75,90),
+    )  
+    plot.saveToPDF(f"Fitting_Params_Angle")

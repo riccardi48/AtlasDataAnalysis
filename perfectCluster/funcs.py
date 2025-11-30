@@ -227,23 +227,34 @@ def fitTemplate(cluster,section,estimate,spread,excludeCrossTalk=True):
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)[section]
     x,y = convertRowsForFit(Rows,Timestamps,flipped=False)
     func = getFuncForMinimize(x,y,estimate,spread)
-    initial_guess = [1, 1]
-    bounds = ((0.1,2),(0.1,2))
-    p1,f1,dict1 = optimize.fmin_l_bfgs_b(func, initial_guess,bounds=bounds, approx_grad=True, epsilon=0.1,pgtol=1e-07)
-    if dict1["task"] == 'ABNORMAL: ':
-        f1 = 1
+    initial_guess = [0.5, 0.5]
+    bounds = ((0.2,2),(0.2,2))
+    #result1 = optimize.differential_evolution(func,bounds=bounds)
+    p1,f1,dict1 = optimize.fmin_l_bfgs_b(func, initial_guess,bounds=bounds, approx_grad=True)#, epsilon=0.1,pgtol=1e-07)
+    #if dict1["task"] == 'ABNORMAL: ':
+    #    f1 = 1
     x,y = convertRowsForFit(Rows,Timestamps,flipped=True)
     func = getFuncForMinimize(x,y,estimate,spread)
-    p2,f2,dict2 = optimize.fmin_l_bfgs_b(func, initial_guess,bounds=bounds, approx_grad=True, epsilon=0.1,pgtol=1e-07)
-    if dict2["task"] == 'ABNORMAL: ':
-        f2 = 1
+    #result2 = optimize.differential_evolution(func,bounds=bounds)
+    p2,f2,dict2 = optimize.fmin_l_bfgs_b(func, initial_guess,bounds=bounds, approx_grad=True)#, epsilon=0.1,pgtol=1e-07)
+    #if dict2["task"] == 'ABNORMAL: ':
+    #    f2 = 1
+    #if result1.fun>result2.fun:
+    #    return result2.x,True
     if f1>f2:
         return p2,True
     return p1,False
 
 def getFuncForMinimize(x,y,estimate,spread):
-    func = lambda params:-gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,*scaleTemplate(estimate,spread,params[0],params[1]))))
+    func = lambda params:funcForMinimizing(params,x,y,estimate,spread)
     return func
+
+def funcForMinimizing(params,x,y,estimate,spread):
+    newEstimate,newSpread = scaleTemplate(estimate,spread,params[0],params[1])
+    y_filtered,estimate_filtered,spread_filtered = filterForTemplate(x,y,newEstimate,newSpread)
+    if len(y_filtered) <= 5:
+        return 2**16-1
+    return -logLike_gaussian(scaleOnGaussian(y_filtered,estimate_filtered,spread_filtered))/(len(y_filtered)-4)
 
 def filterForTemplate(x,y,estimate,spread):
     index = (x<len(estimate))&(x>=0)
@@ -270,3 +281,15 @@ def scaleTemplate(estimate,spread,angleScaler,flatScaler):
         input(f"{Indexes}")
     newSpread = np.interp(np.arange(int(np.floor(Indexes[-1]))+1),Indexes,spread)
     return newEstimate,newSpread
+
+def loadOrCalcMPV(dataFile,config):
+    calcFileManager = calcDataFileManager(config["pathToCalcData"], "MPV_Params", config["maxLine"])
+    calcFileName = calcFileManager.generateFileName(
+        attribute=f"{dataFile.fileName}",
+    )
+    fileCheck = calcFileManager.fileExists(calcFileName=calcFileName)
+    if not fileCheck:
+        raise NotImplementedError
+    else:
+        paramsList = calcFileManager.loadFile(calcFileName=calcFileName)
+    return paramsList

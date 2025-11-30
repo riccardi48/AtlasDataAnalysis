@@ -9,3 +9,4 @@ from scipy.special import lambertw
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.backends.backend_pdf import PdfPages
+from tqdm import tqdm
