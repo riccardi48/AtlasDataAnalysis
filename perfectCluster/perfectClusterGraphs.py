@@ -33,9 +33,10 @@ for dataFile in dataFiles:
     presentRowsList2 = []
     relativeRowsList = []
     missingRelativeRowsList = []
+    presentRelativeRowsList = []
     MPV_Params = loadOrCalcMPV(dataFile, config)
     cutOff = 12
-    for cluster in tqdm(clusters[:100000], desc="Running over clusters"):
+    for cluster in tqdm(clusters, desc="Running over clusters"):
         if not isPerfectCluster(cluster, estimate, spread, minPval=0.2, excludeCrossTalk=True):
             continue
         rows = cluster.getRows(True)[cluster.section]
@@ -56,7 +57,8 @@ for dataFile in dataFiles:
             + len(MPV_Params[:, 0])
             + len(MPV_Params[:, 0]) * 2 * -1 * cluster.flipped,
             len(MPV_Params[:, 0]) + 1,
-        ).astype(int)
+        ).astype(int)[:-1]
+        expectedRows = expectedRows[(expectedRows >= 0) & (expectedRows < 372)]
         expectedRowsRelative, _ = convertRowsForFit(expectedRows, expectedRows, flipped=False)
         x, _ = convertRowsForFit(rows, rows, flipped=cluster.flipped)
         missing = np.array([r for r in expectedRowsRelative if r not in x])
@@ -68,8 +70,8 @@ for dataFile in dataFiles:
         # print([1-landau.cdf(0.16,mpv,width) for mpv,width in zip(MPV_Params[:,0][missing],MPV_Params[:,1][missing])])
         missingRow = np.array([r for r in expectedRows if r not in rows])
         missingRowsList.extend(missingRow[missing < len(MPV_Params[:, 0])])
-        missingRelativeRowsList.extend(missing[missing < len(MPV_Params[:, 0])])
         relativeRowsList.extend(missing[missing < len(MPV_Params[:, 0])])
+        presentRelativeRowsList.extend(expectedRowsRelative)
         presentRowsList.extend(expectedRows[expectedRowsRelative <= cutOff])
         presentRowsList2.extend(expectedRows[expectedRowsRelative > cutOff])
         # print(missing)
@@ -87,6 +89,7 @@ for dataFile in dataFiles:
     presentRowsList2 = np.array(presentRowsList2)
     relativeRowsList = np.array(relativeRowsList)
     missingRelativeRowsList = np.array(missingRelativeRowsList)
+    presentRelativeRowsList = np.array(presentRelativeRowsList)
     plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
     axs = plot.axs
     array, yedges, xedges = np.histogram2d(
@@ -209,10 +212,10 @@ for dataFile in dataFiles:
     plot.saveToPDF(f"ChanceOfNoHitvsRowPercentage_FarRows")
 
     rowFrequency = np.zeros(len(MPV_Params[:, 0]))
-    for row in relativeRowsList:
+    for row in presentRelativeRowsList:
         rowFrequency[row] += 1
     missingRowFrequency = np.zeros(len(MPV_Params[:, 0]))
-    for row in missingRelativeRowsList:
+    for row in relativeRowsList:
         missingRowFrequency[row] += 1
     rowPercent = missingRowFrequency / (rowFrequency + 1e-10)
     error = np.sqrt((rowPercent * (1 - rowPercent)) / (rowFrequency + 1e-10))
@@ -224,17 +227,17 @@ for dataFile in dataFiles:
             for mpv, width in zip(MPV_Params[:, 0], MPV_Params[:, 1])
         ]
         )
-    axs.plot(np.arange(rowPercent.size), landauCDFList, color=plot.colorPalette[1], label="Estimated Efficiency")
+    axs.plot(np.arange(rowPercent.size), 1-landauCDFList, color=plot.colorPalette[1], label="Estimated Efficiency")
     axs.scatter(
         np.arange(rowPercent.size),
-        rowPercent,
+        1-rowPercent,
         color=plot.colorPalette[0],
         marker="x",
         label="Missing Row %",
     )
     axs.errorbar(
         np.arange(rowPercent.size),
-        rowPercent,
+        1-rowPercent,
         yerr=error,
         fmt="none",
         color=plot.colorPalette[0],
@@ -247,7 +250,7 @@ for dataFile in dataFiles:
         xlabel="Row",
         ylabel="Efficiency",
         legend=True,
-        ylim=(0.8,1),
+        #ylim=(0.8,1),
     )
     plot.saveToPDF(f"Efficiency_Relative_Row")
 

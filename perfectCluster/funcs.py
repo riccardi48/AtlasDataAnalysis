@@ -90,7 +90,7 @@ def isPerfectCluster(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
         return False
     if isOnEdge(cluster):
         return False
-    if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 10:
+    if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 8:
         return False
     addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
     relativeTS = abs(cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.max(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)))

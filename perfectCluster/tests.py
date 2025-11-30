@@ -118,7 +118,7 @@ for k, dataFile in enumerate(dataFiles):
         )  
     plot2.saveToPDF("Last_Low")
     TSRange = 40
-    RowRange = 30
+    RowRange = 25
     array, yedges, xedges = np.histogram2d(plot3List2,plot3List1,range=((-0.5,TSRange+0.5),(-0.5,RowRange+0.5)),bins=(TSRange+1,RowRange+1))
     plot3.axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
     estimate = []
