@@ -2,6 +2,7 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     np,  # numpy
     njit,  # numba
+    tqdm, # tqdm
 )
 import warnings
 
@@ -49,7 +50,7 @@ def calcClusters(
 ) -> list[npt.NDArray[np.int_]]:
     activeClusters = []
     finishedClusters = []
-    for i in range(len(Layers)):
+    for i in tqdm(range(len(Layers)),desc="Calculating Clusters"):
         layer = Layers[i]
         triggerID = TriggerID[i]
         ts = TS[i]
@@ -64,9 +65,6 @@ def calcClusters(
             activeClusters.append(clusterChecker(layer,index,ts,triggerID))
         finishedClusters += [np.array(cluster.indexes) for cluster in activeClusters if not cluster.checkActive(triggerID)]
         activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
-        if i % 10000 == 0:
-                print(f"{i/len(Layers)*100:.2f}%", end="\r")
-    print("100.00%")
     return np.array(finishedClusters, dtype=object)
 
 def __calcClusters(
