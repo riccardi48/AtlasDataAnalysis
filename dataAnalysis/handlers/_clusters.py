@@ -2,33 +2,42 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     np,  # numpy
     njit,  # numba
-    tqdm, # tqdm
+    tqdm,  # tqdm
 )
 import warnings
 
 warnings.filterwarnings("ignore", "unsafe cast from int64 to int32")
 
+
 class clusterChecker:
-    def __init__(self,layer,index,TS,TriggerID):
+    def __init__(self, layer, index, TS, TriggerID):
         self.layer = layer
         self.indexes = [index]
         self.minTS = TS
         self.maxTS = TS
         self.minTriggerID = TriggerID
         self.maxTriggerID = TriggerID
-    def checkHit(self,layer,index,TS,TriggerID,timeVariance = 40, triggerVariance = 1):
+
+    def checkHit(self, layer, index, TS, TriggerID, timeVariance=40, triggerVariance=1):
         if self.layer != layer:
             return False
         if TriggerID <= self.maxTriggerID and TriggerID >= self.minTriggerID:
             pass
-        elif abs(TriggerID - self.maxTriggerID) > triggerVariance and abs(TriggerID - self.minTriggerID) > triggerVariance:
+        elif (
+            abs(TriggerID - self.maxTriggerID) > triggerVariance
+            and abs(TriggerID - self.minTriggerID) > triggerVariance
+        ):
             return False
         if TS <= self.maxTS and TS >= self.minTS:
             return True
-        elif (abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance) and (abs((TS + 512) - (self.maxTS + 512)) > timeVariance and abs((TS + 512) - (self.minTS + 512)) > timeVariance):
+        elif (abs(TS - self.maxTS) > timeVariance and abs(TS - self.minTS) > timeVariance) and (
+            abs((TS + 512) - (self.maxTS + 512)) > timeVariance
+            and abs((TS + 512) - (self.minTS + 512)) > timeVariance
+        ):
             return False
         return True
-    def addHit(self,index,TS,TriggerID):
+
+    def addHit(self, index, TS, TriggerID):
         self.indexes.append(index)
         if TS > self.maxTS:
             self.maxTS = TS
@@ -38,9 +47,11 @@ class clusterChecker:
             self.maxTriggerID = TriggerID
         if TriggerID < self.minTriggerID:
             self.minTriggerID = TriggerID
-    def checkActive(self,TriggerID, triggerVariance = 10):
+
+    def checkActive(self, TriggerID, triggerVariance=10):
         return True if self.maxTriggerID + triggerVariance >= TriggerID else False
-    
+
+
 def calcClusters(
     Layers: npt.NDArray[np.int_],
     TriggerID: npt.NDArray[np.int_],
@@ -50,22 +61,34 @@ def calcClusters(
 ) -> list[npt.NDArray[np.int_]]:
     activeClusters = []
     finishedClusters = []
-    for i in tqdm(range(len(Layers)),desc="Calculating Clusters"):
+    for i in tqdm(range(len(Layers)), desc="Calculating Clusters"):
         layer = Layers[i]
         triggerID = TriggerID[i]
         ts = TS[i]
         index = i
         addedToCluster = False
         for cluster in activeClusters:
-            if cluster.checkHit(layer,index,ts,triggerID,timeVariance=time_variance,triggerVariance=trigger_variance):
-                cluster.addHit(index,ts,triggerID)
+            if cluster.checkHit(
+                layer,
+                index,
+                ts,
+                triggerID,
+                timeVariance=time_variance,
+                triggerVariance=trigger_variance,
+            ):
+                cluster.addHit(index, ts, triggerID)
                 addedToCluster = True
                 break
         if not addedToCluster:
-            activeClusters.append(clusterChecker(layer,index,ts,triggerID))
-        finishedClusters += [np.array(cluster.indexes) for cluster in activeClusters if not cluster.checkActive(triggerID)]
+            activeClusters.append(clusterChecker(layer, index, ts, triggerID))
+        finishedClusters += [
+            np.array(cluster.indexes)
+            for cluster in activeClusters
+            if not cluster.checkActive(triggerID)
+        ]
         activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
     return np.array(finishedClusters, dtype=object)
+
 
 def __calcClusters(
     Layers: npt.NDArray[np.int_],

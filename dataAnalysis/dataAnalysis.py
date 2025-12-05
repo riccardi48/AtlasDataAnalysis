@@ -8,7 +8,6 @@ from ._dependencies import (
     npt,  # numpy.typing
 )
 
-
 def _isFiltered(dataFile: dataAnalysis, filter_dict: dict = {}) -> bool:
     # Takes in an array of data_class and filters and sorts them
     # filter_dict has keys that are attributes of data_class with values that you want to filter for
@@ -55,47 +54,23 @@ class dataAnalysis:
     def get_base_attr(
         self, attribute: str, **kwargs
     ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[Any]]]:
-        if "layer" in kwargs:
-            if kwargs["layer"] is None:
-                kwargs["layers"] = None
-                kwargs.pop("layer")
-            else:
-                kwargs["layers"] = [kwargs["layer"]]
-                kwargs.pop("layer")
+        kwargs = self._fixLayers(kwargs)
         return self.dataHandler.baseAttr(attribute, **kwargs)
 
     def get_clusters(self, **kwargs) -> clusterArray:
-        if "layer" in kwargs:
-            if kwargs["layer"] is None:
-                kwargs["layers"] = None
-                kwargs.pop("layer")
-            else:
-                kwargs["layers"] = [kwargs["layer"]]
-                kwargs.pop("layer")
+        kwargs = self._fixLayers(kwargs)
         return self.dataHandler.getClusters(**kwargs)
 
     def get_cluster_attr(
         self, attribute, excludeCrossTalk: bool = False, **kwargs
     ) -> tuple[npt.NDArray[Any], Optional[npt.NDArray[np.int_]]]:
-        if "layer" in kwargs:
-            if kwargs["layer"] is None:
-                kwargs["layers"] = None
-                kwargs.pop("layer")
-            else:
-                kwargs["layers"] = [kwargs["layer"]]
-                kwargs.pop("layer")
+        kwargs = self._fixLayers(kwargs)
         return self.dataHandler.getClustersAttr(
             attribute, excludeCrossTalk=excludeCrossTalk, **kwargs
         )
 
     def get_crossTalk(self, recalc: bool = False, **kwargs) -> npt.NDArray[np.bool_]:
-        if "layer" in kwargs:
-            if kwargs["layer"] is None:
-                kwargs["layers"] = None
-                kwargs.pop("layer")
-            else:
-                kwargs["layers"] = [kwargs["layer"]]
-                kwargs.pop("layer")
+        kwargs = self._fixLayers(kwargs)
         return self.dataHandler.getCrossTalk(recalc=recalc, **kwargs)
 
     def init_cluster_voltages(self) -> None:
@@ -105,6 +80,33 @@ class dataAnalysis:
         self.dataHandler.save_nonCrossTalk_to_csv(path, self.fileName)
 
     def get_flatClusters(self, width, **kwargs) -> clusterArray:
+        kwargs = self._fixLayers(kwargs)
+        return self.dataHandler.getFlatClusters(width, **kwargs)
+
+    def get_timeStampTemplate(
+        self, maxRow=25, layers=None,excludeCrossTalk=True
+    ) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
+        return self.dataHandler.getTimeStampTemplate(maxRow=maxRow, layers=layers,excludeCrossTalk=excludeCrossTalk)
+
+    def get_perfectCluster_indexes(
+        self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs
+    ) -> npt.NDArray[np.int_]:
+        kwargs = self._fixLayers(kwargs)
+        estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
+        self.get_clusters(excludeCrossTalk=excludeCrossTalk)
+        return self.dataHandler.getPerfectClusterIndexes(
+            estimate, spread, minPval=minPval, excludeCrossTalk=True, **kwargs
+        )
+
+    def get_perfectClusters(self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs):
+        kwargs = self._fixLayers(kwargs)
+        estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
+        self.get_clusters(excludeCrossTalk=excludeCrossTalk)
+        return self.dataHandler.getPerfectClusters(
+            estimate, spread, minPval=minPval, excludeCrossTalk=True, **kwargs
+        )
+
+    def _fixLayers(self, kwargs):
         if "layer" in kwargs:
             if kwargs["layer"] is None:
                 kwargs["layers"] = None
@@ -112,4 +114,8 @@ class dataAnalysis:
             else:
                 kwargs["layers"] = [kwargs["layer"]]
                 kwargs.pop("layer")
-        return self.dataHandler.getFlatClusters(width, **kwargs)
+        return kwargs
+
+    def clear_data(self) -> None:
+        self.dataHandler.clearData()
+

@@ -24,6 +24,12 @@ class clusterClass:
         self.TSs = TSs
         self.index = index
 
+        # For perfect cluster identification
+        self.pVal = 0.0
+        self.flipped = False
+        self.perm = ()
+        self.section = []
+
     def setHit_Voltage(
         self, Hit_Voltages: npt.NDArray[np.float64], Hit_VoltageErrors: npt.NDArray[np.float64]
     ) -> None:
@@ -140,14 +146,20 @@ class clusterClass:
         else:
             return TStoMS(self.TSs)
 
-    def getClusterCharge(self, excludeCrossTalk: bool = False) -> float:
+    def getClusterCharge(self, excludeCrossTalk: bool = False, section=None) -> float:
         if excludeCrossTalk:
-            return np.sum(self.Hit_Voltages[self.notCrossTalk])
+            if section is None:
+                return np.sum(self.Hit_Voltages[self.notCrossTalk])
+            else:
+                return np.sum(self.Hit_Voltages[self.notCrossTalk][section])
         else:
             return np.sum(self.Hit_Voltages)
         
-    def getClusterChargeError(self, excludeCrossTalk: bool = False) -> float:
+    def getClusterChargeError(self, excludeCrossTalk: bool = False, section=None) -> float:
         if excludeCrossTalk:
-            return np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk] ** 2))
+            if section is None:
+                return np.sum(np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk][section] ** 2)))
+            else:
+                return np.sum(np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk] ** 2)))
         else:
             return np.sqrt(np.sum(self.Hit_VoltageErrors ** 2))
