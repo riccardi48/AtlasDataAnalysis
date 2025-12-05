@@ -6,6 +6,8 @@ import numba
 from landau import landau
 from psutil import Process
 from scipy.special import lambertw
+from scipy.optimize import curve_fit
+from scipy.stats import norm,chi2
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.backends.backend_pdf import PdfPages
