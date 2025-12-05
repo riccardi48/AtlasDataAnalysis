@@ -1,5 +1,8 @@
-import numpy as np
-import numpy.typing as npt
+from dataAnalysis._dependencies import (
+    npt,  # numpy.typing
+    np,  # numpy
+)
+from ._functions import TStoMS
 
 
 class clusterClass:
@@ -20,6 +23,12 @@ class clusterClass:
         self.ToTs = ToTs
         self.TSs = TSs
         self.index = index
+
+        # For perfect cluster identification
+        self.pVal = 0.0
+        self.flipped = False
+        self.perm = ()
+        self.section = []
 
     def setHit_Voltage(
         self, Hit_Voltages: npt.NDArray[np.float64], Hit_VoltageErrors: npt.NDArray[np.float64]
@@ -81,15 +90,15 @@ class clusterClass:
 
     def getColumns(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.columns[self.notCrossTalk]
+            return self.columns[self.notCrossTalk].astype(int)
         else:
-            return self.columns
+            return self.columns.astype(int)
 
     def getRows(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.rows[self.notCrossTalk]
+            return self.rows[self.notCrossTalk].astype(int)
         else:
-            return self.rows
+            return self.rows.astype(int)
 
     def getHit_Voltages(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.float64]:
         if excludeCrossTalk:
@@ -117,12 +126,40 @@ class clusterClass:
 
     def getTSs(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
-            return self.TSs[self.notCrossTalk]%1024
+            return self.TSs[self.notCrossTalk] % 1024
         else:
-            return self.TSs%1024
+            return self.TSs % 1024
 
     def getEXT_TSs(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
         if excludeCrossTalk:
+            if np.sum(self.notCrossTalk) == 0:
+                return np.array([np.nan])
             return self.TSs[self.notCrossTalk]
         else:
             return self.TSs
+
+    def getTimes(self, excludeCrossTalk: bool = False) -> npt.NDArray[np.int_]:
+        if excludeCrossTalk:
+            if np.sum(self.notCrossTalk) == 0:
+                return np.array([np.nan])
+            return TStoMS(self.TSs)[self.notCrossTalk]
+        else:
+            return TStoMS(self.TSs)
+
+    def getClusterCharge(self, excludeCrossTalk: bool = False, section=None) -> float:
+        if excludeCrossTalk:
+            if section is None:
+                return np.sum(self.Hit_Voltages[self.notCrossTalk])
+            else:
+                return np.sum(self.Hit_Voltages[self.notCrossTalk][section])
+        else:
+            return np.sum(self.Hit_Voltages)
+        
+    def getClusterChargeError(self, excludeCrossTalk: bool = False, section=None) -> float:
+        if excludeCrossTalk:
+            if section is None:
+                return np.sum(np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk][section] ** 2)))
+            else:
+                return np.sum(np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk] ** 2)))
+        else:
+            return np.sqrt(np.sum(self.Hit_VoltageErrors ** 2))

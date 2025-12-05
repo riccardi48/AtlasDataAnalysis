@@ -1,10 +1,12 @@
-from dataAnalysis import dataAnalysis,initDataFiles
-import configLoader
-import glob
+from dataAnalysis import initDataFiles,configLoader,printMemUsage
 
-configLoader.saveConfig({"filterDict":{"telescope":"kit","fileName":"angle6_4Gev_kit_2"}},path="config.json")
+if __name__ == "__main__":
+    configLoader.saveConfig({"filterDict":{"telescope":"kit","fileName":"long_term_6Gev_kit_01"}},path="config.json")
+
 config = configLoader.loadConfig(path="config.json")
-
 dataFiles = initDataFiles(config)
+printMemUsage()
+
 for dataFile in dataFiles:
     dataFile.save_nonCrossTalk_to_csv(config["pathToDataOutput"])
+    printMemUsage()

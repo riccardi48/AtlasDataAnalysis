@@ -1,11 +1,9 @@
-from dataAnalysis import dataAnalysis, calcDataFileManager, crossTalkFinder, clusterClass
+from dataAnalysis import dataAnalysis, clusterClass
 from lowLevelFunctions import (
     calcHit_VoltageByPixel,
     histogramErrors,
     neg_log_likelihood_truncated,
     landauFunc,
-    print_mem_usage,
-    TStoMS,
     fitVoltageDepth,
     chargeCollectionEfficiencyFunc,
     calcDepth,
@@ -18,8 +16,15 @@ from typing import Optional, Any, TypeAlias
 import numpy as np
 import numpy.typing as npt
 from landau import landau
-
+from dataAnalysis._fileReader import calcDataFileManager
 clusterArray: TypeAlias = npt.NDArray[np.object_]
+
+def TStoMS(TS: npt.NDArray[np.int_]) -> npt.NDArray[np.float64]:
+    return TS * 25 / 1000000
+
+
+def MStoTS(Time: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
+    return np.round(Time * 1000000 / 25).astype(np.int_)
 
 
 class depthAnalysis:
@@ -41,7 +46,7 @@ class depthAnalysis:
     ) -> None:
         fileCheck = True
         attribute = f"{measuredAttribute}ByPixel"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/hist/"
+        file = f"{dataFile.fileName}/depthAnalysis/hist/"
 
         for i in range(self.maxClusterWidth - 1):
             calcFileName = self.calcFileManager.generateFileName(
@@ -108,7 +113,7 @@ class depthAnalysis:
         if error:
             attribute = f"{attribute}Error"
         name = f"_{clusterWidth}"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/hist/"
+        file = f"{dataFile.fileName}/depthAnalysis/hist/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name=name, file=file, layers=self.layers
         )
@@ -137,7 +142,7 @@ class depthAnalysis:
         elif fitting == "nnlf":
             attribute = f"{measuredAttribute}Peaks_nnlf"
         name = f"_{clusterWidth}"
-        file = f"{dataFile.get_fileName()}/depthAnalysis/peaks/"
+        file = f"{dataFile.fileName}/depthAnalysis/peaks/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name=name, file=file, layers=self.layers
         )
@@ -167,7 +172,7 @@ class depthAnalysis:
             hitPositionErrorArray=hitPositionErrorArray[:,remove]
             hitPositionArray=hitPositionArray[:,remove]
             if measuredAttribute == "Hit_Voltage":
-                _range = (0.162, 1)
+                _range = (0.162, 3)
             elif measuredAttribute == "ToT":
                 _range = (40, 256)
             if fitting == "histogram":
@@ -262,7 +267,7 @@ class depthAnalysis:
                         values, errors=errors, returnParams=[1], _range=_range
                     )
             avgWidth = np.mean(widths, axis=0)
-            xi_bounds = (avgWidth[0] / 10, avgWidth[0] * 2)
+            xi_bounds = (avgWidth[0] / 4, avgWidth[0] * 2)
             scale_bounds = (avgWidth[1] / 1.1, avgWidth[1] * 2)
             for i in range(clusterWidth):
                 values = hitPositionArray[i, :][hitPositionArray[i, :] != 0]
@@ -363,13 +368,13 @@ class depthAnalysis:
                 0.8 * np.sum(hist * np.diff(binEdges)) / Z,
                 3 * np.sum(hist * np.diff(binEdges)) / Z,
             )
-        unzippedBounds = [x_mpv_bounds, xi_bounds, scale_bounds]
+        unzippedBounds = [x_mpv_bounds, xi_bounds, (0,np.inf)]
         lower_bounds, upper_bounds = zip(*unzippedBounds)
         bounds = (list(lower_bounds), list(upper_bounds))
         initial_guess = [
             binCentres[3:][np.argmax(hist[3:])],
             (binCentres[3:][np.argmax(hist[3:])] - 0.5) * 0.5,
-            np.average(scale_bounds),
+            np.sum(hist * np.diff(binEdges)),
         ]
         if initial_guess[1] < bounds[0][1]:
             initial_guess[1] = bounds[0][1] * 1.01
@@ -406,7 +411,7 @@ class depthAnalysis:
         values = values[(values >= _range[0]) & (values <= _range[1])]
         values = np.sort(values)
         if min_bin_width is None:
-            min_bin_width = (values.max() - values.min()) / 150
+            min_bin_width = (values.max() - values.min()) / 300
         if max_bin_width is None:
             max_bin_width = (values.max() - values.min()) / 20
 
@@ -495,24 +500,23 @@ class depthAnalysis:
 
     def residual(self, dataFile: dataAnalysis, d: float) -> float:
         bins, values = self.findClusterAngleDistribution(dataFile, d)
-        ignoreFirst = 10
-        maxValueIndex = np.argmax(values[ignoreFirst:])
-        shift = 0
+        ignoreFirst = 8
+        maxValueIndex = np.argsort(values[ignoreFirst:])[-4:]
+        #print(maxValueIndex)
+        shift = -1
+        #print(values[maxValueIndex+ignoreFirst])
         return (
-            np.average(
+            np.sum(
                 np.rad2deg(
-                    bins[
+                    (bins[1:]+np.diff(bins))[
                         maxValueIndex
-                        + ignoreFirst
-                        + shift : maxValueIndex
-                        + 2
                         + ignoreFirst
                         + shift
                     ]
                 )
+            - dataFile.angle
+            ) ** 2
             )
-            - dataFile.get_angle()
-        ) ** 2
 
     def find_d_value(self, dataFile: dataAnalysis) -> float:
         func = lambda d: self.residual(dataFile, d)
@@ -539,13 +543,17 @@ class plotClass:
         self.axs = gs.subplots(sharex=sharex, sharey=sharey)
         self.colorPalette = [
             "#CC3F0C",
-            "#9A6D38",
+            "#8896AB",
             "#33673B",
             "#333745",
-            "#8896AB",
             "#EDB0E4",
             "#CC8A8A",
             "#239A7E",
+            "#9A6D38",
+            "#7B4173",
+            "#525252",
+            "#000000",
+            "#AAAAAA",
         ]
         self.textColor = self.colorPalette[-1]
 
@@ -564,6 +572,7 @@ class plotClass:
         handletextpad: float = 0.8,
         columnspacing: float = 2,
         legendTitle: str = "",
+        labelcolor: str = None,
     ) -> None:
         if ylim is not None:
             ax.set_ylim(ylim[0], ylim[1])
@@ -580,6 +589,7 @@ class plotClass:
                 handletextpad=handletextpad,
                 columnspacing=columnspacing,
                 title=legendTitle,
+                labelcolor=labelcolor,
             )
         if xlabel is not None:
             ax.set_xlabel(xlabel)
@@ -597,7 +607,6 @@ class plotClass:
         self.fig.savefig(f"{out_put_file_name}")
         plt.close()
         print(f"Saved Plot: {out_put_file_name}")
-        print_mem_usage()
 
 
 class clusterPlotter:
@@ -606,7 +615,7 @@ class clusterPlotter:
         self.buffer = buffer
         self.excludeCrossTalk = excludeCrossTalk
         self.cmap = "plasma"
-        self.crossTalkFinder = crossTalkFinder()
+        #self.crossTalkFinder = crossTalkFinder()
 
     def plotClusters(self, ax: Any, clusters: clusterArray, z: str = "Hit_Voltages") -> Any:
         numberOfPoints = sum(
@@ -625,7 +634,7 @@ class clusterPlotter:
                 cluster.getColumns(excludeCrossTalk=self.excludeCrossTalk)
             )
             values = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
-            if type(values) == type(np.array([])):
+            if type(values) == type(np.array([])) and z == "TSs":
                 values = values - np.min(values)
             Hit_Voltage[count : count + cluster.getSize(excludeCrossTalk=self.excludeCrossTalk)] = (
                 values
@@ -638,14 +647,15 @@ class clusterPlotter:
             display - np.nanmin(display),
             extent,
             vmin=0,
+            #vmax=2,
             vmax=float(np.nanmax(display) - np.nanmin(display) + 1),
         )
-        minTS = np.average(clusters[0].getTSs(excludeCrossTalk=self.excludeCrossTalk))
+        minTS = np.average(clusters[0].getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk))
         for cluster in clusters:
-            ang = np.random.uniform(0, 2)
+            ang = np.random.uniform(-1, 2)
             value = getattr(cluster, "get" + z)(excludeCrossTalk=self.excludeCrossTalk)
             value = np.reshape(value, np.size(value))[0]
-            time = f"{TStoMS(np.average(cluster.getTSs(excludeCrossTalk=self.excludeCrossTalk)) - minTS):.2f} ms"
+            time = f"{TStoMS(np.average(cluster.getEXT_TSs(excludeCrossTalk=self.excludeCrossTalk)) - minTS):.2f} ms"
             # time = f"{np.average(cluster.getTSs(excludeCrossTalk=self.excludeCrossTalk)):.0f}"
             ax.annotate(
                 time,
@@ -745,7 +755,7 @@ class correlationPlotter:
         self, dataFile: dataAnalysis, recalc: bool = False
     ) -> npt.NDArray[np.float64]:
         attribute = f"RowRowCorrelation"
-        file = f"{dataFile.get_fileName()}/"
+        file = f"{dataFile.fileName}/"
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name="", file=file, layers=self.layers
         )
@@ -762,9 +772,6 @@ class correlationPlotter:
             rows, _ = dataFile.get_base_attr("Row")
             indexes = rows - np.min(rows)
             for cluster in clusters:
-                # print(cluster.notCrossTalk)
-                # print(cluster.getRows(excludeCrossTalk = self.excludeCrossTalk))
-                # input()
                 for pixel in cluster.getIndexes(excludeCrossTalk=self.excludeCrossTalk):
                     self.RowRow[
                         indexes[pixel],
@@ -891,14 +898,14 @@ def fit_dataFile(
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
-            upTwo=True if dataFile.get_fileName() == "angle6_4Gev_kit_2" else False,
+            upTwo=True if dataFile.fileName == "angle6_4Gev_kit_2" else False,
         )
         x = calcDepth(
             d,
             i,
-            dataFile.get_angle(),
+            dataFile.angle,
             depthCorrection=depthCorrection,
             upTwo=False,
         )
@@ -910,7 +917,7 @@ def fit_dataFile(
         # if i < 20:
         #    y, y_err = adjustPeakVoltage(y, y_err, d, i)
         if not hideLowWidths or (
-            np.rad2deg(np.arctan(i / d)) > 85.5 and np.rad2deg(np.arctan(i / d)) < 87
+            np.rad2deg(np.arctan(i / d)) > 85 and np.rad2deg(np.arctan(i / d)) < 86.8
         ):
             allXValues = allXValues + list(x[1:-1])
             allYValues = allYValues + list(y[1:-1])
@@ -921,7 +928,7 @@ def fit_dataFile(
     y = allYValues_np[np.argsort(allXValues_np)]
     yerr = allYValuesErrors_np[np.argsort(allXValues_np)]
     x = allXValues_np[np.argsort(allXValues_np)]
-    cut = (y > 0.1) & (x < d * 50 * 0.85)
+    cut = (y>0.10) & (x < d*50*0.9)
     popt, pcov = fitVoltageDepth(x[cut], y[cut], yerr[cut], GeV=GeV)
     return popt, pcov, x[cut], y[cut], yerr[cut]
 
