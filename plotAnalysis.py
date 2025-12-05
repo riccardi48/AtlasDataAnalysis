@@ -606,7 +606,7 @@ class plotClass:
         os.makedirs("/".join(out_put_file_name.split("/")[:-1]), exist_ok=True)
         self.fig.savefig(f"{out_put_file_name}")
         plt.close()
-        print(f"Saved Plot: {out_put_file_name}")
+        print(f"\033[94mSaved Plot:\033[0m {name}.pdf\n\033[96m{out_put_file_name}\033[0m")
 
 
 class clusterPlotter:

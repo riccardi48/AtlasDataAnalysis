@@ -97,6 +97,7 @@ class clusterHandler:
             )
         self.haveClusters = True
         #self.dataFrameHandler.dropDataIfRamUsageHigh()
+        print(f"\033[92mInitialized Clusters\033[0m")
         return self._clusters
 
     def initClusterVoltages(

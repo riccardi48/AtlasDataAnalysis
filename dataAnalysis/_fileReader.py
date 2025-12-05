@@ -55,7 +55,7 @@ class calcDataFileManager:
         if calcFileName is None:
             calcFileName = self.generateFileName(attribute, cut, **kwargs)
         if not suppressText:
-            print(f"Loaded: {calcFileName}")
+            print(f"\033[94mLoaded: \033[0m{calcFileName.split("/")[-1]}")
         return np.load(calcFileName, allow_pickle=True)
 
     def saveFile(
@@ -72,7 +72,7 @@ class calcDataFileManager:
         self.makeDirIfNeeded(calcFileName)
         np.save(calcFileName, array)
         if not suppressText:
-            print(f"Saved: {calcFileName}")
+            print(f"\033[94mSaved:\033[0m {calcFileName.split("/")[-1]}")
 
     def makeDirIfNeeded(self, fileName) -> None:
         dirName = "/".join(fileName.split("/")[:-1])
@@ -87,7 +87,7 @@ class rawDataFileManager:
         self.maxLine = maxLine
 
     def readFile(self) -> pd.DataFrame:
-        print(f"Opening: {self.pathToData}")
+        print(f"\033[94mOpening: \033[0m{self.pathToData.split("/")[-1]}")
         dtypes = {
             "PackageID": np.int64,
             "Layer": np.int64,
@@ -102,7 +102,7 @@ class rawDataFileManager:
             "ext_TS2": np.int64,
             "FIFO_overflow": bool,
         }
-        return pd.read_csv(
+        df = pd.read_csv(
             self.pathToData,
             delimiter="\t",
             names=self.columns,
@@ -110,7 +110,8 @@ class rawDataFileManager:
             header=0,
             nrows=self.maxLine,
         )
-
+        print(f"\033[92mOpened Data\033[0m")
+        return df
     def saveFile(self, dataFrame: pd.DataFrame, path: str, name: str) -> None:
         self.makeDirIfNeeded(path)
         with open(f"{path}{name}_decode.dat", "w") as file:
@@ -118,7 +119,7 @@ class rawDataFileManager:
                 "# PackageID; Layer; Column; Row; TS; TS1; TS2; TriggerTS; TriggerID; ext. TS; ext. TS2; FIFO overflow\n"
             )
             dataFrame.astype(int).to_csv(file, sep="\t", header=False, index=False)
-            print(f"Saved to csv: {path}{name}_decode.dat")
+            print(f"\033[94mSaved to csv: \033[0m\033[96m{path}{name}_decode.dat\033[0m")
 
     def makeDirIfNeeded(self, fileName: str) -> None:
         dirName = "/".join(fileName.split("/")[:-1])
