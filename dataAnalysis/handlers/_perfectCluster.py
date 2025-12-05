@@ -44,7 +44,7 @@ def addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
 
 def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTalk=True):
     if len(sections) == 1:
-        pVal,flipped = logLikeOfSection(cluster,sections[0],estimate,spread,excludeCrossTalk=excludeCrossTalk)
+        pVal,flipped = pValOfSection(cluster,sections[0],estimate,spread,excludeCrossTalk=excludeCrossTalk)
         perm = (0,)
     else:
         max_pVal = -1
@@ -57,7 +57,7 @@ def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTa
                     section.extend(sections[int(i)])
                 if len(section) <= 5:
                     continue
-                pVal,flipped = logLikeOfSection(cluster,section,estimate,spread,excludeCrossTalk=excludeCrossTalk)
+                pVal,flipped = pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=excludeCrossTalk)
                 if (pVal > max_pVal and len(perm)==len(max_perm)) or (len(perm)>len(max_perm) and pVal > minPval and pVal != max_pVal):
                     max_pVal = pVal
                     max_flipped = flipped
@@ -67,7 +67,7 @@ def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTa
         perm = max_perm
     return pVal,flipped,perm
 
-def logLikeOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
+def pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
     Timestamps = cluster.getTSs(excludeCrossTalk=excludeCrossTalk)[section]
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)[section]
     x,y = convertRowsForFit(Rows,Timestamps,flipped=False)

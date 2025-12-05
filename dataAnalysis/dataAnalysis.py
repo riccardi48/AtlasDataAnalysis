@@ -84,9 +84,10 @@ class dataAnalysis:
         return self.dataHandler.getFlatClusters(width, **kwargs)
 
     def get_timeStampTemplate(
-        self, maxRow=25, layers=None,excludeCrossTalk=True
+        self, maxRow=25, **kwargs
     ) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
-        return self.dataHandler.getTimeStampTemplate(maxRow=maxRow, layers=layers,excludeCrossTalk=excludeCrossTalk)
+        kwargs = self._fixLayers(kwargs)
+        return self.dataHandler.getTimeStampTemplate(maxRow=maxRow, **kwargs)
 
     def get_perfectCluster_indexes(
         self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs

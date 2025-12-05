@@ -221,7 +221,7 @@ class dataHandler:
         )
 
     def getTimeStampTemplate(
-        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True
+        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True, recalc=False, **kwargs
     ):
         calcFileName = self.calcFileManager.generateFileName(
             attribute="perfectClusterTemplate",
@@ -230,11 +230,11 @@ class dataHandler:
         )
         fileCheck = self.calcFileManager.fileExists(calcFileName=calcFileName)
 
-        if fileCheck:
+        if fileCheck and not recalc:
             estimate, spread = self.calcFileManager.loadFile(calcFileName=calcFileName)
         else:
             estimate, spread = self.perfectClusterHandler.getTimeStampTemplate(
-                maxRow=maxRow, layers=layers, excludeCrossTalk=excludeCrossTalk
+                maxRow=maxRow, layers=layers, excludeCrossTalk=excludeCrossTalk,**kwargs
             )
             self.calcFileManager.saveFile([estimate, spread], calcFileName=calcFileName)
         return estimate, spread

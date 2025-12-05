@@ -8,7 +8,7 @@ from dataAnalysis._dependencies import (
 from ._genericClusterFuncs import isFlat, isOnePixel, isOnEdge
 
 
-def isGoodCluster(cluster):
+def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 1):
     if not isFlat(cluster):
         return False, False
     if isOnePixel(cluster):
@@ -16,21 +16,28 @@ def isGoodCluster(cluster):
     if isOnEdge(cluster):
         return False, False
     relativeRows = cluster.getRows(True) - np.min(cluster.getRows(True))
+    if np.ptp(relativeRows) < minExpectedClusterSize*2:
+        return False, False
     relativeTS = cluster.getTSs(True) - np.min(cluster.getTSs(True))
+    if np.all(relativeRows<=lowTS+2):
+        return False, False
     sortIndexes = np.argsort(relativeRows)
     relativeRows = relativeRows[sortIndexes]
     relativeTS = relativeTS[sortIndexes]
+    if np.any((np.diff(relativeTS)>10)|(np.diff(relativeTS)<-10)):
+        return False, False
     flipped = False
-    lengthOfFlatSections = 6
+    lengthOfFlatSections = int(minExpectedClusterSize-1)
     FirstLength = relativeTS[
         (relativeRows > np.min(relativeRows))
-        & (relativeRows < np.min(relativeRows) + lengthOfFlatSections)
+        & (relativeRows <= np.min(relativeRows) + lengthOfFlatSections)
     ]
     LastLength = relativeTS[
         (relativeRows < np.max(relativeRows))
-        & (relativeRows > np.max(relativeRows) - lengthOfFlatSections)
+        & (relativeRows >= np.max(relativeRows) - lengthOfFlatSections)
     ]
-    lowTS = 3
+    if np.any(FirstLength <= lowTS) and np.any(LastLength <= lowTS):
+        return False, False
     if (np.all(FirstLength <= lowTS) + np.all(LastLength <= lowTS))%2 == 1:
         flipped = np.all(LastLength <= lowTS)
         return True, flipped
