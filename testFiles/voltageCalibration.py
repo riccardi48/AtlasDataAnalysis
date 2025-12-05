@@ -60,7 +60,7 @@ def calibrate(k):
             u = u[index]
             ToT = ToT[index] / 2
             error = error[index]
-            bounds = ([0.05, 0.0001, 0.0001], [200, 2000, 2000])
+            bounds = ([0.5, 1, 1], [20, 200, 200])
             u_0 = 0.161
             u_0_e = 0.001
             func = lambda x,a,b,c: _lambert_W_u_to_ToT(x,u_0,a,b,c)

@@ -176,6 +176,17 @@ for k, dataFile in enumerate(dataFiles):
             elinewidth=1,
             capsize=3,
         )
+    estimate,spread = dataFile.get_timeStampTemplate(layer=4)
+    plot3.axs.scatter(np.arange(len(estimate)),estimate,marker="x",color=plot3.colorPalette[2],label="Gaussian Fitting on each Row\nError bars show std")
+    plot3.axs.errorbar(
+            np.arange(len(estimate)),
+            estimate,
+            yerr=spread,
+            fmt="none",
+            color=plot3.colorPalette[2],
+            elinewidth=1,
+            capsize=3,
+        )
     plot3.set_config(plot3.axs,
         title="Row vs TS",
         xlabel="Relative Row",

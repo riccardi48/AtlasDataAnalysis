@@ -46,6 +46,8 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
         vmax = 20
     elif colorbarName == "Voltage":
         vmax = 2
+    elif colorbarName == "ToT":
+        vmax = 256
     im = display.showDisplay(plot.axs,vmax=vmax)
     #divider = make_axes_locatable(axs)
     #cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -59,7 +61,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
         ylabel="Pixel Column",
         xlim=display.xlim,
         ylim=display.ylim,
-        #legend=True,
+        legend=True,
     )
     if np.ptp(x) > 20:
         plot.axs.xaxis.set_major_locator(MultipleLocator(5))
@@ -88,7 +90,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
 class clusterPlotter():
     def __init__(self,cluster: clusterClass,path,name):
         self.cluster = cluster
-        self.plot = plotClass(path,sizePerPlot=(10,5))
+        self.plot = plotClass(path,sizePerPlot=(20,5))
         self.name = name
     def finishPlot(self,colorbarName, values, textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
         plotCluster(self.plot,self.cluster, values,self.name,colorbarName, textLabels=textLabels,excludeCrossTalk=excludeCrossTalk, cmap = cmap)

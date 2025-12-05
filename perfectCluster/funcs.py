@@ -141,6 +141,8 @@ def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTa
                     section.extend(sections[int(i)])
                 if len(section) <= 5:
                     continue
+                if np.all((cluster.getTSs(excludeCrossTalk=True)[section]-np.min(cluster.getTSs(excludeCrossTalk=True)[section]))<=4):
+                    continue
                 pVal,flipped = logLikeOfSection(cluster,section,estimate,spread,excludeCrossTalk=excludeCrossTalk)
                 if (pVal > max_pVal and len(perm)==len(max_perm)) or (len(perm)>len(max_perm) and pVal > minPval and pVal != max_pVal):
                     max_pVal = pVal
@@ -209,7 +211,21 @@ def convertRowsForFit(Rows,Timestamps,flipped):
     x = x - np.min(x)
     if flipped:
         x = -x+x[-1]
+        x = np.flip(x)
+        y = np.flip(y)
     return x,y
+
+def convertToRelative(Rows,values,flipped):
+    x = Rows - np.min(Rows)
+    sortIndexes = np.argsort(x)
+    x = x[sortIndexes]
+    values = values[sortIndexes]
+    x = x - np.min(x)
+    if flipped:
+        x = -x+x[-1]
+        x = np.flip(x)
+        values = np.flip(values)
+    return x,values
 
 def gaussian_loglike_pval(data):
     n = len(data)
@@ -267,10 +283,10 @@ def scaleTemplate(estimate,spread,angleScaler,flatScaler):
         return estimate,spread
     flatCutOff = np.where(estimate[1:]>0.5)[0][0]+1
     midPoint = (flatCutOff-1)*flatScaler
-    endPoint = midPoint+(len(estimate)-flatCutOff)*angleScaler
+    endPoint = midPoint+(len(estimate)-flatCutOff)
     flatIndexes = np.linspace(1,midPoint,flatCutOff-1)
     angleIndexes = np.linspace(midPoint,endPoint,len(estimate)-flatCutOff+1)[1:]
-    Indexes = np.concatenate([[0],flatIndexes, angleIndexes])
+    Indexes = np.concatenate([[0],flatIndexes, angleIndexes])*angleScaler
     try:
         newEstimate = np.interp(np.arange(int(np.floor(Indexes[-1]))+1),Indexes,estimate)
     except:
@@ -293,3 +309,25 @@ def loadOrCalcMPV(dataFile,config):
     else:
         paramsList = calcFileManager.loadFile(calcFileName=calcFileName)
     return paramsList
+
+def fitTemplate2(cluster,estimate,spread,excludeCrossTalk=True,minPval=0.2,angleList=np.linspace(0.1,1.4,27),flatList=np.linspace(0.2,1.4,13)):
+    Timestamps = cluster.getTSs(excludeCrossTalk=excludeCrossTalk)
+    Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)
+    x,y = convertRowsForFit(Rows,Timestamps,flipped=False)
+    sections = findConnectedSections(cluster.getRows(excludeCrossTalk=excludeCrossTalk),cluster.getColumns(excludeCrossTalk=excludeCrossTalk))
+    angleScalerList = []
+    flatScalerList = []
+    pValList = []
+    flippedList = []
+    permList = []
+    for angleScaler in angleList:
+        for flatScaler in flatList:
+            newEstimate,newSpread = scaleTemplate(estimate,spread,angleScaler,flatScaler)
+            pVal,flipped,perm = findBestSections(cluster,sections,newEstimate,newSpread,minPval=minPval,excludeCrossTalk=excludeCrossTalk)
+            if pVal > minPval:
+                flatScalerList.append(flatScaler)
+                angleScalerList.append(angleScaler)
+                pValList.append(pVal)
+                flippedList.append(flipped)
+                permList.append(perm)
+    return np.array(flatScalerList),np.array(angleScalerList),np.array(pValList),np.array(flippedList),permList

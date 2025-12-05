@@ -10,7 +10,7 @@ from funcs import (
 
 sys.path.append("..")
 import numpy as np
-from dataAnalysis import initDataFiles, configLoader
+from dataAnalysis import initDataFiles, configLoader, _memCheck
 from plotAnalysis import plotClass
 from matplotlib.ticker import MultipleLocator
 import time
@@ -36,19 +36,11 @@ for dataFile in dataFiles:
     presentRelativeRowsList = []
     MPV_Params = loadOrCalcMPV(dataFile, config)
     cutOff = 12
-    for cluster in tqdm(clusters, desc="Running over clusters"):
-        if not isPerfectCluster(cluster, estimate, spread, minPval=0.2, excludeCrossTalk=True):
-            continue
+    for cluster in tqdm(dataFile.get_perfectClusters(layer=4,excludeCrossTalk=True,maxRow=25), desc="Finding Efficiency"):
         rows = cluster.getRows(True)[cluster.section]
         columns = cluster.getColumns(True)[cluster.section]
         timestamps = cluster.getTSs(True)[cluster.section]
         voltages = cluster.getHit_Voltages(True)[cluster.section]
-        sections = findConnectedSections(rows, columns)
-        if len(sections) == 1:
-            continue
-        sectionsMinMax = []
-        for section in sections:
-            sectionsMinMax.append((np.min(rows[section]), np.max(rows[section])))
         # print(sectionsMinMax)
         # print(len(cluster.perm))
         expectedRows = np.linspace(
@@ -65,12 +57,13 @@ for dataFile in dataFiles:
         index = (x < len(estimate)) & (x >= 0)
         x = x[index]
         # print(MPV_Params[:,0][missing])
-        MPV_ParamsList.extend(MPV_Params[missing[missing < len(MPV_Params)]])
+        if len(missing[missing < len(MPV_Params)]) != 0:
+            MPV_ParamsList.extend(MPV_Params[missing[missing < len(MPV_Params)]])
 
         # print([1-landau.cdf(0.16,mpv,width) for mpv,width in zip(MPV_Params[:,0][missing],MPV_Params[:,1][missing])])
-        missingRow = np.array([r for r in expectedRows if r not in rows])
-        missingRowsList.extend(missingRow[missing < len(MPV_Params[:, 0])])
-        relativeRowsList.extend(missing[missing < len(MPV_Params[:, 0])])
+            missingRow = np.array([r for r in expectedRows if r not in rows])
+            missingRowsList.extend(missingRow[missing < len(MPV_Params[:, 0])])
+            relativeRowsList.extend(missing[missing < len(MPV_Params[:, 0])])
         presentRelativeRowsList.extend(expectedRowsRelative)
         presentRowsList.extend(expectedRows[expectedRowsRelative <= cutOff])
         presentRowsList2.extend(expectedRows[expectedRowsRelative > cutOff])
@@ -162,6 +155,7 @@ for dataFile in dataFiles:
         marker="x",
         label="Missing Row %",
     )
+
     plot.set_config(
         axs,
         title="Chance of no Hit vs Missing Row Percentage",
@@ -171,6 +165,8 @@ for dataFile in dataFiles:
         xlim=(xRange),
         legend=True,
     )
+    
+
     plot.saveToPDF(f"ChanceOfNoHitvsRowPercentage_CloseRows")
 
     plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
@@ -250,7 +246,51 @@ for dataFile in dataFiles:
         xlabel="Row",
         ylabel="Efficiency",
         legend=True,
-        #ylim=(0.8,1),
+        ylim=(0.9,1),
     )
+    axs.xaxis.set_major_locator(MultipleLocator(5))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(1))
+    axs.yaxis.set_major_locator(MultipleLocator(0.01))
+    axs.yaxis.set_major_formatter("{x:.2f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(0.002))
+    plot.saveToPDF(f"Efficiency_Relative_Row_ShortAxis")
+
+    plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
+    axs = plot.axs
+    axs.plot(np.arange(rowPercent.size), 1-landauCDFList, color=plot.colorPalette[1], label="Estimated Efficiency")
+    axs.scatter(
+        np.arange(rowPercent.size),
+        1-rowPercent,
+        color=plot.colorPalette[0],
+        marker="x",
+        label="Missing Row %",
+    )
+    axs.errorbar(
+        np.arange(rowPercent.size),
+        1-rowPercent,
+        yerr=error,
+        fmt="none",
+        color=plot.colorPalette[0],
+        elinewidth=1,
+        capsize=3,
+    )
+    plot.set_config(
+        axs,
+        title="Efficiency by relative Row",
+        xlabel="Row",
+        ylabel="Efficiency",
+        legend=True,
+        ylim=(0,1),
+    )
+    axs.xaxis.set_major_locator(MultipleLocator(5))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(1))
+    axs.yaxis.set_major_locator(MultipleLocator(0.1))
+    axs.yaxis.set_major_formatter("{x:.2f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(0.02))
     plot.saveToPDF(f"Efficiency_Relative_Row")
 
+    _memCheck.printMemUsage()
+    dataFile.clear_data()
+    _memCheck.printMemUsage()
