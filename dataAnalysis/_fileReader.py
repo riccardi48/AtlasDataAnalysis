@@ -89,13 +89,13 @@ class rawDataFileManager:
     def readFile(self) -> pd.DataFrame:
         print(f"Opening: {self.pathToData}")
         dtypes = {
-            "PackageID": np.int32,
-            "Layer": np.int16,
-            "Column": np.int16,
-            "Row": np.int16,
-            "TS": np.int16,
-            "TS1": np.int16,
-            "TS2": np.int16,
+            "PackageID": np.int64,
+            "Layer": np.int64,
+            "Column": np.int64,
+            "Row": np.int64,
+            "TS": np.int64,
+            "TS1": np.int64,
+            "TS2": np.int64,
             "TriggerTS": np.int64,
             "TriggerID": np.int64,
             "ext_TS": np.int64,
