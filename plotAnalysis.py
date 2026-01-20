@@ -544,7 +544,7 @@ class plotClass:
         self.colorPalette = [
             "#CC3F0C",
             "#8896AB",
-            "#33673B",
+            "#2B337E",
             "#333745",
             "#EDB0E4",
             "#CC8A8A",
@@ -759,24 +759,27 @@ class correlationPlotter:
         calcFileName = self.calcFileManager.generateFileName(
             attribute=attribute, cut=self.excludeCrossTalk, name="", file=file, layers=self.layers
         )
+        
         if "RowRow" in self.__dict__ and not recalc:
             toBeReturned = self.RowRow
         elif self.calcFileManager.fileExists(calcFileName=calcFileName) and not recalc:
             toBeReturned = self.calcFileManager.loadFile(calcFileName=calcFileName)
         else:
-            clusters = dataFile.get_clusters(layers=self.layers, recalc=recalc)
-            if self.excludeCrossTalk:
-                dataFile.get_crossTalk(recalc=recalc)
+            clusters = dataFile.get_clusters(layers=self.layers)
+            dataFile.get_crossTalk()
             self.RowRow = np.zeros((371, 371))
             print(f"Finding RowRow correlation")
-            rows, _ = dataFile.get_base_attr("Row")
+            rows = dataFile.get_base_attr("Row")
+            ToT = dataFile.get_base_attr("ToT")
             indexes = rows - np.min(rows)
             for cluster in clusters:
-                for pixel in cluster.getIndexes(excludeCrossTalk=self.excludeCrossTalk):
-                    self.RowRow[
-                        indexes[pixel],
-                        indexes[cluster.getIndexes(excludeCrossTalk=self.excludeCrossTalk)],
-                    ] += 1
+                clusterIndexes = cluster.getIndexes(excludeCrossTalk=self.excludeCrossTalk)
+                for pixel in clusterIndexes:
+                    if ToT[pixel] > 40:
+                        self.RowRow[
+                            indexes[pixel],
+                            indexes[clusterIndexes],
+                        ] += 1
             self.RowRow[np.where(self.RowRow == 0)] = None
             self.calcFileManager.saveFile(self.RowRow, calcFileName=calcFileName)
             toBeReturned = self.RowRow
