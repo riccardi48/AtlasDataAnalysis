@@ -87,6 +87,8 @@ class dataAnalysis:
         self, maxRow=25, **kwargs
     ) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
         kwargs = self._fixLayers(kwargs)
+        #if "minExpectedClusterSize" not in kwargs:
+        #    kwargs["minExpectedClusterSize"] = int(np.ceil(np.sqrt(self.voltage/48.6) * 8))
         return self.dataHandler.getTimeStampTemplate(maxRow=maxRow, **kwargs)
 
     def get_perfectCluster_indexes(

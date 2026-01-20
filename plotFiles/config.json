@@ -1,0 +1,18 @@
+{
+    "maxLine": null,
+    "pathToOutput": "/home/atlas/rballard/AtlasDataAnalysis/output/",
+    "pathToCalcData": "/home/atlas/rballard/AtlasDataAnalysis/calculatedData/",
+    "pathToData": "/home/atlas/rballard/for_magda/data/Cut/",
+    "fileFormat": "202204*udp*_decode.dat",
+    "pathToDataOutput": "/home/atlas/rballard/for_magda/data/pythonOutput/",
+    "filterDict": {
+        "telescope": "kit",
+        "angle": 86.5,
+        "voltage": 48.6
+    },
+    "maxClusterWidth": 30,
+    "layers": [
+        4
+    ],
+    "excludeCrossTalk": true
+}

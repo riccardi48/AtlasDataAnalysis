@@ -11,13 +11,26 @@ from scipy.stats import linregress
 from landau import landau
 from matplotlib.ticker import MultipleLocator
 from plotAnalysis import plotClass
-from landau import landau
 from scipy.optimize import curve_fit
 from scipy import stats
 from perfectCluster.findPerfectCluster import isPerfectCluster
 from dataAnalysis._fileReader import calcDataFileManager
 from perfectCluster.funcs import convertRowsForFit, convertToRelative
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+
+def getColor(dataFile):
+    cmap = plt.get_cmap("plasma")
+    color=cmap(dataFile.voltage/48.6)
+    if dataFile.fileName == "angle6_4Gev_kit_2":
+        color = "r"
+    return color
+
+def legend_without_duplicate_labels(ax):
+    handles, labels = ax.get_legend_handles_labels()
+    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+    ax.legend(*zip(*unique),
+                frameon=False,)
 
 
 def landauFunc(
@@ -64,6 +77,9 @@ def gaussianCDFFunc(x, mu, sig):
 
 def gaussianBinned(mu, sigma, scaler, edges):
     return (gaussianCDFFunc(edges[1:], mu, sigma) - gaussianCDFFunc(edges[:-1], mu, sigma)) * scaler
+
+def gaussianPDFFunc(x, mu, sig, scaler):
+    return norm.pdf((x - mu) / sig) * scaler
 
 
 def histogramHit_Voltage(
@@ -162,9 +178,16 @@ def histogramHit_Voltage_Errors(
         else:
             new_edges.append(proposed_edge)
     binEdges = np.array(new_edges)
-    hist = np.zeros(binEdges.size - 1, dtype=float)
-    for i in range(values.size):
-        hist += gaussianBinned(values[i], valuesErrors[i], 1, binEdges)
+    #hist, binEdges = np.histogram(values, bins=binEdges)
+    hist = np.sum(
+            gaussianBinned(
+                np.tile([values], (binEdges.size - 1, 1)),
+                np.tile([valuesErrors], (binEdges.size - 1, 1)),
+                1,
+                np.tile(binEdges[:, np.newaxis], (1, values.size)),
+            ),
+            axis=1,
+        )
     binCentres = (binEdges[:-1] + binEdges[1:]) / 2
     return hist, binEdges, binCentres
 
@@ -183,10 +206,9 @@ def getBestFitting(values, valuesErrors, x0, p):
     x_mpv_eList = []
     xi_eList = []
     scale_eList = []
-    for points_per_bin in [50,100,200]:
-        for _range in ((0.160, 2.1),(0.160,2),(0.160,1.9)):
+    for points_per_bin in [100, 200]:
+        for _range in ((0.160, 2.32), (0.160, 2), (0.160, 1.732)):
             for min_bin_width in [
-                (_range[1] - _range[0]) / 40,
                 (_range[1] - _range[0]) / 80,
                 (_range[1] - _range[0]) / 120,
             ]:
@@ -212,21 +234,34 @@ def getBestFitting(values, valuesErrors, x0, p):
                     x_mpv, xi, scale = popt
                     x_mpv_e, xi_e, scale_e = np.sqrt(np.diag(pcov))
                 else:
-                    if 1 - p < landauCDFFunc(x0, x0, 1):
-                        bounds = ([x0, 0], [2, np.inf])
+                    if 1 - p <= landauCDFFunc(x0, x0, 1):
+                        bounds = ([x0*1.001, 0], [0.6, np.inf])
                         p0 = [x0 * 2, np.sum(hist) * 2]
                     else:
-                        bounds = ([0.04, 0], [x0, np.inf])
+                        bounds = ([0, 0], [x0*0.999, np.inf])
                         p0 = [x0 / 2, np.sum(hist) * 2]
-                    #print(landauCDFFunc(x0, p0[0], 1e-12) - (1 - p))
-                    #print(landauCDFFunc(x0, p0[0], 10000) - (1 - p))
-                    find_sigma = lambda x0, mpv, p: brentq(
+                    lower = 1e-12
+                    upper = 100000
+                    """
+                    print("****")
+                    print(f"p={p}")
+                    print(f"x0={x0}")
+                    print(f"bounds={bounds}")
+                    print(f"p0={p0}")
+                    print(f"p0-lower = {landauCDFFunc(x0, p0[0], lower) - (1 - p)}")
+                    print(f"p0-upper = {landauCDFFunc(x0, p0[0], upper) - (1 - p)}")
+                    print(f"bounds-upper = {landauCDFFunc(x0, bounds[0][0], lower) - (1 - p)}")
+                    print(f"bounds-lower = {landauCDFFunc(x0, bounds[1][0], upper) - (1 - p)}")
+                    for u in np.linspace(bounds[0][0],bounds[1][0],100):
+                        print(f"{u:.4f} : {landauCDFFunc(x0, u, lower) - (1 - p):.4f} - {landauCDFFunc(x0, u, upper) - (1 - p):.4f}")
+                    """
+                    find_sigma = lambda mpv: brentq(
                         lambda s: landauCDFFunc(x0, mpv, s) - (1 - p),
-                        1e-6,  # lower bound for sigma
-                        10000,  # upper bound
+                        lower,  # lower bound for sigma
+                        upper,  # upper bound
                     )
                     func = lambda x, x_mpv, scaler: landauBinned(
-                        x, x_mpv, find_sigma(x0, x_mpv, p), scaler, binEdges
+                        x, x_mpv, find_sigma(x_mpv), scaler, binEdges
                     )
                     popt, pcov = curve_fit(
                         func,
@@ -238,10 +273,10 @@ def getBestFitting(values, valuesErrors, x0, p):
                     )
                     x_mpv, scale = popt
                     x_mpv_e, scale_e = np.sqrt(np.diag(pcov))
-                    xi = find_sigma(x0, x_mpv, p)
+                    xi = find_sigma(x_mpv)
                     xi_e = (
-                        abs(find_sigma(x0, x_mpv + x_mpv_e, p) - xi)
-                        + abs(find_sigma(x0, x_mpv - x_mpv_e, p) - xi)
+                        abs(find_sigma(x_mpv + x_mpv_e) - xi)
+                        + abs(find_sigma(x_mpv - x_mpv_e) - xi)
                     ) / 2
                 x_mpvList.append(x_mpv)
                 xiList.append(xi)
@@ -266,15 +301,14 @@ def getBestFitting(values, valuesErrors, x0, p):
 
 
 config = configLoader.loadConfig()
-# config["filterDict"] = {"telescope":"kit","fileName":"angle1_4Gev_kit_1"}
-#config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
+# config["filterDict"] = {"telescope":"kit","fileName":"angle6_6Gev_kitHV30_kit_5"}
+# config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 dataFiles = initDataFiles(config)
 _range = (0.160, 2)
 mpvPlot = plotClass(f"{config["pathToOutput"]}ClusterTracks/Collected/")
-k = 0
 width = 30
 minPval = 0.5
-for dataFile in dataFiles:
+for k,dataFile in enumerate(dataFiles):
     dataFile.init_cluster_voltages()
     clusters = dataFile.get_clusters(excludeCrossTalk=True, layer=4)
     relativeRowsList = []
@@ -321,11 +355,11 @@ for dataFile in dataFiles:
     lengthInDW = 820
     rowPitch = 50
     possibleRows = int(np.ceil(lengthInDW / 50)) + 1
-    #calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
-    #calcFileName = calcFileManager.generateFileName(
+    # calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
+    # calcFileName = calcFileManager.generateFileName(
     #    attribute=f"{dataFile.fileName}",
-    #)
-    #estimate, spread = calcFileManager.loadFile(calcFileName=calcFileName)
+    # )
+    # estimate, spread = calcFileManager.loadFile(calcFileName=calcFileName)
     l = 0
     for cluster in dataFile.get_perfectClusters(minPval=minPval, layer=4, maxRow=25):
         rows = cluster.getRows(True)[cluster.section]
@@ -351,9 +385,12 @@ for dataFile in dataFiles:
                 histLists[relativeRows[i]].append(voltage[i])
                 histErrorsLists[relativeRows[i]].append(voltageErrors[i])
             else:
-                #print(i, voltage[i], voltageErrors[i])
+                # print(i, voltage[i], voltageErrors[i])
                 l += 1
     print(f"Skipped {l} hits due to invalid voltage")
+    plotMPV = plotClass(
+        base_path,sizePerPlot=(6,4)
+    )
     for i in range(width):
         values = np.array(histLists[i])
         valuesErrors = np.array(histErrorsLists[i])
@@ -368,9 +405,9 @@ for dataFile in dataFiles:
         # hist, binEdges, binCentres = histogramHit_Voltage(values, _range=_range)
 
         p = 1 - rowPercent[i]
-        if p > 0.995:
-            p = 1
-        #print(p)
+        if p <= 0.05 or len(values) < 100:
+            continue
+        # print(p)
         # print(landauCDFFunc(0.161, 0.161, 1e-6))
         # print(landauCDFFunc(0.161, 0.161, 1000))
         # print(landauCDFFunc(0.161, 0.01, 1e-6))
@@ -378,8 +415,37 @@ for dataFile in dataFiles:
         # print(landauCDFFunc(0.161, 2, 1e-6))
         # print(landauCDFFunc(0.161, 2, 1000))
         x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = getBestFitting(
-            values, valuesErrors, _range[0], p
+            values, valuesErrors, _range[0], 1
         )
+        plotMPV.axs.scatter(
+            i, x_mpv, color=plotMPV.colorPalette[0], marker="x", label="Unconstrained"
+        )
+        plotMPV.axs.errorbar(
+            i,
+            x_mpv,
+            yerr=x_mpv_e,
+            fmt="none",
+            color=plotMPV.colorPalette[0],
+            elinewidth=1,
+            capsize=3,
+        )
+        if p <= 0.98:
+            x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = getBestFitting(
+                values, valuesErrors, _range[0], p
+            )
+            plotMPV.axs.scatter(
+                i, x_mpv, color=plotMPV.colorPalette[2], marker="x", label="Constrained"
+            )
+            plotMPV.axs.errorbar(
+                i,
+                x_mpv,
+                yerr=x_mpv_e,
+                fmt="none",
+                color=plotMPV.colorPalette[2],
+                elinewidth=1,
+                capsize=3,
+            )
+
         hist, binEdges, binCentres = histogramHit_Voltage_Errors(
             values, valuesErrors, _range=_range
         )
@@ -529,57 +595,47 @@ for dataFile in dataFiles:
     )
     plot.saveToPDF(f"Counts_Percent")
     paramsList = np.array(paramsList)
-    plot = plotClass(
-        base_path,
-    )
-    axs = plot.axs
+
     x = np.arange(len(paramsList[:, 0]))
     # x = (np.arange(len(paramsList[:,0]))-0.5)*np.cos(np.deg2rad(dataFile.angle))*50
-    axs.scatter(x, paramsList[:, 0], color=plot.colorPalette[0], marker="x")
-    axs.errorbar(
-        x,
-        paramsList[:, 0],
-        yerr=paramsList[:, 3],
-        fmt="none",
-        color=plot.colorPalette[0],
-        elinewidth=1,
-        capsize=3,
+    plotMPV.axs.hlines(
+        0.161,
+        -1,
+        paramsList[:, 0].size + 1,
+        linestyle="--",
+        color=plotMPV.colorPalette[5],
+        label="Threshold",
     )
-    plot.set_config(
-        axs,
-        title="MPV per Pixel in Cluster",
-        xlabel="Pixel in Cluster (0 is seed pixel)",
-        ylabel="MPV",
+    plotMPV.set_config(
+        plotMPV.axs,
+        title="MPV per Pixel in Cluster [V]",
+        xlabel="Relative Row [Px]",
+        ylabel="MPV [V]",
+        xlim=(-1, paramsList[:, 0].size + 1),
         ylim=(0, paramsList[:, 0].max() * 1.1),
     )
-    axs.xaxis.set_major_locator(MultipleLocator(5))
-    axs.xaxis.set_major_formatter("{x:.0f}")
-    axs.xaxis.set_minor_locator(MultipleLocator(1))
-    axs.yaxis.set_major_locator(MultipleLocator(0.05))
-    axs.yaxis.set_major_formatter("{x:.2f}")
-    axs.yaxis.set_minor_locator(MultipleLocator(0.01))
-    axs.grid(True)
-    plot.saveToPDF(f"MPV")
-    if k < 7:
-        mpvPlot.axs.scatter(
-            x,
-            paramsList[:, 0],
-            color=plot.colorPalette[k],
-            marker="x",
-            label=f"{dataFile.fileName}",
-        )
-        mpvPlot.axs.errorbar(
-            x,
-            paramsList[:, 0],
-            yerr=paramsList[:, 3],
-            fmt="none",
-            color=plot.colorPalette[k],
-            elinewidth=1,
-            capsize=3,
-        )
-    else:
-        break
-    k += 1
+    plotMPV.axs.xaxis.set_major_locator(MultipleLocator(5))
+    plotMPV.axs.xaxis.set_major_formatter("{x:.0f}")
+    plotMPV.axs.xaxis.set_minor_locator(MultipleLocator(1))
+    plotMPV.axs.yaxis.set_major_locator(MultipleLocator(0.05))
+    plotMPV.axs.yaxis.set_major_formatter("{x:.2f}")
+    plotMPV.axs.yaxis.set_minor_locator(MultipleLocator(0.01))
+    plotMPV.axs.grid(True)
+    legend_without_duplicate_labels(plotMPV.axs)
+    plotMPV.saveToPDF(f"MPV")
+    mpvPlot.axs.plot(
+        x,
+        paramsList[:, 0],
+        color=getColor(dataFile),
+        label=f"{dataFile.fileName}",
+    )
+    mpvPlot.axs.fill_between(
+        x,
+        paramsList[:, 0]+paramsList[:, 3],
+        paramsList[:, 0]+paramsList[:, 3],
+        alpha=0.2,
+        color=getColor(dataFile),
+    )
     plot = plotClass(
         base_path,
     )
@@ -650,22 +706,23 @@ for dataFile in dataFiles:
     clusterChargesSummed = np.sum(clusterCharges, axis=0)
     height, x = np.histogram(clusterChargesSummed, bins=500, range=(0, 50))
     binCentres = (x[:-1] + x[1:]) / 2
+    func = lambda _x,mu,sig,scaler : gaussianBinned(mu,sig,scaler,x)
     popt, pcov = curve_fit(
-        landauFunc,
+        func,
         binCentres,
-        height,
+        height*(x[1:] - x[:-1]),
         maxfev=8000,
     )
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
     x = np.linspace(0, np.max(x), 1000)
-    y = landauFunc(x, *popt)
-    x_mpv, xi, scale = popt
-    x_mpv_e, xi_e, scale_e = np.sqrt(np.diag(pcov))
+    y = gaussianPDFFunc(x,*popt)
+    mu, sig, scale = popt
+    mu_e, sig_e, scale_e = np.sqrt(np.diag(pcov))
     axs.plot(
         x,
         y,
         c=plot.colorPalette[0],
-        label=f"Mpv:{x_mpv:.5f} ± {x_mpv_e:.5f}\nWidth:{xi:.5f} ± {xi_e:.5f}\nScale:{scale:.5f} ± {scale_e:.5f}",
+        label=f"Peak:{mu:.5f} ± {mu_e:.5f}\nStd:{sig:.5f} ± {sig_e:.5f}\nScale:{scale:.5f} ± {scale_e:.5f}",
     )
     plot.set_config(
         axs,
@@ -677,6 +734,7 @@ for dataFile in dataFiles:
         legend=True,
     )
     plot.saveToPDF(f"Sim_Cluster_Charge")
+    continue
     plot = plotClass(
         base_path,
     )
@@ -713,4 +771,4 @@ mpvPlot.set_config(
     ylim=(0, 0.5),
     legend=True,
 )
-mpvPlot.saveToPDF(f"MPV") 
+mpvPlot.saveToPDF(f"MPV")

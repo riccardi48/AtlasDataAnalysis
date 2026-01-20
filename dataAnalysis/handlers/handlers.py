@@ -69,7 +69,7 @@ class dataHandler:
             else:
                 attr = getattr(self.dataFrameHandler, "get" + attribute)
                 if attribute in ["Hit_Voltage", "Hit_VoltageError"]:
-                    toBeReturned = attr(ToTs=self.baseAttr("ToT")[0])
+                    toBeReturned = attr(ToTs=self.baseAttr("ToT"))
                 else:
                     toBeReturned = attr()
                 setattr(self, attribute, toBeReturned)
@@ -78,7 +78,7 @@ class dataHandler:
         if returnIndexes:
             return toBeReturned, indexes
         else:
-            return (toBeReturned, None)
+            return toBeReturned
 
     def getClusters(self, excludeCrossTalk: bool = False, **kwargs) -> clusterArray:
         if excludeCrossTalk:
@@ -143,7 +143,7 @@ class dataHandler:
 
     def initClusterVoltages(self) -> None:
         self.clusterHandler.initClusterVoltages(
-            self.baseAttr("Hit_Voltage")[0], self.baseAttr("Hit_VoltageError")[0]
+            self.baseAttr("Hit_Voltage"), self.baseAttr("Hit_VoltageError")
         )
 
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
@@ -190,7 +190,7 @@ class dataHandler:
         if layers is None:
             includedIndexes = np.full(len(array), True, dtype=bool).astype(np.bool_)
         else:
-            layersArray = self.baseAttr("Layer")[0]
+            layersArray = self.baseAttr("Layer")
             includedIndexes = np.isin(layersArray, layers, assume_unique=True, kind="table")
         return includedIndexes
 

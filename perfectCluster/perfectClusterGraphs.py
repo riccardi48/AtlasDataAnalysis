@@ -47,7 +47,7 @@ for dataFile in dataFiles:
     # MPV_Params = loadOrCalcMPV(dataFile, config)
     cutOff = 12
     for cluster in tqdm(
-        dataFile.get_perfectClusters(layer=4, excludeCrossTalk=True, maxRow=25,minPval=0.9),
+        dataFile.get_perfectClusters(layer=4, excludeCrossTalk=True, maxRow=25),
         desc="Finding Efficiency",
     ):
         rows = cluster.getRows(True)[cluster.section]
