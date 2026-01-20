@@ -8,13 +8,15 @@ from plotAnalysis import plotClass
 from matplotlib.ticker import MultipleLocator
 from scipy.optimize import curve_fit
 from dataAnalysis._fileReader import calcDataFileManager
+from dataAnalysis.handlers._handler_perfectClusterHandler import isGoodCluster,findConnectedSections
+
 
 def quad(x,a,b,c):
     return a*x**2+b*x+c
 
 config = configLoader.loadConfig()
 # config["filterDict"] = {"telescope":"kit","fileName":"angle1_4Gev_kit_1"}
-config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
+#config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 #config["maxLine"] = 500000
 dataFiles = initDataFiles(config)
 for k, dataFile in enumerate(dataFiles):
@@ -31,65 +33,37 @@ for k, dataFile in enumerate(dataFiles):
     lengthInDW = 820
     rowPitch = 50
     possibleRows = int(np.ceil(lengthInDW/50))+1
-    print(possibleRows)
+    #print(possibleRows)
     clusters, indexes = dataFile.get_clusters(excludeCrossTalk=True, returnIndexes=True, layer=4)
     clusters = clusters
+    k = 0
+    TSRange = 30
     for cluster in clusters:
-        if not isFlat(cluster):
-            continue
-        relativeRows = abs(cluster.getRows(True) - np.max(cluster.getRows(True)))
+        goodCluster, flipped = isGoodCluster(cluster)
         Timestamps = cluster.getTSs(True)
         relativeTS = Timestamps - np.min(Timestamps)
-        if np.ptp(relativeRows) < possibleRows-4:
+        if not goodCluster:
             continue
-        path = base_path + f"Cluster_{cluster.getIndex()}/"
-        #CP = clusterPlotter(cluster, path, "Line Check")
+        if np.any(relativeTS>=TSRange):
+            continue
+        if len(findConnectedSections(cluster.getRows(True),cluster.getColumns(True))) != 1:
+            continue
+        relativeRows = cluster.getRows(True) - np.min(cluster.getRows(True))
+        relativeTS = cluster.getTSs(True) - np.min(cluster.getTSs(True))
         sortIndexes = np.argsort(relativeRows)
         relativeRows = relativeRows[sortIndexes]
         relativeTS = relativeTS[sortIndexes]
-        gaps = np.diff(relativeRows)
-        if np.any(gaps>5):
-            #print(gaps)
-            gap = np.where(gaps>5)[0][0] + 1
-            #print(gap)
-            if gap > relativeRows.size/2:
-                relativeTS = relativeTS[:gap]
-                relativeRows = relativeRows[:gap]
-            else:
-                relativeTS = relativeTS[gap:]
-                relativeRows = relativeRows[gap:]
-        if np.all(relativeTS[-5:-1]<=2) and not np.all(relativeTS[1:5]<=2):
-            relativeTS = np.flip(relativeTS)
-            relativeRows = np.flip(relativeRows)
-            #print("Flipped")
-        if np.ptp(relativeRows) < possibleRows-2:
-            continue
-        #print(relativeRows[relativeRows<=possibleRows])
-        #print(relativeTS[relativeRows<=possibleRows])
-        #print(relativeRows[relativeRows>possibleRows])
-        #print(relativeTS[relativeRows>possibleRows])
+        if flipped:
+            relativeRows = np.max(relativeRows) - relativeRows
+        plot1List.append([0])
 
-        lowTSs = relativeTS<=1
-        firstPixel = lowTSs[0]
-        #print(firstPixel)
-        if len(np.where(lowTSs)[0]) > 0:
-            lastLow = np.where(lowTSs)[0][-1]
-        else:
-            lastLow = -1
-        #print(lastLow)
-        TSdiffs = np.diff(relativeTS[lastLow:])/np.diff(relativeRows[lastLow:])
-        #print(relativeTS[lastLow:])
-        #print(TSdiffs)
-        #CP.finishPlot("Relative TS", cluster.getTSs(True) - np.min(cluster.getTSs(True)))
-        #CP = clusterPlotter(cluster, path, "ToT")
-        #CP.finishPlot("ToT", cluster.getToTs(True))
-
-        plot1List.append(relativeTS[0])
-
-        plot2List.append(lastLow)
+        plot2List.append([0])
 
         plot3List1.extend(relativeRows)
         plot3List2.extend(relativeTS)
+        k += 1
+        if k > 100:
+            break
         #input()
     plot1.axs.hist(plot1List,bins=11,range=(-0.5,10.5))
     plot1.set_config(plot1.axs,
@@ -117,7 +91,7 @@ for k, dataFile in enumerate(dataFiles):
         xlim = (0,30),
         )  
     plot2.saveToPDF("Last_Low")
-    TSRange = 40
+    TSRange = 30
     RowRange = 25
     array, yedges, xedges = np.histogram2d(plot3List2,plot3List1,range=((-0.5,TSRange+0.5),(-0.5,RowRange+0.5)),bins=(TSRange+1,RowRange+1))
     plot3.axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
@@ -176,7 +150,7 @@ for k, dataFile in enumerate(dataFiles):
             elinewidth=1,
             capsize=3,
         )
-    estimate,spread = dataFile.get_timeStampTemplate(layer=4)
+    estimate,spread = dataFile.get_timeStampTemplate(maxRow=RowRange,layer=4,recalc=True)
     plot3.axs.scatter(np.arange(len(estimate)),estimate,marker="x",color=plot3.colorPalette[2],label="Gaussian Fitting on each Row\nError bars show std")
     plot3.axs.errorbar(
             np.arange(len(estimate)),
@@ -200,8 +174,8 @@ for k, dataFile in enumerate(dataFiles):
     estimate = np.array(estimate)
     if dataFile.fileName == "angle6_4Gev_kit_2":
         z = np.polyfit(np.arange(estimate.size)[12:25],estimate[12:25],2)
-        print(z)
-    plot3.axs.plot(x,quad(x,*z),color=plot3.colorPalette[2],label="PolyFit")  
+        #print(z)
+    #plot3.axs.plot(x,quad(x,*z),color=plot3.colorPalette[2],label="PolyFit")  
     plot3.axs.xaxis.set_major_locator(MultipleLocator(5))
     plot3.axs.xaxis.set_major_formatter("{x:.0f}")
     plot3.axs.xaxis.set_minor_locator(MultipleLocator(1))

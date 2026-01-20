@@ -859,7 +859,7 @@ def RowRowCorrelation(
     showFunction: bool = True,
     name:str = "",
 ):
-    plot = plotClass(pathToOutput + f"{dataFile.fileName}/", sizePerPlot=(8, 8))
+    plot = plotClass(pathToOutput + f"{dataFile.fileName}/", sizePerPlot=(6, 6))
     axs = plot.axs
 
     rowRowPlotter = correlationPlotter(
@@ -876,13 +876,13 @@ def RowRowCorrelation(
     if log:
         norm = LogNorm(vmin=1, vmax=np.max(RowRow, where=~np.isnan(RowRow), initial=-1))
     im = axs.imshow(RowRow, origin="lower", aspect="equal", extent=extent, norm=norm)
-    plot.set_config(axs, title="RowRow correlation", xlabel="Row [px]", ylabel="Row [px]")
-    axs.xaxis.set_major_locator(MultipleLocator(30))
+    plot.set_config(axs, title="RowRow Correlation", xlabel="Row [px]", ylabel="Row [px]")
+    axs.xaxis.set_major_locator(MultipleLocator(100))
     axs.xaxis.set_major_formatter("{x:.0f}")
-    axs.xaxis.set_minor_locator(MultipleLocator(10))
-    axs.yaxis.set_major_locator(MultipleLocator(30))
+    axs.xaxis.set_minor_locator(MultipleLocator(20))
+    axs.yaxis.set_major_locator(MultipleLocator(100))
     axs.yaxis.set_major_formatter("{x:.0f}")
-    axs.yaxis.set_minor_locator(MultipleLocator(10))
+    axs.yaxis.set_minor_locator(MultipleLocator(20))
     divider = make_axes_locatable(axs)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(im, cax=cax, orientation="vertical")
@@ -998,10 +998,12 @@ def LandauMPVWidthScatter(
 if __name__ == "__main__":
     config = configLoader.loadConfig()
     #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_6Gev_kitHV30_kit_5","angle6_6Gev_kitHV20_kit_6"]}
-    #config["filterDict"] = {"telescope":"kit","fileName":["angle6_6Gev_kit_4","angle6_4Gev_kit_2"]}
+    config["filterDict"] = {"telescope":"kit","fileName":["angle6_4Gev_kit_2"]}
     #config["maxClusterWidth"] = 40
     dataFiles = initDataFiles(config)
     for dataFile in dataFiles:
+        dataFile.get_crossTalk()
+        """
         depth = depthAnalysis(
             config["pathToCalcData"],
             maxLine=config["maxLine"],
@@ -1009,7 +1011,7 @@ if __name__ == "__main__":
             layers=config["layers"],
             excludeCrossTalk=config["excludeCrossTalk"],
         )
-        """
+        
         AngleDistribution(dataFile, depth, config["pathToOutput"])
         WidthDistribution(dataFile, depth, config["pathToOutput"])
         AngleDistribution_2(dataFile, depth, config["pathToOutput"])
@@ -1017,7 +1019,6 @@ if __name__ == "__main__":
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=4)
         ColumnWidthDistribution(dataFile, config["pathToOutput"], layer=1)
         RowWidthDistribution(dataFile, config["pathToOutput"], layer=1)
-        """
         ClustersCountOverTime(dataFile, config["pathToOutput"])
         VoltageDepthScatter(
             dataFile,
@@ -1088,7 +1089,6 @@ if __name__ == "__main__":
             depthCorrection=True,
             hideLowWidths=False,
         )
-        """
         LandauMPVWidthScatter(
             dataFile,
             depth,
@@ -1115,12 +1115,14 @@ if __name__ == "__main__":
             HitDistributionInClusterAllOnOne(dataFile,depth,config["pathToOutput"],vmin=2,vmax=config["maxClusterWidth"])
         """
         #CuttingComparison(dataFile,config["pathToOutput"],layers=config["layers"])
-        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"],showFunction = False,name="_noFunction")
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"],showFunction = False,name="_noFunction",recalc=True)
+        RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"],showFunction = False,name="_noFunction_onlyHighSeed",recalc=True)
+        #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"],showFunction = False,name="_cut",recalc=True)
         #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=False,maxLine=config["maxLine"])
         #RowRowCorrelation(dataFile,config["pathToOutput"],config["pathToOutput"],layers=config["layers"] ,excludeCrossTalk=True,maxLine=config["maxLine"],showFunction = False)
-        iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
+        #iList = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24, 25, 27]
         #iList = [30,35,38,45]
-        for i in iList:
-            HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
-            Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
-            Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],_range=(0.162, 4))
+        #for i in iList:
+        #    HitDistributionInCluster(dataFile,depth,i,config["pathToOutput"])
+        #    Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],measuredAttribute = "ToT",_range=(40, 256))
+        #    Hit_VoltageDistributionByPixel(dataFile,depth,i,config["pathToOutput"],_range=(0.162, 4))

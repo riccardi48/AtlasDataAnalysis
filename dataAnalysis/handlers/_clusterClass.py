@@ -163,3 +163,4 @@ class clusterClass:
                 return np.sum(np.sqrt(np.sum(self.Hit_VoltageErrors[self.notCrossTalk] ** 2)))
         else:
             return np.sqrt(np.sum(self.Hit_VoltageErrors ** 2))
+        

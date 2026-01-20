@@ -29,7 +29,7 @@ def _defaultConfig():
 
 def saveConfig(config: dict, path: str = "config.json"):
     with open(path, "w") as f:
-        json.dump(config, f)
+        json.dump(config, f,indent=4)
 
 
 def loadConfig(path: str = "") -> dict:
