@@ -1,0 +1,104 @@
+###############################
+# Plots in this file:
+# 1. RowRow correlation plot
+# 2. RowRow correlation plot with only high -> low correlations
+# 3. RowRow correlation plot with crosstalk removed
+# 4. RowRow correlation plot with crosstalk mapping overlaid
+###############################
+
+from plotClass import plotGenerator
+import sys
+sys.path.append("..")
+from dataAnalysis import dataAnalysis, initDataFiles, configLoader
+from matplotlib.ticker import MultipleLocator
+from matplotlib.colors import LogNorm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
+from typing import Optional
+import numpy.typing as npt
+from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
+import matplotlib.pyplot as plt
+
+def RowRowCorrelation(
+    dataFile: dataAnalysis, config : dict, recalc: bool = False, excludeCrossTalk = False, highToLow=False
+):
+    
+    clusters = dataFile.get_clusters(layers=config["layers"])
+    dataFile.get_crossTalk()
+    RowRow = np.zeros((371, 371))
+    print(f"Finding RowRow correlation")
+    rows = dataFile.get_base_attr("Row")
+    ToT = dataFile.get_base_attr("ToT")
+    indexes = rows - np.min(rows)
+    for cluster in clusters:
+        clusterIndexes = cluster.getIndexes(excludeCrossTalk=excludeCrossTalk)
+        for pixel in clusterIndexes:
+            if ToT[pixel] > 40 or not highToLow:
+                RowRow[
+                    indexes[pixel],
+                    indexes[clusterIndexes],
+                ] += 1
+    RowRow[np.where(RowRow == 0)] = None
+    return RowRow
+
+def plotRowRow(dataFile,plotGen,config,path,recalc=False,excludeCrossTalk=False,log=False,showFunction=False, highToLow=False):
+    plot = plotGen.newPlot(path,sizePerPlot = (6,4))
+    axs = plot.axs
+    RowRow = RowRowCorrelation(dataFile, config, recalc = recalc, excludeCrossTalk = excludeCrossTalk, highToLow = highToLow)
+    extent = (
+        0.5,
+        371.5,
+        0.5,
+        371.5,
+    )
+    norm = None
+    if log:
+        norm = LogNorm(vmin=1, vmax=np.max(RowRow, where=~np.isnan(RowRow), initial=-1))
+    im = axs.imshow(RowRow, origin="lower", aspect="equal", extent=extent, norm=norm)
+    plot.set_config(axs, title="RowRow Correlation", xlabel="Row [px]", ylabel="Row [px]")
+    axs.xaxis.set_major_locator(MultipleLocator(100))
+    axs.xaxis.set_major_formatter("{x:.0f}")
+    axs.xaxis.set_minor_locator(MultipleLocator(20))
+    axs.yaxis.set_major_locator(MultipleLocator(100))
+    axs.yaxis.set_major_formatter("{x:.0f}")
+    axs.yaxis.set_minor_locator(MultipleLocator(20))
+    divider = make_axes_locatable(axs)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(im, cax=cax, orientation="vertical")
+    cbar.set_label("Frequency", rotation=270, labelpad=15)
+    if showFunction:
+        tempCrossTalkFinder = crossTalkFinder()
+        x = []
+        y = []
+        for _x, _y in tempCrossTalkFinder.crossTalkFunction().items():
+            for i, j in _y:
+                x.append(i)
+                y.append(j)
+
+        axs.scatter(x, y, c="r", s=1)
+    plot.saveToPDF(
+        f"RowRowCorrelation"
+        + f"{"_cut" if excludeCrossTalk else ""}" 
+        + f"{"_"+"".join(str(x) for x in config["layers"]) if config["layers"] is not None else ""}"
+        + f"{"_log" if log else ""}"     
+        + f"{"_highToLow" if highToLow else ""}"   
+        + f"{"_showFunc" if showFunction else ""}"     
+        )
+
+def runCorrelation(
+    dataFiles: dataAnalysis,
+    plotGen,
+    config,
+):
+    for i,dataFile in enumerate(dataFiles):
+        path = f"Correlation/{dataFile.fileName}/"
+        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=False, highToLow=False)
+        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=False, highToLow=True)
+        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=True,log=False,showFunction=False, highToLow=False)
+        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=True, highToLow=False)
+
+if __name__ == "__main__":
+    config = configLoader.loadConfig("config.json")
+    dataFiles = initDataFiles(config)
+    plotGen = plotGenerator(config["pathToOutput"])
+    runCorrelation(dataFiles,plotGen,config)
