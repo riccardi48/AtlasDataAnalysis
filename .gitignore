@@ -1,5 +1,6 @@
 # Ignore output pdfs
 *.pdf
+*.png
 
 # Ignore Cached Data
 *.npy
