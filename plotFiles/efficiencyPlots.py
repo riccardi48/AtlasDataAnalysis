@@ -13,7 +13,7 @@ import numpy as np
 from dataAnalysis import initDataFiles, configLoader
 
 def runEfficiency(dataFiles,plotGen,config):
-    bigPlot = plotGen.newPlot("Combined/")
+    bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for i,dataFile in enumerate(dataFiles):
         path = f"Efficiency/{dataFile.fileName}/"
         clusters = dataFile.get_perfectClusters(layers=config["layers"])
@@ -43,9 +43,9 @@ def runEfficiency(dataFiles,plotGen,config):
             xlabel="Relative Row",
             ylabel="Efficiency",
             legend=True,
-            ylim=(0.98, 1),
+            ylim=(0.990, 1),
             xticks=[5,1],
-            yticks=[0.005,0.001],
+            yticks=[0.001,0.0002],
             yticksSig=3,
         )
         plot.axs.grid(True)
@@ -89,6 +89,7 @@ def runEfficiency(dataFiles,plotGen,config):
         yticks=[0.1,0.02],
         yticksSig=1,
     )
+    bigPlot.axs.grid(True)
     bigPlot.saveToPDF(f"Efficiency_Relative_Row",close=False)
 
     bigPlot.set_config(
@@ -97,9 +98,9 @@ def runEfficiency(dataFiles,plotGen,config):
         xlabel="Row",
         ylabel="Efficiency",
         legend=True,
-        ylim=(0.98, 1),
+        ylim=(0.990, 1),
         xticks=[5,1],
-        yticks=[0.005,0.001],
+        yticks=[0.001,0.0002],
         yticksSig=3,
     )
     bigPlot.saveToPDF(f"Efficiency_Relative_Row_ShortAxis")
