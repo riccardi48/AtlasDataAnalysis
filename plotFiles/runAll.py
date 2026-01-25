@@ -11,7 +11,7 @@ from mpvPlots import runMPV
 from correlationPlots import runCorrelation
 
 config = configLoader.loadConfig()
-config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
+# config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 # config["filterDict"] = {"telescope":"kit","fileName":["angle6_4Gev_kit_2","angle6_6Gev_kit_4"]}
 configLoader.saveConfig(config,"config.json")
 config = configLoader.loadConfig("config.json")

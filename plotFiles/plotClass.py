@@ -116,6 +116,16 @@ class plotClass:
             plt.close()
         print(f"\033[94mSaved Plot:\033[0m {name}.pdf\n\033[96m{out_put_file_name}\033[0m")
 
+    def saveToPNG(self, name: str = "",close=True) -> None:
+        self.finalizePlot()
+        out_put_file_name = f"{self.pathToOutput}" + f"{name}" + f".png"
+        os.makedirs("/".join(out_put_file_name.split("/")[:-1]), exist_ok=True)
+        self.fig.savefig(f"{out_put_file_name}")
+        if close:
+            plt.close()
+        print(f"\033[94mSaved Plot:\033[0m {name}.pdf\n\033[96m{out_put_file_name}\033[0m")
+
+
 class clusterPlotter:
     def __init__(self, dataFile: dataAnalysis, buffer: int = 3, excludeCrossTalk: bool = True):
         self.dataFile = dataFile

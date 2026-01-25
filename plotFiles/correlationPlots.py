@@ -8,6 +8,7 @@
 
 from plotClass import plotGenerator
 import sys
+
 sys.path.append("..")
 from dataAnalysis import dataAnalysis, initDataFiles, configLoader
 from matplotlib.ticker import MultipleLocator
@@ -19,16 +20,23 @@ import numpy.typing as npt
 from dataAnalysis.handlers._crossTalkFinder import crossTalkFinder
 import matplotlib.pyplot as plt
 
+
 def RowRowCorrelation(
-    dataFile: dataAnalysis, config : dict, recalc: bool = False, excludeCrossTalk = False, highToLow=False
+    dataFile: dataAnalysis,
+    config: dict,
+    recalc: bool = False,
+    excludeCrossTalk=False,
+    highToLow=False,
+    addVoltage=False,
 ):
-    
+
     clusters = dataFile.get_clusters(layers=config["layers"])
     dataFile.get_crossTalk()
     RowRow = np.zeros((371, 371))
     print(f"Finding RowRow correlation")
     rows = dataFile.get_base_attr("Row")
     ToT = dataFile.get_base_attr("ToT")
+    voltage = dataFile.get_base_attr("Hit_Voltage")
     indexes = rows - np.min(rows)
     for cluster in clusters:
         clusterIndexes = cluster.getIndexes(excludeCrossTalk=excludeCrossTalk)
@@ -37,14 +45,29 @@ def RowRowCorrelation(
                 RowRow[
                     indexes[pixel],
                     indexes[clusterIndexes],
-                ] += 1
+                ] += (
+                    ToT[clusterIndexes] if addVoltage else 1
+                )
     RowRow[np.where(RowRow == 0)] = None
     return RowRow
 
-def plotRowRow(dataFile,plotGen,config,path,recalc=False,excludeCrossTalk=False,log=False,showFunction=False, highToLow=False):
-    plot = plotGen.newPlot(path,sizePerPlot = (6,4))
+
+def plotRowRow(
+    dataFile,
+    plotGen,
+    config,
+    path,
+    recalc=False,
+    excludeCrossTalk=False,
+    log=False,
+    showFunction=False,
+    highToLow=False,
+):
+    plot = plotGen.newPlot(path, sizePerPlot=(6, 4))
     axs = plot.axs
-    RowRow = RowRowCorrelation(dataFile, config, recalc = recalc, excludeCrossTalk = excludeCrossTalk, highToLow = highToLow)
+    RowRow = RowRowCorrelation(
+        dataFile, config, recalc=recalc, excludeCrossTalk=excludeCrossTalk, highToLow=highToLow
+    )
     extent = (
         0.5,
         371.5,
@@ -78,27 +101,145 @@ def plotRowRow(dataFile,plotGen,config,path,recalc=False,excludeCrossTalk=False,
         axs.scatter(x, y, c="r", s=1)
     plot.saveToPDF(
         f"RowRowCorrelation"
-        + f"{"_cut" if excludeCrossTalk else ""}" 
+        + f"{"_cut" if excludeCrossTalk else ""}"
         + f"{"_"+"".join(str(x) for x in config["layers"]) if config["layers"] is not None else ""}"
-        + f"{"_log" if log else ""}"     
-        + f"{"_highToLow" if highToLow else ""}"   
-        + f"{"_showFunc" if showFunction else ""}"     
-        )
+        + f"{"_log" if log else ""}"
+        + f"{"_highToLow" if highToLow else ""}"
+        + f"{"_showFunc" if showFunction else ""}"
+    )
+
+
+def plotRowRow3D(
+    dataFile,
+    plotGen,
+    config,
+    path,
+    recalc=False,
+    excludeCrossTalk=False,
+    log=False,
+    highToLow=False,
+):
+    plot = plotGen.newPlot(path, sizePerPlot=(12, 12))
+    plot.fig = plt.figure()
+    axs = plot.fig.add_subplot(111, projection="3d")
+    RowRow = RowRowCorrelation(
+        dataFile, config, recalc=recalc, excludeCrossTalk=excludeCrossTalk, highToLow=highToLow
+    )
+    RowRowVoltage = RowRowCorrelation(
+        dataFile,
+        config,
+        recalc=recalc,
+        excludeCrossTalk=excludeCrossTalk,
+        highToLow=highToLow,
+        addVoltage=True,
+    )
+    RowRowVoltage = RowRowVoltage / RowRow
+    coordinates = np.where(RowRow)
+    cmap = plt.get_cmap("plasma")
+    im = axs.bar3d(
+        coordinates[0],
+        coordinates[1],
+        np.zeros(coordinates[0].size),
+        np.ones(coordinates[0].size),
+        np.ones(coordinates[0].size),
+        RowRow[coordinates],
+        color=cmap(RowRowVoltage[coordinates] / np.max(RowRowVoltage)),
+    )
+    axs.set_ylim(372,0)
+    axs.set_xlim(0,372)
+    plot.saveToPNG(
+        f"RowRowCorrelation_3d"
+        + f"{"_cut" if excludeCrossTalk else ""}"
+        + f"{"_"+"".join(str(x) for x in config["layers"]) if config["layers"] is not None else ""}"
+        + f"{"_log" if log else ""}"
+        + f"{"_highToLow" if highToLow else ""}",
+        close=False
+    )
+    plot.saveToPDF(
+        f"RowRowCorrelation_3d"
+        + f"{"_cut" if excludeCrossTalk else ""}"
+        + f"{"_"+"".join(str(x) for x in config["layers"]) if config["layers"] is not None else ""}"
+        + f"{"_log" if log else ""}"
+        + f"{"_highToLow" if highToLow else ""}"
+    )
+
 
 def runCorrelation(
     dataFiles: dataAnalysis,
     plotGen,
     config,
 ):
-    for i,dataFile in enumerate(dataFiles):
+    for i, dataFile in enumerate(dataFiles):
         path = f"Correlation/{dataFile.fileName}/"
-        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=False, highToLow=False)
-        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=False, highToLow=True)
-        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=True,log=False,showFunction=False, highToLow=False)
-        plotRowRow(dataFile,plotGen,config,path,recalc=True,excludeCrossTalk=False,log=False,showFunction=True, highToLow=False)
+        plotRowRow3D(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=False,
+            excludeCrossTalk=False,
+            log=False,
+            highToLow=False,
+        )
+        plotRowRow3D(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=False,
+            excludeCrossTalk=False,
+            log=False,
+            highToLow=True,
+        )
+        plotRowRow(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=True,
+            excludeCrossTalk=False,
+            log=False,
+            showFunction=False,
+            highToLow=False,
+        )
+        plotRowRow(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=True,
+            excludeCrossTalk=False,
+            log=False,
+            showFunction=False,
+            highToLow=True,
+        )
+        plotRowRow(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=True,
+            excludeCrossTalk=True,
+            log=False,
+            showFunction=False,
+            highToLow=False,
+        )
+        plotRowRow(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=True,
+            excludeCrossTalk=False,
+            log=False,
+            showFunction=True,
+            highToLow=False,
+        )
+
 
 if __name__ == "__main__":
     config = configLoader.loadConfig("config.json")
+    config["filterDict"] = {"fileName":"4Gev_kit_1"}
     dataFiles = initDataFiles(config)
     plotGen = plotGenerator(config["pathToOutput"])
-    runCorrelation(dataFiles,plotGen,config)
+    runCorrelation(dataFiles, plotGen, config)
