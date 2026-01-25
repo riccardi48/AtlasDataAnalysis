@@ -3,11 +3,21 @@ from dataAnalysis._dependencies import (
     np,  # numpy
     njit,  # numba
     tqdm,  # tqdm
+    numba,  # numba
 )
 import warnings
 
+List = numba.typed.List
+types = numba.types
+
 warnings.filterwarnings("ignore", "unsafe cast from int64 to int32")
 
+################################################################################
+# File split into my own code and AI written optimized code
+# Original code below
+# "calcClusters" is the function called externally. 
+# Change the function name of the function to be called externally.
+################################################################################
 
 class clusterChecker:
     def __init__(self, layer, index, TS, TriggerID):
@@ -52,7 +62,7 @@ class clusterChecker:
         return True if self.maxTriggerID + triggerVariance >= TriggerID else False
 
 
-def calcClusters(
+def _calcClusters(
     Layers: npt.NDArray[np.int_],
     TriggerID: npt.NDArray[np.int_],
     TS: npt.NDArray[np.int_],
@@ -89,74 +99,229 @@ def calcClusters(
         activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
     return np.array(finishedClusters, dtype=object)
 
+################################################################################
+# AI optimized code below
+################################################################################
 
-def __calcClusters(
+@njit
+def check_hit(
+    cluster_layer,
+    cluster_min_ts,
+    cluster_max_ts,
+    cluster_min_trigger_id,
+    cluster_max_trigger_id,
+    layer,
+    ts,
+    trigger_id,
+    time_variance=40,
+    trigger_variance=1,
+):
+    """Check if a hit belongs to a cluster."""
+    if cluster_layer != layer:
+        return False
+    
+    # Check trigger ID
+    if trigger_id <= cluster_max_trigger_id and trigger_id >= cluster_min_trigger_id:
+        pass
+    elif (
+        abs(trigger_id - cluster_max_trigger_id) > trigger_variance
+        and abs(trigger_id - cluster_min_trigger_id) > trigger_variance
+    ):
+        return False
+    
+    # Check timestamp
+    if ts <= cluster_max_ts and ts >= cluster_min_ts:
+        return True
+    elif (
+        abs(ts - cluster_max_ts) > time_variance
+        and abs(ts - cluster_min_ts) > time_variance
+    ) and (
+        abs((ts + 512) - (cluster_max_ts + 512)) > time_variance
+        and abs((ts + 512) - (cluster_min_ts + 512)) > time_variance
+    ):
+        return False
+    
+    return True
+
+
+@njit
+def check_active(cluster_max_trigger_id, trigger_id, trigger_variance=10):
+    """Check if a cluster is still active."""
+    return cluster_max_trigger_id + trigger_variance >= trigger_id
+
+
+@njit(nogil=True)
+def process_hits_batch(
+    layers,
+    trigger_ids,
+    timestamps,
+    start_idx,
+    end_idx,
+    active_layers,
+    active_min_ts,
+    active_max_ts,
+    active_min_trigger,
+    active_max_trigger,
+    active_indexes,
+    finished_clusters,
+    time_variance,
+    trigger_variance,
+):
+    """Process a batch of hits and update cluster state."""
+    for i in range(start_idx, end_idx):
+        layer = layers[i]
+        trigger_id = trigger_ids[i]
+        ts = timestamps[i]
+        
+        added_to_cluster = False
+        
+        # Check active clusters
+        for c in range(len(active_layers)):
+            if check_hit(
+                active_layers[c],
+                active_min_ts[c],
+                active_max_ts[c],
+                active_min_trigger[c],
+                active_max_trigger[c],
+                layer,
+                ts,
+                trigger_id,
+                time_variance,
+                trigger_variance,
+            ):
+                # Add hit to cluster
+                old_indexes = active_indexes[c]
+                new_indexes = np.empty(len(old_indexes) + 1, dtype=np.int32)
+                new_indexes[:-1] = old_indexes
+                new_indexes[-1] = i
+                active_indexes[c] = new_indexes
+                
+                # Update cluster bounds
+                if ts > active_max_ts[c]:
+                    active_max_ts[c] = ts
+                if ts < active_min_ts[c]:
+                    active_min_ts[c] = ts
+                if trigger_id > active_max_trigger[c]:
+                    active_max_trigger[c] = trigger_id
+                if trigger_id < active_min_trigger[c]:
+                    active_min_trigger[c] = trigger_id
+                
+                added_to_cluster = True
+                break
+        
+        # Create new cluster if needed
+        if not added_to_cluster:
+            active_layers.append(layer)
+            active_min_ts.append(ts)
+            active_max_ts.append(ts)
+            active_min_trigger.append(trigger_id)
+            active_max_trigger.append(trigger_id)
+            new_cluster = np.array([i], dtype=np.int32)
+            active_indexes.append(new_cluster)
+        
+        # Move inactive clusters to finished
+        c = 0
+        while c < len(active_layers):
+            if not check_active(active_max_trigger[c], trigger_id, 10):
+                finished_clusters.append(active_indexes[c])
+                
+                last_idx = len(active_layers) - 1
+                if c != last_idx:
+                    active_layers[c] = active_layers[last_idx]
+                    active_min_ts[c] = active_min_ts[last_idx]
+                    active_max_ts[c] = active_max_ts[last_idx]
+                    active_min_trigger[c] = active_min_trigger[last_idx]
+                    active_max_trigger[c] = active_max_trigger[last_idx]
+                    active_indexes[c] = active_indexes[last_idx]
+                
+                active_layers.pop()
+                active_min_ts.pop()
+                active_max_ts.pop()
+                active_min_trigger.pop()
+                active_max_trigger.pop()
+                active_indexes.pop()
+            else:
+                c += 1
+
+
+def calcClusters(
     Layers: npt.NDArray[np.int_],
     TriggerID: npt.NDArray[np.int_],
     TS: npt.NDArray[np.int_],
     time_variance: np.int_ = 80,
     trigger_variance: np.int_ = 1,
-) -> list[npt.NDArray[np.int_]]:
-    """Optimized cluster calculation with vectorized operations and JIT compilation"""
-
-    # Pre-allocate result list
-    all_clusters = []
-
-    # Process each layer
-    for layer in range(1, 5):
-        layer_mask = Layers == layer
-        if not np.any(layer_mask):
-            continue
-
-        layer_indices = np.where(layer_mask)[0]
-        if len(layer_indices) <= 1:
-            # Single pixel clusters
-            for idx in layer_indices:
-                all_clusters.append(np.array([idx], dtype=np.int32))
-            continue
-
-        # Extract layer data
-        layer_ts = TS[layer_mask]
-        layer_trigger = TriggerID[layer_mask]
-
-        # Use JIT-compiled function for the heavy lifting
-
-        cluster_boundaries = _find_cluster_boundaries_jit(
-            layer_ts, layer_trigger, time_variance, trigger_variance
-        )
-
-        # Build clusters from boundaries
-        start_idx = 0
-        for end_idx in cluster_boundaries:
-            cluster_indices = layer_indices[start_idx : end_idx + 1]
-            all_clusters.append(cluster_indices.astype(np.int32))
-            start_idx = end_idx + 1
-    return np.array(all_clusters, dtype=object)
-
-
-@njit(cache=True)
-def _find_cluster_boundaries_jit(ts_array, trigger_array, time_var, trigger_var):
-    """JIT-compiled function to find cluster boundaries"""
-    n = len(ts_array)
-    if n <= 1:
-        return np.array([0], dtype=np.int32)
-
-    boundaries = []
-
-    for i in range(n - 1):
-        # Calculate time difference with wraparound handling
-        ts_diff1 = abs(ts_array[i + 1] - ts_array[i])
-        ts_diff2 = abs((ts_array[i + 1] + 512) % 1024 - (ts_array[i] + 512) % 1024)
-        min_ts_diff = min(ts_diff1, ts_diff2)
-
-        # Calculate trigger difference
-        trigger_diff = abs(trigger_array[i + 1] - trigger_array[i])
-
-        # Check if this should end a cluster
-        if min_ts_diff > time_var or trigger_diff > trigger_var:
-            boundaries.append(i)
-
-    # Always end with the last index
-    boundaries.append(n - 1)
-
-    return np.array(boundaries, dtype=np.int32)
+    batch_size: int = 10000,
+) -> np.ndarray:
+    """
+    Calculate clusters with progress bar.
+    
+    Parameters:
+    -----------
+    Layers : array of layer indices
+    TriggerID : array of trigger IDs
+    TS : array of timestamps
+    time_variance : time window for clustering (default: 80)
+    trigger_variance : trigger ID window for clustering (default: 1)
+    batch_size : size of batches for progress updates (default: 10000)
+    
+    Returns:
+    --------
+    numpy array of cluster index arrays (dtype=object)
+    """
+    # Convert to int32 for Numba
+    layers = Layers.astype(np.int32)
+    trigger_ids = TriggerID.astype(np.int32)
+    timestamps = TS.astype(np.int32)
+    
+    n = len(layers)
+    
+    # Initialize typed lists
+    active_layers = List.empty_list(types.int32)
+    active_min_ts = List.empty_list(types.int32)
+    active_max_ts = List.empty_list(types.int32)
+    active_min_trigger = List.empty_list(types.int32)
+    active_max_trigger = List.empty_list(types.int32)
+    
+    # For list of arrays
+    active_indexes = List()
+    active_indexes.append(np.array([0], dtype=np.int32))
+    active_indexes.clear()
+    
+    finished_clusters = List()
+    finished_clusters.append(np.array([0], dtype=np.int32))
+    finished_clusters.clear()
+    
+    # Process in batches with progress bar
+    with tqdm(total=n, desc="Calculating Clusters") as pbar:
+        for batch_start in range(0, n, batch_size):
+            batch_end = min(batch_start + batch_size, n)
+            
+            # Process this batch (JIT compiled, releases GIL)
+            process_hits_batch(
+                layers,
+                trigger_ids,
+                timestamps,
+                batch_start,
+                batch_end,
+                active_layers,
+                active_min_ts,
+                active_max_ts,
+                active_min_trigger,
+                active_max_trigger,
+                active_indexes,
+                finished_clusters,
+                time_variance,
+                trigger_variance,
+            )
+            
+            # Update progress bar
+            pbar.update(batch_end - batch_start)
+    
+    # Add remaining active clusters to finished
+    for c in range(len(active_layers)):
+        finished_clusters.append(active_indexes[c])
+    
+    # Convert to list of numpy arrays
+    result = [np.array(cluster, dtype=np.int32) for cluster in finished_clusters]
+    
+    return np.array(result, dtype=object)
