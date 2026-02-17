@@ -67,9 +67,9 @@ class mpvData:
             self.dataFile.get_crossTalk()
             self.dataFile.init_cluster_voltages()
             self.calcFittings()
-            calcFileManager.saveFile(calcFileName=calcFileName,array=[self.fittings,self.constrainedFittings])
+            calcFileManager.saveFile(calcFileName=calcFileName,array=np.array([self.fittings,self.constrainedFittings,self.pList,self.histLists,self.histErrorsLists],dtype=object))
         else:
-            self.fittings,self.constrainedFittings = calcFileManager.loadFile(calcFileName=calcFileName)
+            self.fittings,self.constrainedFittings,self.pList,self.histLists,self.histErrorsLists = calcFileManager.loadFile(calcFileName=calcFileName)
 
     def calcFittings(self):
         clusters = self.dataFile.get_perfectClusters(minPval=self.minPval, layer=self.layer, maxRow=25)
@@ -328,10 +328,10 @@ def fitVoltageDepth(
     yerr,
     GeV = 6,
 ):
-    unzippedBounds = [(0, np.inf), (0, 100), (1, np.inf)]
+    unzippedBounds = [(0, np.inf), (0, 100), (0, np.inf)]
     lower_bounds, upper_bounds = zip(*unzippedBounds)
     bounds = (list(lower_bounds), list(upper_bounds))
-    initial_guess = [0.25, 10, 50]
+    initial_guess = [0.5, 30, 10]
     cut = x > 0  # (x<70) & (y > 0.17)
     func = lambda depth, V_0, t_epi, edl: chargeCollectionEfficiencyFunc(
         depth, V_0, t_epi, edl, GeV=GeV

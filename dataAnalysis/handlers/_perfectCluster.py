@@ -70,11 +70,11 @@ def pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)[section]
     x,y = convertRowsForFit(Rows,Timestamps,flipped=False)
     pVal1 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 30:
+    if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30:
         pVal1 = 0
     x,y = convertRowsForFit(Rows,Timestamps,flipped=True)
     pVal2 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 30:
+    if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30:
         pVal2 = 0
     pVal = np.max([pVal1,pVal2])
     flipped = pVal2>pVal1
