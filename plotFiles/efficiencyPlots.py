@@ -16,7 +16,7 @@ def runEfficiency(dataFiles,plotGen,config):
     bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for i,dataFile in enumerate(dataFiles):
         path = f"Efficiency/{dataFile.fileName}/"
-        clusters = dataFile.get_perfectClusters(layers=config["layers"])
+        clusters = dataFile.get_perfectClusters(excludeCrossTalk = True,layers=config["layers"])
         print(len(clusters))
         efficiencyDict = calcEfficiency(clusters,maxWidth=30)
         pList,errors = getPercentFromDict(efficiencyDict)
@@ -68,7 +68,7 @@ def runEfficiency(dataFiles,plotGen,config):
             np.arange(pList.size),
             pList,
             color=getColor(dataFile),
-            label=f"{dataFile.fileName}",
+            label=f"{dataFile.fileName[7:]}",
         )
         bigPlot.axs.fill_between(
             np.arange(pList.size),

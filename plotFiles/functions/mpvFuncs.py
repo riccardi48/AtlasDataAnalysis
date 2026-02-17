@@ -6,6 +6,8 @@ import numpy as np
 from scipy.stats import norm
 from scipy.optimize import curve_fit,brentq
 from landau import landau
+from tqdm import tqdm
+from dataAnalysis._fileReader import calcDataFileManager
 
 def getPList(clusters,maxWidth=30):
     efficiencyDict = calcEfficiency(clusters,maxWidth=maxWidth)
@@ -55,11 +57,25 @@ class mpvData:
         self.dataFile = dataFile
         self.fittings = {}
         self.constrainedFittings = {}
+    def initFittings(self,config):
+        calcFileManager = calcDataFileManager(config["pathToCalcData"], self.dataFile.fileName, config["maxLine"])
+        calcFileName = calcFileManager.generateFileName(
+            attribute=f"landauFittings",
+        )
+        fileCheck = calcFileManager.fileExists(calcFileName=calcFileName)
+        if not fileCheck:
+            self.dataFile.get_crossTalk()
+            self.dataFile.init_cluster_voltages()
+            self.calcFittings()
+            calcFileManager.saveFile(calcFileName=calcFileName,array=[self.fittings,self.constrainedFittings])
+        else:
+            self.fittings,self.constrainedFittings = calcFileManager.loadFile(calcFileName=calcFileName)
+
     def calcFittings(self):
         clusters = self.dataFile.get_perfectClusters(minPval=self.minPval, layer=self.layer, maxRow=25)
         self.histLists,self.histErrorsLists = generateHistLists(clusters, maxWidth = self.maxWidth)
         self.pList,_ = getPList(clusters,maxWidth=self.maxWidth)
-        for i in range(self.maxWidth):
+        for i in tqdm(range(self.maxWidth), desc="Calculating Landau fittings"):
             values = np.array(self.histLists[i])
             valuesErrors = np.array(self.histErrorsLists[i])
             p = self.pList[i]
@@ -76,6 +92,21 @@ class mpvData:
                 self.constrainedFittings[i] = [x_mpv, xi, scale, x_mpv_e, xi_e, scale_e]
             else:
                 self.constrainedFittings[i] = [np.nan,np.nan,np.nan,np.nan,np.nan,np.nan]
+    def calcExpectedDepth(self):
+        MPVs = np.zeros(self.maxWidth)
+        for i in range(self.maxWidth-1):
+            MPVs[i] = self.fittings[i][0] if i in self.fittings else np.nan
+            if i in self.constrainedFittings:
+                if not np.isnan(self.constrainedFittings[i][0]):
+                    MPVs[i] = self.constrainedFittings[i][0]
+        print(MPVs)
+        totalVoltage = np.sum(MPVs) - MPVs[0]/2
+        averageMaxVoltage = np.average(MPVs[2:8])
+        N = (49.5/50 * np.tan(np.deg2rad(86.5)))
+        print(averageMaxVoltage*N)
+        print(totalVoltage)
+        print(totalVoltage/averageMaxVoltage)
+        print((totalVoltage/averageMaxVoltage)*50/np.tan(np.deg2rad(86.5)))
 
 
 
@@ -270,3 +301,54 @@ def landauFunc(
 
 def convert_x_mpv_to_x0(x_mpv, xi):
     return x_mpv + 0.22278298 * xi
+
+def chargeCollectionEfficiencyFunc(
+    depth,
+    V_0,
+    t_epi,
+    edl,
+    base = 0,
+    GeV = None,
+):
+
+    if GeV is not None:
+        if GeV == 4:
+            base = 0.00
+        elif GeV == 6:
+            base = 0.00
+    depth = np.reshape(depth, np.size(depth))
+    voltage = np.zeros(depth.shape)
+    voltage[depth < t_epi] = V_0
+    voltage[depth >= t_epi] = np.exp(-(depth[depth >= t_epi] - t_epi) / edl) * (V_0 - base) + base
+    return voltage
+
+def fitVoltageDepth(
+    x,
+    y,
+    yerr,
+    GeV = 6,
+):
+    unzippedBounds = [(0, np.inf), (0, 100), (1, np.inf)]
+    lower_bounds, upper_bounds = zip(*unzippedBounds)
+    bounds = (list(lower_bounds), list(upper_bounds))
+    initial_guess = [0.25, 10, 50]
+    cut = x > 0  # (x<70) & (y > 0.17)
+    func = lambda depth, V_0, t_epi, edl: chargeCollectionEfficiencyFunc(
+        depth, V_0, t_epi, edl, GeV=GeV
+    )
+    popt, pcov = curve_fit(
+        func,
+        x[cut],
+        y[cut],
+        p0=initial_guess,
+        maxfev=10000000,
+        bounds=bounds,
+        sigma=yerr[cut] / y[cut],
+        absolute_sigma=False,
+    )
+    return popt, pcov
+
+def depletionWidthFunc(
+    V, a, b, c
+):
+    return np.sqrt(a * (V + b)) + c

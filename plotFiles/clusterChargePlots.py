@@ -66,13 +66,16 @@ def runCharge(dataFiles,plotGen,config):
         clusters = dataFile.get_perfectClusters(layer=4,excludeCrossTalk = True)
         RowWidthsPerfect = [cluster.getRowWidth(True) for cluster in clusters]
         plot = plotGen.newPlot(path)
-        height, x = np.histogram(RowWidths, bins=50, range=(0.5, 50.5))
+        height1, x1 = np.histogram(RowWidths, bins=50, range=(0.5, 50.5))
         plot.axs.stairs(
-            height, x, color=plot.colorPalette[1], baseline=None, label="All Clusters Row Width"
+            height1, x1, color=plot.colorPalette[1], baseline=None, label="All Clusters Row Width"
         )
-        height, x = np.histogram(RowWidthsPerfect, bins=50, range=(0.5, 50.5))
+        height2, x2 = np.histogram(RowWidthsPerfect, bins=50, range=(0.5, 50.5))
         plot.axs.stairs(
-            height, x, color=plot.colorPalette[0], baseline=None, label="Perfect Clusters Row Width"
+            height2, x2, color=plot.colorPalette[0], baseline=None, label="Perfect Clusters Row Width"
+        )
+        plot.axs.stairs(
+            height1-height2, x2, color=plot.colorPalette[3], baseline=None, label="Difference"
         )
         plot.set_config(plot.axs,
             title="Row Width",
@@ -103,6 +106,9 @@ def runCharge(dataFiles,plotGen,config):
             legend=True,
             )
         plot.saveToPDF("RowWidth_Perfect") 
+        
+
+
 
 if __name__ == "__main__":
     config = configLoader.loadConfig("config.json")

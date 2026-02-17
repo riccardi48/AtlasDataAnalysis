@@ -171,6 +171,7 @@ def runCorrelation(
 ):
     for i, dataFile in enumerate(dataFiles):
         path = f"Correlation/{dataFile.fileName}/"
+        """
         plotRowRow3D(
             dataFile,
             plotGen,
@@ -191,6 +192,7 @@ def runCorrelation(
             log=False,
             highToLow=True,
         )
+        """
         plotRowRow(
             dataFile,
             plotGen,
