@@ -16,15 +16,13 @@ def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.5,excludeCr
         return False
     if isOnEdge(cluster):
         return False
-    if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 8:
+    if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 3:
         return False
     addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
     relativeTS = abs(cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.max(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)))
-    if np.all(relativeTS<=4):
-        return False
     if cluster.pVal < minPval:
         return False
-    if np.all(relativeTS[cluster.section]<=4):
+    if np.all(relativeTS[cluster.section]<=2):
         return False
     relativeRows = abs(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section] - np.max(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section]))
     if np.ptp(relativeRows) < np.where(estimate[1:]>0.5)[0][0]+1:
@@ -55,7 +53,7 @@ def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTa
                 section = []
                 for i in perm:
                     section.extend(sections[int(i)])
-                if len(section) <= 5:
+                if len(section) <= 3:
                     continue
                 pVal,flipped = pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=excludeCrossTalk)
                 if (pVal > max_pVal and len(perm)==len(max_perm)) or (len(perm)>len(max_perm) and pVal > minPval and pVal != max_pVal):
@@ -72,11 +70,11 @@ def pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)[section]
     x,y = convertRowsForFit(Rows,Timestamps,flipped=False)
     pVal1 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 3:
+    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 30:
         pVal1 = 0
     x,y = convertRowsForFit(Rows,Timestamps,flipped=True)
     pVal2 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 3:
+    if np.sum((x<len(estimate))&(x>=0)) <= 5 or np.sum((x>len(estimate))|(x<0)) > 30:
         pVal2 = 0
     pVal = np.max([pVal1,pVal2])
     flipped = pVal2>pVal1

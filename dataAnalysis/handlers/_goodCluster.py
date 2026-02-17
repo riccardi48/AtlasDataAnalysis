@@ -16,7 +16,7 @@ def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 1):
     if isOnEdge(cluster):
         return False, False
     relativeRows = cluster.getRows(True) - np.min(cluster.getRows(True))
-    if np.ptp(relativeRows) < minExpectedClusterSize*2:
+    if np.ptp(relativeRows) < minExpectedClusterSize:
         return False, False
     relativeTS = cluster.getTSs(True) - np.min(cluster.getTSs(True))
     if np.all(relativeRows<=lowTS+2):
@@ -24,8 +24,8 @@ def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 1):
     sortIndexes = np.argsort(relativeRows)
     relativeRows = relativeRows[sortIndexes]
     relativeTS = relativeTS[sortIndexes]
-    if np.any((np.diff(relativeTS)>10)|(np.diff(relativeTS)<-10)):
-        return False, False
+    #if np.any((np.diff(relativeTS)>10)|(np.diff(relativeTS)<-10)):
+    #    return False, False
     flipped = False
     lengthOfFlatSections = int(minExpectedClusterSize-1)
     FirstLength = relativeTS[

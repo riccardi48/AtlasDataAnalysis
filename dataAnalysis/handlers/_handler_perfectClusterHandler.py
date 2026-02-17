@@ -5,12 +5,13 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     tqdm,  # tqdm
     minimize,  # scipy.optimize.minimize
+    curve_fit,  # scipy.optimize.curve_fit
 )
 from dataAnalysis._fileReader import calcDataFileManager
 from ._handler_dataFrameHandler import dataFrameHandler
 from ._handler_clusterHandler import clusterHandler
 from ._goodCluster import isGoodCluster
-from ._genericClusterFuncs import findConnectedSections
+from ._genericClusterFuncs import findConnectedSections,gaussianBinned
 from ._perfectCluster import isPerfectCluster
 
 
@@ -57,7 +58,7 @@ def getRelativeRowTS(clusters: clusterArray,minExpectedClusterSize=8,numberOfClu
     relativeRowList = []
     relativeTSList = []
     k = 0
-    for cluster in clusters:
+    for cluster in clusters[1000:]:
         goodCluster, flipped = isGoodCluster(cluster,minExpectedClusterSize=minExpectedClusterSize)
         Timestamps = cluster.getTSs(True)
         relativeTS = Timestamps - np.min(Timestamps)
@@ -89,8 +90,8 @@ def calcTemplate(relativeRowList,relativeTSList):
     spread = []
     for i in np.sort(np.unique(relativeRowList)):
         TSsToFit = relativeTSList[np.where(relativeRowList==i)[0]]
-        if len(estimate)>5 and estimate[-1]>2:
-            TSsToFit=TSsToFit[TSsToFit>1]
+        if len(TSsToFit) < 20:
+            break
         mu, sigma, mu_e, sigma_e = fitGaussian(TSsToFit)
         """
         if i > 15:
@@ -116,7 +117,7 @@ def nll(data,params):
             return np.inf
         return np.sum( np.log(sigma*np.sqrt(2*np.pi)) + (data - mu)**2/(2*sigma**2) )
 
-def fitGaussian(data):
+def _fitGaussian(data):
     mu0 = np.mean(data)
     sigma0 = np.std(data)
     func = lambda params:nll(data,params)
@@ -131,3 +132,31 @@ def fitGaussian(data):
         sigma_e = np.nan
     return mu, sigma, mu_e, sigma_e
 
+def fitGaussian(data):
+    bins = np.max(data)+1
+    _range = [-0.5,np.max(data)+0.5]
+    height, x = np.histogram(data, bins=bins, range=_range)
+    binCentres = (x[:-1] + x[1:]) / 2
+    cut = np.mean(binCentres[np.where(height==np.max(height))[0]])+2
+    popt, pcov = fit(height, x, cut, binCentres)
+    mu,sigma = popt
+    mu_e,sigma_e = np.sqrt(np.diag(pcov))
+    if mu < cut-1 and cut-1 > 2:
+        bins = (bins-np.max(data)%2)/2+0.5
+        _range = [_range[0],_range[1]+np.max(data+1)%2]
+        height, x = np.histogram(data, bins=int(bins), range=_range)
+        binCentres = (x[:-1] + x[1:]) / 2
+        cut = np.mean(binCentres[np.where(height==np.max(height))[0]])+2
+        popt, pcov = fit(height, x, cut, binCentres)
+        mu,sigma = popt
+        mu_e,sigma_e = np.sqrt(np.diag(pcov))
+    return mu, sigma, mu_e, sigma_e
+
+def fit(height, x, cut, binCentres):
+    func = lambda _x,mu,sigma : gaussianBinned(_x, mu, sigma, np.sum(height),x[x<=cut+((x[1]-x[0])/2)])
+    popt, pcov = curve_fit(
+        func,
+        binCentres[binCentres<=cut],
+        height[binCentres<=cut],
+    )
+    return popt,pcov
