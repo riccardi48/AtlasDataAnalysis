@@ -87,9 +87,13 @@ class dataAnalysis:
         self, maxRow=25, **kwargs
     ) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
         kwargs = self._fixLayers(kwargs)
+        minExpectedClusterSize = 8
+        minExpectedClusterSize = int(np.floor(np.sqrt((minExpectedClusterSize**2)*(self.voltage/48.6))))
+        if self.angle != 86.5:
+            minExpectedClusterSize = 2
         #if "minExpectedClusterSize" not in kwargs:
         #    kwargs["minExpectedClusterSize"] = int(np.ceil(np.sqrt(self.voltage/48.6) * 8))
-        return self.dataHandler.getTimeStampTemplate(maxRow=maxRow, **kwargs)
+        return self.dataHandler.getTimeStampTemplate(maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize, **kwargs)
 
     def get_perfectCluster_indexes(
         self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs
@@ -103,8 +107,8 @@ class dataAnalysis:
 
     def get_perfectClusters(self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs):
         kwargs = self._fixLayers(kwargs)
-        estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
         self.get_clusters(excludeCrossTalk=excludeCrossTalk)
+        estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
         return self.dataHandler.getPerfectClusters(
             estimate, spread, minPval=minPval, excludeCrossTalk=True, **kwargs
         )
