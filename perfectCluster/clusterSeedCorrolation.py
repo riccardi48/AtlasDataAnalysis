@@ -30,41 +30,34 @@ for dataFile in dataFiles:
     dataList2 = []
     ToTList1 = []
     ToTList2 = []
-    for cluster in tqdm(dataFile.get_perfectClusters(minPval=0.1,layer=4,excludeCrossTalk=True,maxRow=25), desc="Checking Correlation"):
+    clusters = dataFile.get_clusters(layer=4,excludeCrossTalk=True)
+    #clusters = dataFile.get_perfectClusters(minPval=0.1,layer=4,excludeCrossTalk=True,maxRow=25)
+    for cluster in tqdm(clusters, desc="Checking Correlation"):
         rows = cluster.getRows(excludeCrossTalk=True)
         ToT = cluster.getToTs(excludeCrossTalk=True)
-        if cluster.flipped:
-            seedRow = np.max(rows[cluster.section])
-        else:
-            seedRow = np.min(rows[cluster.section])
+        #if cluster.flipped:
+        #    seedRow = np.max(rows[cluster.section])
+        #else:
+        #    seedRow = np.min(rows[cluster.section])
         mask = np.zeros(len(rows), dtype=bool)
         mask[cluster.section,] = True
-        rowDiffs = rows - seedRow
-        if np.any(rowDiffs > 100) or np.any(rowDiffs < -100):    
+        #rowDiffs = rows - seedRow
+        if cluster.getSize(True) > 10 and np.unique(cluster.getColumns(True)).size == 2 and np.ptp(cluster.getColumns(True)) < 3:#np.any(rowDiffs > 100) or np.any(rowDiffs < -100):    
             path = base_path + f"Clusters/Cluster_{cluster.getIndex()}/"
             CP = clusterPlotter(cluster, path, "ToT")
-            column = cluster.getColumns(excludeCrossTalk=True)[0]
-            CP.plot.axs.vlines(seedRow,column-10,column+10, color=CP.plot.colorPalette[0], linestyle="--", label="Seed Pixel")
-            CP.plot.axs.vlines(seedRow+248-248 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[2], linestyle="--", label="Seed Pixel + 248")
-            CP.plot.axs.vlines(seedRow+185-185 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[3], linestyle="--", label="Seed Pixel + 185")
-            CP.plot.axs.vlines(seedRow+80-80 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[4], linestyle="--", label="Seed Pixel + 80")
-            CP.finishPlot("ToT", cluster.getToTs(True))
+            CP.plot.axs.vlines(np.max(rows),0,132,color="red")
+            CP.plot.axs.vlines(np.max(rows)-13,0,132,color="red")
+            CP.finishPlot("ToT", cluster.getHit_Voltages(True))
+            CP = clusterPlotter(cluster, path, "Voltage")
+            CP.plot.axs.vlines(np.max(rows),0,132,color="red")
+            CP.plot.axs.vlines(np.max(rows)-13,0,132,color="red")
+            CP.finishPlot("Voltage", cluster.getHit_Voltages(True))
+            CP = clusterPlotter(cluster, path, "TS")
+            CP.plot.axs.vlines(np.max(rows),0,132,color="red")
+            CP.plot.axs.vlines(np.max(rows)-13,0,132,color="red")
+            CP.finishPlot("TS", cluster.getTSs(True) - np.min(cluster.getTSs(True)))
             
-            CP = clusterPlotter(cluster, path, "ToT_WithCrossTalk")
-            column = cluster.getColumns(excludeCrossTalk=False)[0]
-            CP.plot.axs.vlines(seedRow,column-10,column+10, color=CP.plot.colorPalette[0], linestyle="--", label="Seed Pixel")
-            CP.plot.axs.vlines(seedRow+248-248 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[2], linestyle="--", label="Seed Pixel + 248")
-            CP.plot.axs.vlines(seedRow+185-185 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[3], linestyle="--", label="Seed Pixel + 185")
-            CP.plot.axs.vlines(seedRow+80-80 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[4], linestyle="--", label="Seed Pixel + 80")
-            CP.finishPlot("ToT", cluster.getToTs(False),excludeCrossTalk=False)
-
-            CP = clusterPlotter(cluster, path, "Hit_Voltages_WithCrossTalk")
-            column = cluster.getColumns(excludeCrossTalk=False)[0]
-            CP.plot.axs.vlines(seedRow,column-10,column+10, color=CP.plot.colorPalette[0], linestyle="--", label="Seed Pixel")
-            CP.plot.axs.vlines(seedRow+248-248 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[2], linestyle="--", label="Seed Pixel + 248")
-            CP.plot.axs.vlines(seedRow+185-185 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[3], linestyle="--", label="Seed Pixel + 185")
-            CP.plot.axs.vlines(seedRow+80-80 * 2 * np.any(rowDiffs < -100),column-10,column+10, color=CP.plot.colorPalette[4], linestyle="--", label="Seed Pixel + 80")
-            CP.finishPlot("Voltage", cluster.getHit_Voltages(False),excludeCrossTalk=False)
+            
             input()
     plot = plotClass(base_path + "SeedCorrelation/")
     axs = plot.axs

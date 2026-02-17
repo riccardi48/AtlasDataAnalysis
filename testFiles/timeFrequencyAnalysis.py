@@ -22,7 +22,7 @@ for i, dataFile in enumerate(dataFiles):
     maxTime = 135500
     range = (minTime, maxTime)
     bins = int(np.ptp(range) / 1)
-    plot = plotClass(config["pathToOutput"] + "TimeTests/FFT/")
+    plot = plotClass(config["pathToOutput"] + f"TimeTests/{dataFile.fileName}/")
     axs = plot.axs
     height, x = np.histogram(times, bins=bins, range=range)
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1], label=f"Layer 4 Bin width 1ms")
@@ -39,13 +39,13 @@ for i, dataFile in enumerate(dataFiles):
         xlabel="Time [ms]",
         ylabel="Count",
     )
-    plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}_small")
+    plot.saveToPDF(f"ClusterTimes_small")
     
     minTime = 0
     maxTime = 600000
     range = (minTime, maxTime)
     bins = int(np.ptp(range) / 1000)
-    plot = plotClass(config["pathToOutput"] + "TimeTests/FFT/")
+    plot = plotClass(config["pathToOutput"] + f"TimeTests/{dataFile.fileName}/")
     axs = plot.axs
     height, x = np.histogram(times, bins=bins, range=range)
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1], label=f"Layer 4 Bin width 1s")
@@ -62,4 +62,4 @@ for i, dataFile in enumerate(dataFiles):
         xlabel="Time [ms]",
         ylabel="Count",
     )
-    plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}_big")
+    plot.saveToPDF(f"ClusterTimes_big")

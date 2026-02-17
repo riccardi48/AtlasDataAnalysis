@@ -132,7 +132,7 @@ orthCharge, orthCharge_e = getOrthClusterCharge(layer=4)
 np.set_printoptions(precision=3, linewidth=125)
 
 config = configLoader.loadConfig()
-#config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
+config["filterDict"] = {"telescope": "kit", "angle": 86.5, "voltage": 48.6}
 dataFiles = initDataFiles(config)
 
 for dataFile in dataFiles:

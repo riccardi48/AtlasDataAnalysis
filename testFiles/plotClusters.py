@@ -69,6 +69,7 @@ def Clusters(
 
 config = configLoader.loadConfig()
 config["pathToOutput"] = "/home/atlas/rballard/AtlasDataAnalysis/output/TimeTests/"
+config["filterDict"] = {"telescope": "kit", "angle": 45}
 dataFiles = initDataFiles(config)
 for dataFile in dataFiles:
     Clusters(dataFile, config["pathToOutput"], z="TSs", layer=4, excludeCrossTalk=True,name="TSs")

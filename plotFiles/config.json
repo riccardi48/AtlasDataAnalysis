@@ -7,8 +7,7 @@
     "pathToDataOutput": "/home/atlas/rballard/for_magda/data/pythonOutput/",
     "filterDict": {
         "telescope": "kit",
-        "angle": 86.5,
-        "voltage": 48.6
+        "angle": 45
     },
     "maxClusterWidth": 30,
     "layers": [

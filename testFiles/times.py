@@ -2,6 +2,7 @@ import sys
 
 sys.path.append("..")
 
+from dataAnalysis.handlers._genericClusterFuncs import isFlat
 from dataAnalysis import initDataFiles, configLoader
 from plotAnalysis import plotClass
 import numpy as np
@@ -12,11 +13,16 @@ dataFiles = initDataFiles(config)
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
-    times4,indexes = dataFile.get_cluster_attr("Times", excludeCrossTalk=True,returnIndexes=True)
-    minTime = 135000
-    maxTime = 135500
+    #times4,indexes = dataFile.get_cluster_attr("Times", excludeCrossTalk=True,returnIndexes=True)
+    clusters = dataFile.get_clusters(excludeCrossTalk=True,layers=config["layers"])
+    clusters =  [cluster for cluster in clusters if isFlat(cluster)]
+    firstTime = clusters[0].getTimes(True)[0]
+    #clusters = dataFile.get_perfectClusters(excludeCrossTalk=True,layers=config["layers"])
+    times4 = (np.array([cluster.getTimes(True)[0] for cluster in clusters]) - firstTime)
+    minTime = 000000
+    maxTime = 2000000
     range = (minTime, maxTime)
-    bins = int(np.ptp(range) / 1)
+    bins = int(np.ptp(range) / 1000)
     height, x = np.histogram(times4, bins=bins, range=range)
     axs.stairs(height, x, baseline=None, color=plot.colorPalette[1], label=f"{dataFile.fileName}")
     plot.set_config(
@@ -28,12 +34,13 @@ for i, dataFile in enumerate(dataFiles):
         xlabel="Time [ms]",
         ylabel="Count",
     )
-    plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}")
+    plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}__")
+    continue
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
     timesDiff4 = np.diff(times4)
-    minTime = 135000
-    maxTime = 140000
+    #minTime = 135000
+    #maxTime = 140000
     range = (minTime, maxTime)
     axs.scatter(
         times4[1:],
@@ -64,7 +71,7 @@ for i, dataFile in enumerate(dataFiles):
     axs.set_yscale("log")
     plot.set_config(
         axs,
-        ylim=(0.001, 1000),
+        ylim=(0.001, 1000000),
         xlim=range,
         title="Clusters Time Difference",
         legend=False,
