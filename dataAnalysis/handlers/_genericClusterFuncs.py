@@ -73,10 +73,7 @@ def findConnectedSections(rows, columns):
     )
     return sections
 
-
-def gaussianBinned(x, mu, sigma, scaler):
-    width = x[1] - x[0]
-    edges = np.append(x - width / 2, x[-1] + width / 2)
+def gaussianBinned(x, mu, sigma, scaler, edges):
     return (gaussianCDFFunc(edges[1:], mu, sigma) - gaussianCDFFunc(edges[:-1], mu, sigma)) * scaler
 
 
