@@ -22,7 +22,7 @@ def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.5,excludeCr
     relativeTS = abs(cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.max(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)))
     if cluster.pVal < minPval:
         return False
-    if np.all(relativeTS[cluster.section]<=2):
+    if np.all(relativeTS[cluster.section][1:-1]<=3):
         return False
     relativeRows = abs(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section] - np.max(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section]))
     if np.ptp(relativeRows) < np.where(estimate[1:]>0.5)[0][0]+1:

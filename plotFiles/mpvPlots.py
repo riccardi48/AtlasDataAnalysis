@@ -122,6 +122,7 @@ def fitAndPlotCCE(
     yerr,
     GeV: int = 6,
     textHeight = 0.98,
+    text = "",
 ) -> None:
     popt, pcov = fitVoltageDepth(x, y, yerr, GeV=GeV)
     (V_0, t_epi, edl) = popt
@@ -152,8 +153,10 @@ def fitAndPlotCCE(
     ax.text(
         0.98,
         textHeight,
-        f"V_0   :{V_0:.5f} ± {V_0_e:.5f}\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}\n"
-        + f"edl    :{edl:.3f} ± {edl_e:.3f}",
+        f"{text}"
+        + f"\nV_0   :{V_0:.5f} ± {V_0_e:.5f}"
+        + f"\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}"
+        + f"\nedl    :{edl:.3f} ± {edl_e:.3f}",
         horizontalalignment="right",
         verticalalignment="top",
         transform=ax.transAxes,
@@ -207,6 +210,7 @@ def plotMPV(data,dataFile,path,plotGen):
         x[x < firstLow],
         y[x < firstLow],
         y_e[x < firstLow],
+        text = f"Unconstrained Fit",
     )
     index = np.where([np.invert(np.isnan(data.constrainedFittings[i][0])) for i in data.constrainedFittings])
     x[index] = np.array(list(data.constrainedFittings.keys()))[index] * 50 / np.tan(np.deg2rad(dataFile.angle))
@@ -221,6 +225,7 @@ def plotMPV(data,dataFile,path,plotGen):
         y[x < firstLow],
         y_e[x < firstLow],
         textHeight=0.75,
+        text = f"Constrained Fit",
     )
     plot.set_config(
         axs,
@@ -250,10 +255,10 @@ def plotMPV(data,dataFile,path,plotGen):
     return popt1, pcov1, popt2, pcov2
 
 def plotDepletionWidth(dataFiles,path,plotGen,fittings):
-    depletionPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
+    plot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for dataFile in dataFiles:
-        depletionPlot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][1], color=getColor(dataFile), marker="x", s=15)
-        depletionPlot.axs.errorbar(
+        plot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][1], color=getColor(dataFile), marker="x", s=15)
+        plot.axs.errorbar(
             dataFile.voltage,
             fittings[dataFile.fileName][0][1],
             yerr=fittings[dataFile.fileName][1][1],
@@ -284,15 +289,15 @@ def plotDepletionWidth(dataFiles,path,plotGen,fittings):
 
     x = np.linspace(0, 50, 1000)
     y = depletionWidthFunc(x, a, b, c)
-    depletionPlot.axs.plot(
+    plot.axs.plot(
         x,
         y,
-        color=depletionPlot.colorPalette[1],
+        color=plot.colorPalette[1],
         linestyle="dashed",
         label=f"a : {a:.5f} ± {a_e:.5f} µm/√V\n∆V_bi : {b:.5f} ± {b_e:.5f} V\nc : {c:.5f} ± {c_e:.5f} µm",
     )
-    depletionPlot.set_config(
-        depletionPlot.axs,
+    plot.set_config(
+        plot.axs,
         ylim=(0, 45),
         xlim=(-2, 50),
         title="Depletion Depth Vs Bias Voltage",
@@ -302,15 +307,16 @@ def plotDepletionWidth(dataFiles,path,plotGen,fittings):
         xticks=[5,1],
         yticks=[5,1],
     )
-    depletionPlot.saveToPDF(
+    plot.axs.grid(True)
+    plot.saveToPDF(
         f"Depletion_Width_Vs_Bias_Voltage"
     )
 
 def plotEDL(dataFiles,path,plotGen,fittings):
-    depletionPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
+    plot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for dataFile in dataFiles:
-        depletionPlot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][2], color=getColor(dataFile), marker="x", s=15)
-        depletionPlot.axs.errorbar(
+        plot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][2], color=getColor(dataFile), marker="x", s=15)
+        plot.axs.errorbar(
             dataFile.voltage,
             fittings[dataFile.fileName][0][2],
             yerr=fittings[dataFile.fileName][1][2],
@@ -319,8 +325,8 @@ def plotEDL(dataFiles,path,plotGen,fittings):
             elinewidth=0.5,
             capsize=1,
         )
-    depletionPlot.set_config(
-        depletionPlot.axs,
+    plot.set_config(
+        plot.axs,
         ylim=(20, 55),
         xlim=(-2, 50),
         title="Electron Diffusion Length Vs Bias Voltage",
@@ -330,36 +336,38 @@ def plotEDL(dataFiles,path,plotGen,fittings):
         xticks=[5,1],
         yticks=[5,1],
     )
-    depletionPlot.saveToPDF(
+    plot.axs.grid(True)
+    plot.saveToPDF(
         f"EDL_Vs_Bias_Voltage"
     )
 
 def plotMaxVoltage(dataFiles,path,plotGen,fittings):
-    depletionPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
+    plot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for dataFile in dataFiles:
-        depletionPlot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][0], color=getColor(dataFile), marker="x", s=15)
-        depletionPlot.axs.errorbar(
+        plot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][0]/fittings["angle6_6Gev_kit_4"][0][0], color=getColor(dataFile), marker="x", s=15)
+        plot.axs.errorbar(
             dataFile.voltage,
-            fittings[dataFile.fileName][0][0],
-            yerr=fittings[dataFile.fileName][1][0],
+            fittings[dataFile.fileName][0][0]/fittings["angle6_6Gev_kit_4"][0][0],
+            yerr=fittings[dataFile.fileName][1][0]/fittings["angle6_6Gev_kit_4"][0][0],
             fmt="none",
             color=getColor(dataFile),
             elinewidth=0.5,
             capsize=1,
         )
-    depletionPlot.set_config(
-        depletionPlot.axs,
-        ylim=(0.3, 0.45),
+    plot.set_config(
+        plot.axs,
+        ylim=(0.8, 1.01),
         xlim=(-2, 50),
         title="Max Voltage Vs Bias Voltage",
         xlabel="Bias Voltage [V]",
-        ylabel="Max Voltage [V]",
+        ylabel="Max Voltage Percent [%]",
         legend=True,
         xticks=[5,1],
-        yticks=[0.1,0.02],
-        yticksSig=1,
+        yticks=[0.02,0.01],
+        yticksSig=2,
     )
-    depletionPlot.saveToPDF(
+    plot.axs.grid(True)
+    plot.saveToPDF(
         f"Max_Voltage_Vs_Bias_Voltage"
     )
 
