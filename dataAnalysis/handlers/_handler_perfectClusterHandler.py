@@ -11,7 +11,7 @@ from dataAnalysis._fileReader import calcDataFileManager
 from ._handler_dataFrameHandler import dataFrameHandler
 from ._handler_clusterHandler import clusterHandler
 from ._goodCluster import isGoodCluster
-from ._genericClusterFuncs import findConnectedSections,gaussianBinned
+from ._genericClusterFuncs import findConnectedSections,gaussianBinned,logGaussianBinned
 from ._perfectCluster import isPerfectCluster
 
 
@@ -90,9 +90,9 @@ def calcTemplate(relativeRowList,relativeTSList):
     spread = []
     for i in np.sort(np.unique(relativeRowList)):
         TSsToFit = relativeTSList[np.where(relativeRowList==i)[0]]
-        if len(TSsToFit) < 20:
+        if len(TSsToFit) < 200:
             break
-        mu, sigma, mu_e, sigma_e = fitGaussian(TSsToFit)
+        mu, sigma, mu_e, sigma_e = fitHistLogGaussian(TSsToFit)
         """
         if i > 15:
             popt, pcov = curve_fit(
@@ -101,10 +101,10 @@ def calcTemplate(relativeRowList,relativeTSList):
         else:
             popt, pcov = curve_fit(gaussianBinned, np.arange(x.size), x, maxfev=5000, bounds=bounds)
         """
-        if sigma < 1:
-            sigma = 1
-        if mu < 0.2:
-            mu = 0.2
+        #if sigma < 1:
+        #    sigma = 1
+        #if mu < 0.2:
+        #    mu = 0.2
         #if i == 0:
         #    mu = 5
         estimate.append(mu)
@@ -160,3 +160,25 @@ def fit(height, x, cut, binCentres):
         height[binCentres<=cut],
     )
     return popt,pcov
+
+def fitHistLogGaussian(data):
+    binWidth = 1
+    bins = int(np.ptp(data)/binWidth+1)
+    data = data + 0.5
+    _range = (0,np.max(data)+0.5)
+    height,edges = np.histogram(data[np.invert(np.isnan(data))],bins=bins,range=_range)
+    print(height,edges)
+    func = lambda x, mu, sigma: logGaussianBinned(
+        x, mu, sigma, np.sum(height), edges
+    )
+    binCentres = (edges[:-1] + edges[1:]) / 2
+    print(binCentres)
+    popt, pcov = curve_fit(
+        func,
+        binCentres,
+        height,
+        maxfev=10000,
+    )
+    mu,sigma = popt
+    mu_e,sigma_e = np.sqrt(np.diag(pcov))
+    return mu, sigma, mu_e, sigma_e

@@ -9,20 +9,41 @@ sys.path.append("..")
 import numpy as np
 from dataAnalysis import initDataFiles, configLoader
 from dataAnalysis.handlers._handler_perfectClusterHandler import getRelativeRowTS,calcTemplate
-from dataAnalysis.handlers._genericClusterFuncs import gaussianFunc
+from dataAnalysis.handlers._genericClusterFuncs import gaussianFunc,logGaussian,logGaussianCDFFunc
+from scipy.stats import lognorm
+from scipy.optimize import root_scalar
+
+def findLogPercentile(mu,sig,percentile):
+    func = lambda x : logGaussianCDFFunc(np.array(x)-0.5,mu,sig) - percentile
+    return root_scalar(func, bracket= [0, 1000]).root-1
+
+def findMPV(estimate,spread):
+    x = np.linspace(0,25,1000)
+    y = logGaussian(x,estimate, spread, 1)
+    return x[np.argmax(y)]-0.5
+
 def plotTemplate(plotGen,path,array, yedges, xedges,estimate, spread):
     plot = plotGen.newPlot(path,sizePerPlot = (6,4))
     plot.axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
-    plot.axs.scatter(np.arange(len(estimate)),estimate,marker="x",color=plot.colorPalette[0],label="Gaussian Fitting on each Row")
+    median = np.array([findLogPercentile(mu,sig,0.5) for mu,sig in zip(estimate,spread)])
+    upper = np.array([findLogPercentile(mu,sig,0.5+0.34) for mu,sig in zip(estimate,spread)])
+    lower = np.array([findLogPercentile(mu,sig,0.5-0.34) for mu,sig in zip(estimate,spread)])
+    mpvs = np.array([findMPV(mu,sig) for mu,sig in zip(estimate,spread)])
+    #print(lower)
+    #print(upper)
+    plot.axs.scatter(np.arange(len(mpvs)),mpvs,marker="x",color=plot.colorPalette[0],label="MPV from Log Normal Fitting on each Row")
+    """
+    plot.axs.scatter(np.arange(len(median)),median,marker="x",color=plot.colorPalette[0],label="Gaussian Fitting on each Row")
     plot.axs.errorbar(
-            np.arange(len(estimate)),
-            estimate,
-            yerr=spread,
+            np.arange(len(median)),
+            median,
+            yerr=[median-lower,upper-median],
             fmt="none",
             color=plot.colorPalette[0],
             elinewidth=1,
             capsize=3,
         )
+    """    
     plot.set_config(plot.axs,
         title="Row vs TS",
         xlabel="Relative Row [px]",
@@ -41,12 +62,11 @@ def plotSlice(plotGen,path,array, yedges, xedges,estimate, spread, slice):
     plot = plotGen.newPlot(path,sizePerPlot = (6,4))
     height = array[:,slice]
     binCentres = (yedges[:-1] + yedges[1:]) / 2
-    cut = np.mean(binCentres[np.where(height==np.max(height))[0]])+2
     plot.axs.stairs(height,yedges, color=plot.colorPalette[0], baseline=None,label = "Data")
-    x = np.linspace(yedges[0],yedges[-1],100)
-    y = gaussianFunc(x, estimate[slice], spread[slice], np.sum(height))
-    plot.axs.plot(x[x<=cut],y[x<=cut],color=plot.colorPalette[2],label="Gaussian Fitting")
-    plot.axs.plot(x[x>cut],y[x>cut],color=plot.colorPalette[2],linestyle="dashed")
+    x = np.linspace(yedges[0],yedges[-1],1000)
+    y = logGaussian(x,estimate[slice], spread[slice], np.sum(height))
+    plot.axs.plot(x-0.5,y,color=plot.colorPalette[2],label=f"Log Normal Fitting\n{estimate[slice]:.2f},{spread[slice]:.2f}")
+    plot.axs.vlines(x[np.argmax(y)]-0.5,0,np.max(y),label=f"MPV\n{x[np.argmax(y)]-0.5:.2f}",color=plot.colorPalette[5],linestyle="--")
     plot.set_config(plot.axs,
         title=f"Row vs TS Slice {slice}",
         xlabel="Relative Row [px]",
@@ -55,7 +75,7 @@ def plotSlice(plotGen,path,array, yedges, xedges,estimate, spread, slice):
         ylim = (0,None),
         legend=True,
         xticks=[5,1],
-        yticks=[5,1],
+        yticks=[50,10],
         )
     plot.saveToPDF(f"Template_Slice_{slice}") 
 
@@ -69,7 +89,7 @@ def runTemplate(dataFiles,plotGen,config):
         minExpectedClusterSize = int(np.ceil(np.sqrt(dataFile.voltage/48.6) * 8))
         if dataFile.angle != 86.5:
             minExpectedClusterSize = 2
-        relativeRowList, relativeTSList = getRelativeRowTS(clusters,TSRange=TSRange,maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize)
+        relativeRowList, relativeTSList = getRelativeRowTS(clusters,TSRange=TSRange,maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize,numberOfClustersUsed=1000)
         estimate, spread = calcTemplate(relativeRowList[relativeRowList<=maxRow],relativeTSList[relativeRowList<=maxRow])
         array, yedges, xedges = np.histogram2d(relativeTSList,relativeRowList,range=((-0.5,TSRange+0.5),(-0.5,len(estimate)+0.5)),bins=(TSRange+1,len(estimate)+1))
         plotTemplate(plotGen,path,array, yedges, xedges,estimate, spread)
@@ -78,7 +98,7 @@ def runTemplate(dataFiles,plotGen,config):
 
 if __name__ == "__main__":
     config = configLoader.loadConfig()
-    config["filterDict"] = {"angle":86.5,"telescope":"kit"}
+    #config["filterDict"] = {"fileName": "angle6_4Gev_kit_2"}
     dataFiles = initDataFiles(config)
     plotGen = plotGenerator(config["pathToOutput"])
     runTemplate(dataFiles,plotGen,config)

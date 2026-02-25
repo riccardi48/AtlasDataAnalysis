@@ -8,7 +8,7 @@ from psutil import Process
 from scipy.special import lambertw
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
-from scipy.stats import norm,chi2
+from scipy.stats import norm,chi2,lognorm
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.backends.backend_pdf import PdfPages

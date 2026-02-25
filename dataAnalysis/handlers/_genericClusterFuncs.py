@@ -5,6 +5,7 @@ from dataAnalysis._dependencies import (
     npt,  # numpy.typing
     tqdm,  # tqdm
     norm,  # scipy.stats.norm
+    lognorm,# scipy.stats.lognorm
 )
 
 
@@ -115,3 +116,16 @@ def scaleTemplate(estimate, spread, angleScaler, flatScaler):
 
 def scaleOnGaussian(x, mu, sig):
     return (x - mu) / sig
+
+def logGaussian(x,mu,sig,scaler):
+    y = np.zeros_like(x)
+    y[x > 0] = lognorm.pdf(x[x > 0], sig, scale=mu) * scaler
+    return y
+
+def logGaussianCDFFunc(x, mu, sig):
+    y = np.zeros_like(x)
+    y[x > 0] = lognorm.cdf(x[x > 0], sig, scale=mu)
+    return y
+
+def logGaussianBinned(x, mu, sigma, scaler, edges):
+    return (logGaussianCDFFunc(edges[1:], mu, sigma) - logGaussianCDFFunc(edges[:-1], mu, sigma)) * scaler
