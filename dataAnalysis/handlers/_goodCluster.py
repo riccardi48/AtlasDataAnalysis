@@ -8,7 +8,7 @@ from dataAnalysis._dependencies import (
 from ._genericClusterFuncs import isFlat, isOnePixel, isOnEdge
 
 
-def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 2):
+def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 1):
     if not isFlat(cluster):
         return False, False
     if isOnePixel(cluster):
@@ -16,16 +16,20 @@ def isGoodCluster(cluster,minExpectedClusterSize=10,lowTS = 2):
     if isOnEdge(cluster):
         return False, False
     relativeRows = cluster.getRows(True) - np.min(cluster.getRows(True))
-    if np.ptp(relativeRows) < minExpectedClusterSize+5:
+    if np.ptp(relativeRows) < minExpectedClusterSize+1:
         return False, False
     relativeTS = cluster.getTSs(True) - np.min(cluster.getTSs(True))
     if np.all(relativeRows[1:-1]<=lowTS):
         return False, False
-    if np.mean(np.diff(relativeTS[cluster.section][1:-1])) < 0:
-        return False
+    #if np.mean(np.diff(relativeTS[cluster.section][1:-1])) < 0:
+    #    return False
     sortIndexes = np.argsort(relativeRows)
     relativeRows = relativeRows[sortIndexes]
     relativeTS = relativeTS[sortIndexes]
+    if np.sum(relativeTS>lowTS)<4:
+        return False, False
+    if np.sum(relativeTS<=lowTS)<minExpectedClusterSize*1.5:
+        return False, False
     #if np.any((np.diff(relativeTS)>10)|(np.diff(relativeTS)<-10)):
     #    return False, False
     flipped = False

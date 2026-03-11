@@ -96,19 +96,23 @@ class dataAnalysis:
         return self.dataHandler.getTimeStampTemplate(maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize, **kwargs)
 
     def get_perfectCluster_indexes(
-        self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs
+        self, minPval=0.2, excludeCrossTalk=True, maxRow = 25, **kwargs
     ) -> npt.NDArray[np.int_]:
         kwargs = self._fixLayers(kwargs)
         estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
         self.get_clusters(excludeCrossTalk=excludeCrossTalk)
+        #if "6Gev" in self.fileName:
+        #    spread=spread/1.4
         return self.dataHandler.getPerfectClusterIndexes(
             estimate, spread, minPval=minPval, excludeCrossTalk=True, **kwargs
         )
 
-    def get_perfectClusters(self, minPval=0.5, excludeCrossTalk=True, maxRow = 25, **kwargs):
+    def get_perfectClusters(self, minPval=0.2, excludeCrossTalk=True, maxRow = 25, **kwargs):
         kwargs = self._fixLayers(kwargs)
         self.get_clusters(excludeCrossTalk=excludeCrossTalk)
         estimate, spread = self.get_timeStampTemplate(maxRow=maxRow, layers=kwargs["layers"],excludeCrossTalk=excludeCrossTalk)
+        #if "6Gev" in self.fileName:
+        #    spread=spread/1.4
         return self.dataHandler.getPerfectClusters(
             estimate, spread, minPval=minPval, excludeCrossTalk=True, **kwargs
         )

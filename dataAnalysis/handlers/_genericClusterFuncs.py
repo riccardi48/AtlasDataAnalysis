@@ -114,9 +114,6 @@ def scaleTemplate(estimate, spread, angleScaler, flatScaler):
     return newEstimate, newSpread
 
 
-def scaleOnGaussian(x, mu, sig):
-    return (x - mu) / sig
-
 def logGaussian(x,mu,sig,scaler):
     y = np.zeros_like(x)
     y[x > 0] = lognorm.pdf(x[x > 0], sig, scale=mu) * scaler

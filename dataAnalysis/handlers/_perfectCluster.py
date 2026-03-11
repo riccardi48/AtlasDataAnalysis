@@ -6,10 +6,10 @@ from dataAnalysis._dependencies import (
     tqdm,  # tqdm
     chi2, # scipy.stats.chi2
 )
-from ._genericClusterFuncs import isFlat, isOnePixel, isOnEdge, findConnectedSections, filterForTemplate, scaleTemplate, scaleOnGaussian
+from ._genericClusterFuncs import isFlat, isOnePixel, isOnEdge, findConnectedSections, filterForTemplate
 from itertools import combinations
 
-def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.5,excludeCrossTalk=True):
+def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.2,excludeCrossTalk=True):
     if not isFlat(cluster):
         return False
     if isOnePixel(cluster):
@@ -26,6 +26,8 @@ def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.5,excludeCr
         return False
     relativeRows = abs(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section] - np.max(cluster.getRows(excludeCrossTalk=excludeCrossTalk)[cluster.section]))
     if np.ptp(relativeRows) < np.where(estimate[1:]>0.5)[0][0]+1:
+        return False
+    if not cluster.flipped:
         return False
     return True
 
@@ -68,16 +70,21 @@ def findBestSections(cluster,sections,estimate,spread,minPval=0.2,excludeCrossTa
 def pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
     Timestamps = cluster.getTSs(excludeCrossTalk=excludeCrossTalk)[section]
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)[section]
-    x,y = convertRowsForFit(Rows,Timestamps,flipped=False)
-    pVal1 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30:
-        pVal1 = 0
-    x,y = convertRowsForFit(Rows,Timestamps,flipped=True)
-    pVal2 = gaussian_loglike_pval(scaleOnGaussian(*filterForTemplate(x,y,estimate,spread)))
-    if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30:
-        pVal2 = 0
-    pVal = np.max([pVal1,pVal2])
-    flipped = pVal2>pVal1
+    pVals = []
+    for _flipped in [False,True]:
+        x,y = convertRowsForFit(Rows,Timestamps,flipped=_flipped)
+        y, _estimate, _spread = filterForTemplate(x,y,estimate,spread)
+        _y = np.zeros(len(y))
+        _y[_estimate!=0] = scaleOnLogGaussian(y[_estimate!=0]+0.5, _estimate[_estimate!=0], _spread[_estimate!=0])
+        _y[_estimate==0] = scaleOnGaussian(y[_estimate==0]+0.5, 1, 1)
+        if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30 or len(_y[_estimate!=0]) < 3:
+            pVals.append(0)
+        #elif np.sum(_y[_estimate!=0]>0)>len(_y[_estimate!=0])*0.75 or np.sum(_y[_estimate!=0]<0)>len(_y[_estimate!=0])*0.75:
+        #    pVals.append(0)
+        else:
+            pVals.append(gaussian_loglike_pval(_y[_estimate!=0],df=len(_y[_estimate!=0])-1))
+    pVal = np.max([pVals])
+    flipped = bool(np.argmax([pVals]))
     return pVal,flipped
 
 def convertRowsForFit(Rows,Timestamps,flipped):
@@ -92,8 +99,16 @@ def convertRowsForFit(Rows,Timestamps,flipped):
         x = -x+x[-1]
     return x,y
 
-def gaussian_loglike_pval(data):
+def gaussian_loglike_pval(data,df=None):
     n = len(data)
     S_obs = np.sum(data**2)
+    if df is None:
+        df = n-1
     pval = 1 - chi2.cdf(S_obs, df=n-1)  # exact p-value
     return pval
+
+def scaleOnLogGaussian(x, mu, sig):
+    return (np.log(x) - np.log(mu)) / sig
+
+def scaleOnGaussian(x, mu, sig):
+    return (x - mu) / sig

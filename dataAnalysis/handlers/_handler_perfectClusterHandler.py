@@ -11,7 +11,7 @@ from dataAnalysis._fileReader import calcDataFileManager
 from ._handler_dataFrameHandler import dataFrameHandler
 from ._handler_clusterHandler import clusterHandler
 from ._goodCluster import isGoodCluster
-from ._genericClusterFuncs import findConnectedSections,gaussianBinned,logGaussianBinned
+from ._genericClusterFuncs import findConnectedSections,gaussianBinned,logGaussianBinned,logGaussian
 from ._perfectCluster import isPerfectCluster
 
 
@@ -27,11 +27,11 @@ class perfectClusterHandler:
         self.clusterHandler = clusterHandler
 
     def getTimeStampTemplate(
-        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True,minExpectedClusterSize=8,numberOfClustersUsed=100,TSRange=30
+        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True,minExpectedClusterSize=8,numberOfClustersUsed=1000,TSRange=30
     ):
         clusters = self.clusterHandler.getClusters(layers=layers, excludeCrossTalk=excludeCrossTalk)
         relativeRowList, relativeTSList = getRelativeRowTS(clusters,maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize,numberOfClustersUsed=numberOfClustersUsed,TSRange=TSRange)
-        estimate, spread = calcTemplate(relativeRowList[relativeRowList<=maxRow],relativeTSList[relativeRowList<=maxRow])
+        estimate, spread, estimate_e, spread_e = calcTemplate(relativeRowList[relativeRowList<=maxRow],relativeTSList[relativeRowList<=maxRow])
         return estimate, spread
 
     def getPerfectClusterIndexes(
@@ -88,11 +88,22 @@ def getRelativeRowTS(clusters: clusterArray,minExpectedClusterSize=8,numberOfClu
 def calcTemplate(relativeRowList,relativeTSList):
     estimate = []
     spread = []
+    estimate_e = []
+    spread_e = []
+
     for i in np.sort(np.unique(relativeRowList)):
         TSsToFit = relativeTSList[np.where(relativeRowList==i)[0]]
-        if len(TSsToFit) < 200:
+        if i == 0:
+            maxNumber = len(TSsToFit)
+        if len(TSsToFit) < maxNumber/10:
             break
-        mu, sigma, mu_e, sigma_e = fitHistLogGaussian(TSsToFit)
+        if np.sum(TSsToFit<=1)/TSsToFit.size > 0.95:
+            sigma = 0
+            mu = 0
+            mu_e = 0
+            sigma_e = 0
+        else:
+            mu, sigma, mu_e, sigma_e = fitHistLogGaussian(TSsToFit)
         """
         if i > 15:
             popt, pcov = curve_fit(
@@ -101,15 +112,12 @@ def calcTemplate(relativeRowList,relativeTSList):
         else:
             popt, pcov = curve_fit(gaussianBinned, np.arange(x.size), x, maxfev=5000, bounds=bounds)
         """
-        #if sigma < 1:
-        #    sigma = 1
-        #if mu < 0.2:
-        #    mu = 0.2
-        #if i == 0:
-        #    mu = 5
         estimate.append(mu)
         spread.append(sigma)
-    return np.array(estimate), np.array(spread)
+        estimate_e.append(mu_e)
+        spread_e.append(sigma_e)
+
+    return np.array(estimate), np.array(spread),np.array(estimate_e), np.array(spread_e)
 
 def nll(data,params):
         mu, sigma = params
@@ -167,17 +175,18 @@ def fitHistLogGaussian(data):
     data = data + 0.5
     _range = (0,np.max(data)+0.5)
     height,edges = np.histogram(data[np.invert(np.isnan(data))],bins=bins,range=_range)
-    print(height,edges)
     func = lambda x, mu, sigma: logGaussianBinned(
         x, mu, sigma, np.sum(height), edges
     )
+
     binCentres = (edges[:-1] + edges[1:]) / 2
-    print(binCentres)
+    bounds = ((0, 0.2), (100, 10))
     popt, pcov = curve_fit(
         func,
         binCentres,
         height,
         maxfev=10000,
+        bounds=bounds
     )
     mu,sigma = popt
     mu_e,sigma_e = np.sqrt(np.diag(pcov))

@@ -162,6 +162,8 @@ class clusterHandler:
             )
             toBeReturned = TStoMS(toBeReturned - np.min(toBeReturned[toBeReturned>0]))
             filter = self.layerFilter(self._clusters, layers=layers)
+        else:
+            print("Not a Valid Attribute")
         if returnIndexes:
             indexes = np.arange(len(self._clusters))
             return (toBeReturned[filter], indexes[filter])
