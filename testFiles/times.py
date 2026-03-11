@@ -8,19 +8,22 @@ from plotAnalysis import plotClass
 import numpy as np
 
 config = configLoader.loadConfig()
+#config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
 dataFiles = initDataFiles(config)
-
+print(len(dataFiles))
 for i, dataFile in enumerate(dataFiles):
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
     #times4,indexes = dataFile.get_cluster_attr("Times", excludeCrossTalk=True,returnIndexes=True)
     clusters = dataFile.get_clusters(excludeCrossTalk=True,layers=config["layers"])
-    clusters =  [cluster for cluster in clusters if isFlat(cluster)]
+    clusters =  np.array([cluster for cluster in clusters if isFlat(cluster)])
     firstTime = clusters[0].getTimes(True)[0]
     #clusters = dataFile.get_perfectClusters(excludeCrossTalk=True,layers=config["layers"])
     times4 = (np.array([cluster.getTimes(True)[0] for cluster in clusters]) - firstTime)
+    print(cluster.index() for cluster in clusters[(times4>135000)&(times4<137000)])
+    print(cluster.getTimes(True) for cluster in clusters[(times4>135000)&(times4<137000)])
     minTime = 000000
-    maxTime = 2000000
+    maxTime = 500000
     range = (minTime, maxTime)
     bins = int(np.ptp(range) / 1000)
     height, x = np.histogram(times4, bins=bins, range=range)
@@ -35,12 +38,11 @@ for i, dataFile in enumerate(dataFiles):
         ylabel="Count",
     )
     plot.saveToPDF(f"ClusterTimes_{dataFile.fileName}__")
-    continue
     plot = plotClass(config["pathToOutput"] + "TimeTests/")
     axs = plot.axs
     timesDiff4 = np.diff(times4)
-    #minTime = 135000
-    #maxTime = 140000
+    minTime = 135000
+    maxTime = 140000
     range = (minTime, maxTime)
     axs.scatter(
         times4[1:],
