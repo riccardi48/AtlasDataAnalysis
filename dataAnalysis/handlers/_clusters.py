@@ -58,8 +58,10 @@ class clusterChecker:
         if TriggerID < self.minTriggerID:
             self.minTriggerID = TriggerID
 
-    def checkActive(self, TriggerID, triggerVariance=10):
-        return True if self.maxTriggerID + triggerVariance >= TriggerID else False
+    def checkActive(self, TriggerID,index, triggerVariance=100,indexVariance=50):
+        if self.maxTriggerID + triggerVariance >= TriggerID or np.max(self.indexes) + indexVariance >= index:
+            return True
+        return False
 
 
 def _calcClusters(
@@ -94,9 +96,10 @@ def _calcClusters(
         finishedClusters += [
             np.array(cluster.indexes)
             for cluster in activeClusters
-            if not cluster.checkActive(triggerID)
+            if not cluster.checkActive(triggerID,index)
         ]
-        activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID)]
+        activeClusters = [cluster for cluster in activeClusters if cluster.checkActive(triggerID,index)]
+    finishedClusters += [cluster.indexes for cluster in activeClusters]
     return np.array(finishedClusters, dtype=object)
 
 ################################################################################
