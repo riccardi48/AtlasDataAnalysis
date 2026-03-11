@@ -45,7 +45,7 @@ def readFileName(path: str) -> tuple[str, int, float, str]:
     telescope: str = "unknown"
     if "kit" in path:
         telescope = "kit"
-    elif "lancs" in path:
+    if "lancs" in path:
         telescope = "lancs"
     return file_name, voltage, angle, telescope
 
