@@ -13,8 +13,16 @@ def convertToRelative(Rows,values,flipped):
     return x,values
 
 def getColor(dataFile):
-    cmap = plt.get_cmap("plasma")
-    color=cmap((dataFile.voltage/48.6)**0.5)
+    cmap = plt.get_cmap("hsv")
+    color=cmap((dataFile.voltage/48.6)**0.3)
     if dataFile.fileName == "angle6_4Gev_kit_2":
-        color = "r"
+        color = "tab:blue"
     return color
+
+def getName(dataFile):
+    if "4Gev" in dataFile.fileName:
+        name = "4 GeV"
+    else:
+        name = "6 GeV"
+    name = f"{dataFile.voltage}V {name}" 
+    return name

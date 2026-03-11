@@ -11,6 +11,7 @@ from matplotlib.ticker import MultipleLocator
 
 config = configLoader.loadConfig()
 config["filterDict"] = {"angle":86.5,"voltage":48.6,"telescope":"lancs"}
+config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
 dataFiles = initDataFiles(config)
 
 for i, dataFile in enumerate(dataFiles[:2]):
@@ -22,6 +23,7 @@ for i, dataFile in enumerate(dataFiles[:2]):
     firstTime = clusters[0].getTimes(True)[0]
     # clusters = dataFile.get_perfectClusters(excludeCrossTalk=True,layers=config["layers"])
     times = np.array([cluster.getTimes(True)[0] for cluster in clusters]) - firstTime
+    print(times)
     clusterCharges = np.array([cluster.getClusterCharge(True) for cluster in clusters])
     clusterWidths = np.array([cluster.getRowWidth(True) for cluster in clusters])
     values = np.ones_like(times)
@@ -55,6 +57,7 @@ for i, dataFile in enumerate(dataFiles[:2]):
     cutEdges = 0.05*period
     plotRatio = plotClass(config["pathToOutput"] + path)
     for n in range(int(np.max(times) / period)):
+        break
         index = np.array(
             np.where((times >= period * n + offset+cutEdges) & (times <= period * (n + 1) + offset-cutEdges))[0]
         )

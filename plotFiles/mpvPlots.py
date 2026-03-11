@@ -6,7 +6,7 @@
 
 import sys
 from functions.mpvFuncs import mpvData,histogramHit_Voltage_Errors,landauFunc,fitVoltageDepth,chargeCollectionEfficiencyFunc,depletionWidthFunc
-from functions.genericFuncs import getColor
+from functions.genericFuncs import getColor,getName
 from plotClass import plotGenerator
 sys.path.append("..")
 import numpy as np
@@ -18,7 +18,7 @@ def legend_without_duplicate_labels(ax):
     handles, labels = ax.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     ax.legend(*zip(*unique),
-                frameon=False,)
+                frameon=False,loc="lower left")
 
 
 def plotVoltagePlots(data,path,plotGen,rangeOfRows = (0,30),xlim=(0,2)):
@@ -63,7 +63,7 @@ def plotVoltagePlots(data,path,plotGen,rangeOfRows = (0,30),xlim=(0,2)):
             elinewidth=1,
             capsize=3,
         )
-        if not np.isnan(data.constrainedFittings[j][0]):
+        if not np.isnan(data.constrainedFittings[j][0]) and False:
             x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = data.constrainedFittings[j]
             y = landauFunc(x, x_mpv, xi, scale)
             axs[i].plot(
@@ -132,7 +132,7 @@ def fitAndPlotCCE(
     ax.plot(
         _x,
         _y,
-        color=plot.colorPalette[0],
+        color=plot.colorPalette[2],
         linestyle="dashed",
     )
 
@@ -147,16 +147,16 @@ def fitAndPlotCCE(
         for _t_epi in [t_epi - t_epi_e, t_epi + t_epi_e]
         for _edl in [edl - edl_e, edl + edl_e]
     ]
-    ax.fill_between(
-        _x, np.min(ylist, axis=0), np.max(ylist, axis=0), color=plot.colorPalette[6], zorder=-1
-    )
+    #ax.fill_between(
+    #    _x, np.min(ylist, axis=0), np.max(ylist, axis=0), color=plot.colorPalette[6], zorder=-1
+    #)
     ax.text(
         0.98,
         textHeight,
         f"{text}"
-        + f"\nV_0   :{V_0:.5f} ± {V_0_e:.5f}"
-        + f"\nt_epi :{t_epi:.3f} ± {t_epi_e:.3f}"
-        + f"\nedl    :{edl:.3f} ± {edl_e:.3f}",
+        + f"\n$V_0$ :{V_0:.3f} ± {V_0_e:.4f}"
+        + f"\n$w_0$ :{t_epi:.3f} ± {t_epi_e:.3f}"
+        + f"\n$L_n$ :{edl:.3f} ± {edl_e:.3f}",
         horizontalalignment="right",
         verticalalignment="top",
         transform=ax.transAxes,
@@ -174,7 +174,7 @@ def plotMPV(data,dataFile,path,plotGen):
         x = i * 50 / np.tan(np.deg2rad(dataFile.angle))
         x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = data.fittings[i]
         axs.scatter(
-            x, x_mpv, color=plot.colorPalette[0], marker="x", label="Unconstrained"
+            x, x_mpv, color=plot.colorPalette[0], marker="x", label="MPVs"
         )
         axs.errorbar(
             x,
@@ -185,7 +185,7 @@ def plotMPV(data,dataFile,path,plotGen):
             elinewidth=1,
             capsize=3,
         )
-        if not np.isnan(data.constrainedFittings[i][0]):
+        if not np.isnan(data.constrainedFittings[i][0]) and False:
             x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = data.constrainedFittings[i]
             axs.scatter(
                 x, x_mpv, color=plot.colorPalette[2], marker="x", label="Constrained"
@@ -202,7 +202,7 @@ def plotMPV(data,dataFile,path,plotGen):
     x = np.array(list(data.fittings.keys())) * 50 / np.tan(np.deg2rad(dataFile.angle))
     y = np.array([data.fittings[i][0] for i in data.fittings])
     y_e = np.array([data.fittings[i][3] for i in data.fittings])
-    firstLow = x[np.where(y<=0.17)[0][0]]
+    firstLow = x[np.where(y<=0.2)[0][0]]
     print(firstLow)
     popt1,pcov1 = fitAndPlotCCE(
         axs,
@@ -210,8 +210,9 @@ def plotMPV(data,dataFile,path,plotGen):
         x[x < firstLow],
         y[x < firstLow],
         y_e[x < firstLow],
-        text = f"Unconstrained Fit",
+        text = f"Landau Fit",
     )
+    """
     index = np.where([np.invert(np.isnan(data.constrainedFittings[i][0])) for i in data.constrainedFittings])
     x[index] = np.array(list(data.constrainedFittings.keys()))[index] * 50 / np.tan(np.deg2rad(dataFile.angle))
     y[index] = np.array([data.constrainedFittings[i][0] for i in data.constrainedFittings])[index]
@@ -227,9 +228,10 @@ def plotMPV(data,dataFile,path,plotGen):
         textHeight=0.75,
         text = f"Constrained Fit",
     )
+    """
     plot.set_config(
         axs,
-        title="MPV per Relative Row in Clusters",
+        title=f"MPV per Relative Row in Clusters - {getName(dataFile)}",
         xlabel="Depth [µm]",
         ylabel="MPV [V]",
         xlim=(-1, axs.get_xlim()[1]),
@@ -252,14 +254,14 @@ def plotMPV(data,dataFile,path,plotGen):
     axs.grid(True)
     legend_without_duplicate_labels(axs)
     plot.saveToPDF(f"MPV")
-    return popt1, pcov1, popt2, pcov2
+    return popt1, pcov1#, popt2, pcov2
 
 def plotDepletionWidth(dataFiles,path,plotGen,fittings):
     plot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
     for dataFile in dataFiles:
-        plot.axs.scatter(dataFile.voltage, fittings[dataFile.fileName][0][1], color=getColor(dataFile), marker="x", s=15)
+        plot.axs.scatter(dataFile.voltage**0.5, fittings[dataFile.fileName][0][1], color=getColor(dataFile), marker="x", s=15)
         plot.axs.errorbar(
-            dataFile.voltage,
+            dataFile.voltage**0.5,
             fittings[dataFile.fileName][0][1],
             yerr=fittings[dataFile.fileName][1][1],
             fmt="none",
@@ -269,42 +271,41 @@ def plotDepletionWidth(dataFiles,path,plotGen,fittings):
         )
 
     func = lambda V, a, b, c: depletionWidthFunc(V, a, b, c)
-    Vs = [dataFile.voltage for dataFile in dataFiles]
+    func = lambda V,m,c : m*V+c
+    Vs = np.array([dataFile.voltage for dataFile in dataFiles])**0.5
     t_epis = [fittings[dataFile.fileName][0][1] for dataFile in dataFiles]
     t_epis_e = [fittings[dataFile.fileName][1][1] for dataFile in dataFiles]
-    initial_guess = (30, 1, 10)
-    bounds = ((0, 0, 0), (np.inf, np.inf, np.inf))
+    #initial_guess = (30, 1, 10)
+    #bounds = ((0, 0, 0), (np.inf, np.inf, np.inf))
     popt, pcov = curve_fit(
         func,
         Vs,
         t_epis,
-        p0=initial_guess,
-        bounds=bounds,
         sigma=t_epis_e,
         absolute_sigma=False,
-        maxfev=10000000,
     )
-    (a, b, c) = popt
-    (a_e, b_e, c_e) = np.sqrt(np.diag(pcov))
+    (m,c) = popt
+    (m_e,c_e) = np.sqrt(np.diag(pcov))
 
-    x = np.linspace(0, 50, 1000)
-    y = depletionWidthFunc(x, a, b, c)
+    x = np.linspace(0, np.max(Vs)*1.2, 1000)
+    y = func(x, *popt)
     plot.axs.plot(
         x,
         y,
         color=plot.colorPalette[1],
         linestyle="dashed",
-        label=f"a : {a:.5f} ± {a_e:.5f} µm/√V\n∆V_bi : {b:.5f} ± {b_e:.5f} V\nc : {c:.5f} ± {c_e:.5f} µm",
+        #label=f"a : {a:.5f} ± {a_e:.5f} µm/√V\n∆V_bi : {b:.5f} ± {b_e:.5f} V\nc : {c:.5f} ± {c_e:.5f} µm",
+        label=f"m : {m:.5f} ± {m_e:.5f} \nc : {c:.5f} ± {c_e:.5f}",
     )
     plot.set_config(
         plot.axs,
         ylim=(0, 45),
-        xlim=(-2, 50),
+        xlim=(-2, None),
         title="Depletion Depth Vs Bias Voltage",
-        xlabel="Bias Voltage [V]",
+        xlabel="√Bias Voltage [√V]",
         ylabel="Depletion Depth [μm]",
         legend=True,
-        xticks=[5,1],
+        xticks=[1,0.5],
         yticks=[5,1],
     )
     plot.axs.grid(True)
@@ -387,34 +388,34 @@ def runMPV(dataFiles,plotGen,config):
         mpvs2 = np.array([data.constrainedFittings[i][0] if not np.isnan(data.constrainedFittings[i][0]) else data.fittings[i][0] for i in data.constrainedFittings])
         mpvs_e2 = np.array([data.constrainedFittings[i][3] if not np.isnan(data.constrainedFittings[i][3]) else data.fittings[i][3] for i in data.constrainedFittings])
 
-        #plotVoltagePlots(data,path,plotGen)
-        #plotVoltagePlots(data,path,plotGen,rangeOfRows=(2,5),xlim=(0,2))
+        plotVoltagePlots(data,path,plotGen)
+        plotVoltagePlots(data,path,plotGen,rangeOfRows=(2,5),xlim=(0,2))
         maxLength = np.where(np.invert(np.isnan(mpvs1)))[-1][-1]
         print(maxLength)
-        #plotVoltagePlots(data,path,plotGen,rangeOfRows=(maxLength-6,maxLength-3),xlim=(0,1))
-        popt1, pcov1, popt2, pcov2 = plotMPV(data,dataFile,path,plotGen)
+        plotVoltagePlots(data,path,plotGen,rangeOfRows=(maxLength-6,maxLength-3),xlim=(0,1))
+        popt1, pcov1 = plotMPV(data,dataFile,path,plotGen)
         fittings[dataFile.fileName] = np.array([popt1,np.sqrt(np.diag(pcov1))])
-        constrainedFittings[dataFile.fileName] = np.array([popt2,np.sqrt(np.diag(pcov2))])
-        
+        #constrainedFittings[dataFile.fileName] = np.array([popt2,np.sqrt(np.diag(pcov2))])
+        firstLow = np.where(mpvs1<=0.2)[0][0]+1
         mpvPlot1.axs.plot(
-            np.arange(mpvs1.size),
-            mpvs1,
+            np.arange(mpvs1.size)[:firstLow],
+            mpvs1[:firstLow],
             color=getColor(dataFile),
-            label=f"{dataFile.fileName[7:]}",
+            label=f"{getName(dataFile)}",
         )
         mpvPlot1.axs.fill_between(
-            np.arange(mpvs1.size),
-            mpvs1+mpvs_e1,
-            mpvs1-mpvs_e1,
+            np.arange(mpvs1.size)[:firstLow],
+            mpvs1[:firstLow]+mpvs_e1[:firstLow],
+            mpvs1[:firstLow]-mpvs_e1[:firstLow],
             alpha=0.2,
             color=getColor(dataFile),
         )
-
+        """
         mpvPlot2.axs.plot(
             np.arange(mpvs2.size),
             mpvs2,
             color=getColor(dataFile),
-            label=f"{dataFile.fileName[7:]}",
+            label=f"{getName(dataFile)}",
         )
         mpvPlot2.axs.fill_between(
             np.arange(mpvs2.size),
@@ -423,6 +424,7 @@ def runMPV(dataFiles,plotGen,config):
             alpha=0.2,
             color=getColor(dataFile),
         )
+        """
     mpvPlot1.set_config(
         mpvPlot1.axs,
         legend=True,
@@ -434,6 +436,7 @@ def runMPV(dataFiles,plotGen,config):
     )
     mpvPlot1.axs.grid(True)
     mpvPlot1.saveToPDF(f"MPV")
+    """
     mpvPlot2.set_config(
         mpvPlot2.axs,
         legend=True,
@@ -445,6 +448,7 @@ def runMPV(dataFiles,plotGen,config):
     )
     mpvPlot2.axs.grid(True)
     mpvPlot2.saveToPDF(f"MPV_Constrained")
+    """
     plotDepletionWidth(dataFiles,path,plotGen,fittings)
     plotEDL(dataFiles,path,plotGen,fittings)
     plotMaxVoltage(dataFiles,path,plotGen,fittings)

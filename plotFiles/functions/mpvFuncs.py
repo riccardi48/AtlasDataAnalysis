@@ -49,10 +49,10 @@ def generateHistLists(clusters, maxWidth = 30):
     return histLists,histErrorsLists
 
 class mpvData:
-    def __init__(self,dataFile):
+    def __init__(self,dataFile,minPval=0.2):
         self._range=(0.160, 2)
         self.maxWidth = 30
-        self.minPval = 0.5
+        self.minPval = minPval
         self.layer = 4
         self.dataFile = dataFile
         self.fittings = {}
@@ -96,9 +96,6 @@ class mpvData:
         MPVs = np.zeros(self.maxWidth)
         for i in range(self.maxWidth-1):
             MPVs[i] = self.fittings[i][0] if i in self.fittings else np.nan
-            if i in self.constrainedFittings:
-                if not np.isnan(self.constrainedFittings[i][0]):
-                    MPVs[i] = self.constrainedFittings[i][0]
         print(MPVs)
         totalVoltage = np.sum(MPVs) - MPVs[0]/2
         averageMaxVoltage = np.average(MPVs[2:8])
@@ -123,7 +120,7 @@ def getBestFitting(values, valuesErrors, x0, p):
         for _range in ((0.160, 2.32), (0.160, 2), (0.160, 1.732)):
             for min_bin_width in [
                 (_range[1] - _range[0]) / 80,
-                (_range[1] - _range[0]) / 120,
+                (_range[1] - _range[0]) / 40,
             ]:
                 hist, binEdges, binCentres = histogramHit_Voltage_Errors(
                     values,
@@ -132,7 +129,7 @@ def getBestFitting(values, valuesErrors, x0, p):
                     points_per_bin=points_per_bin,
                     min_bin_width=min_bin_width,
                 )
-                if p == 1:
+                if p == 1 or True:
                     func = lambda x, x_mpv, x_xi, scaler: landauBinned(
                         x, x_mpv, x_xi, scaler, binEdges
                     )
@@ -141,7 +138,7 @@ def getBestFitting(values, valuesErrors, x0, p):
                         func,
                         binCentres,
                         hist,
-                        maxfev=1200,
+                        maxfev=2000,
                         p0=p0,
                     )
                     x_mpv, xi, scale = popt
@@ -203,7 +200,7 @@ def histogramHit_Voltage_Errors(
     values,
     valuesErrors,
     _range=(0.162, 2),
-    points_per_bin=100,
+    points_per_bin=200,
     min_bin_width=None,
     max_bin_width=None,
 ):
@@ -215,7 +212,7 @@ def histogramHit_Voltage_Errors(
     if min_bin_width is None:
         min_bin_width = (values.max() - values.min()) / 80
     if max_bin_width is None:
-        max_bin_width = (values.max() - values.min()) / 10
+        max_bin_width = (values.max() - values.min()) / 5
 
     n = len(values)
     n_bins = n // points_per_bin
@@ -331,7 +328,7 @@ def fitVoltageDepth(
     unzippedBounds = [(0, np.inf), (0, 100), (0, np.inf)]
     lower_bounds, upper_bounds = zip(*unzippedBounds)
     bounds = (list(lower_bounds), list(upper_bounds))
-    initial_guess = [0.5, 30, 10]
+    initial_guess = [0.4, 15, 10]
     cut = x > 0  # (x<70) & (y > 0.17)
     func = lambda depth, V_0, t_epi, edl: chargeCollectionEfficiencyFunc(
         depth, V_0, t_epi, edl, GeV=GeV

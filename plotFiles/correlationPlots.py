@@ -242,6 +242,7 @@ def runCorrelation(
 if __name__ == "__main__":
     config = configLoader.loadConfig("config.json")
     config["filterDict"] = {"fileName":"4Gev_kit_1"}
+    config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
     dataFiles = initDataFiles(config)
     plotGen = plotGenerator(config["pathToOutput"])
     runCorrelation(dataFiles, plotGen, config)

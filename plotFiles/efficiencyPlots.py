@@ -6,14 +6,14 @@
 ###############################
 from plotClass import plotGenerator
 from functions.efficiencyFuncs import calcEfficiency,getPercentFromDict
-from functions.genericFuncs import getColor
+from functions.genericFuncs import getColor,getName
 import sys
 sys.path.append("..")
 import numpy as np
 from dataAnalysis import initDataFiles, configLoader
 
 def runEfficiency(dataFiles,plotGen,config):
-    bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(6,4))
+    bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(8,6))
     for i,dataFile in enumerate(dataFiles):
         path = f"Efficiency/{dataFile.fileName}/"
         clusters = dataFile.get_perfectClusters(excludeCrossTalk = True,layers=config["layers"])
@@ -45,7 +45,7 @@ def runEfficiency(dataFiles,plotGen,config):
             legend=True,
             ylim=(0.97, 1),
             xticks=[5,1],
-            yticks=[0.001,0.0002],
+            yticks=[0.005,0.001],
             yticksSig=3,
         )
         plot.axs.grid(True)
@@ -68,8 +68,10 @@ def runEfficiency(dataFiles,plotGen,config):
             np.arange(pList.size),
             pList,
             color=getColor(dataFile),
-            label=f"{dataFile.fileName[7:]}",
+            label=f"{getName(dataFile)}",
         )
+        bigPlot.axs.errorbar(np.arange(pList.size), pList, errors, ls='', marker='s',color=getColor(dataFile),)
+        """     
         bigPlot.axs.fill_between(
             np.arange(pList.size),
             pList+errors[1],
@@ -77,7 +79,7 @@ def runEfficiency(dataFiles,plotGen,config):
             alpha=0.2,
             color=getColor(dataFile),
         )
-
+        """
     bigPlot.set_config(
         bigPlot.axs,
         title="Efficiency by relative Row",
@@ -88,6 +90,8 @@ def runEfficiency(dataFiles,plotGen,config):
         xticks=[5,1],
         yticks=[0.1,0.02],
         yticksSig=1,
+        #ncols=2,
+        #loc="lower left",
     )
     bigPlot.axs.grid(True)
     bigPlot.saveToPDF(f"Efficiency_Relative_Row",close=False)
@@ -100,8 +104,10 @@ def runEfficiency(dataFiles,plotGen,config):
         legend=True,
         ylim=(0.97, 1),
         xticks=[5,1],
-        yticks=[0.001,0.0002],
+        yticks=[0.005,0.001],
         yticksSig=3,
+        #ncols=2,
+        #loc="lower left",
     )
     bigPlot.saveToPDF(f"Efficiency_Relative_Row_ShortAxis")
 

@@ -12,7 +12,8 @@ from scipy.stats import chi2
 from itertools import combinations
 from pixelCharges.plotCluster import clusterPlotter
 from matplotlib.colors import LogNorm
-
+from dataAnalysis.handlers._perfectCluster import isPerfectCluster,convertRowsForFit,scaleOnLogGaussian,scaleOnGaussian,gaussian_loglike_pval
+from dataAnalysis.handlers._genericClusterFuncs import filterForTemplate
 
 def quad(x,a,b,c):
     return a*x**2+b*x+c
@@ -86,12 +87,6 @@ def logLike_gaussian(data, mu0=0, sigma0=1):
     ss = np.sum((data - mu0)**2)
     return -0.5*n*np.log(2*np.pi) - n*np.log(sigma0) - 0.5*ss/(sigma0**2)
 
-def gaussian_loglike_pval(data):
-    n = len(data)
-    S_obs = np.sum(data**2)
-    pval = 1 - chi2.cdf(S_obs, df=n-1)  # exact p-value
-    return pval
-
 def gaussianCDFFunc(x,mu,sig):
     return norm.cdf((x-mu)/sig)
 
@@ -160,8 +155,8 @@ def graphTSonRows(cluster,section,estimate,spread,flipped,path,excludeCrossTalk=
     x = relativeRows
     if flipped:
         x = abs(x-np.max(x))
-    axs.scatter(x[~mask], relativeTS[~mask], color=plot.colorPalette[2], marker="x",label="In Fitted Sections")
-    axs.scatter(x[mask], relativeTS[mask], color=plot.colorPalette[8], marker="x",label="Not in Fitted Sections")
+    axs.scatter(x[~mask], relativeTS[~mask], color=plot.colorPalette[2], marker="x",label="Data")
+    #axs.scatter(x[mask], relativeTS[mask], color=plot.colorPalette[8], marker="x",label="Not in Fitted Sections")
     if len(section) != 0:
         if flipped:
             anchor = np.argmax(relativeRows[section])
@@ -175,8 +170,11 @@ def graphTSonRows(cluster,section,estimate,spread,flipped,path,excludeCrossTalk=
         rowsToGraph = np.linspace(relativeRows[rowsForFunc==0][0],relativeRows[rowsForFunc==0][0]+len(estimate)+(len(estimate)*-int(flipped)*2),len(estimate))
         if flipped:
             rowsToGraph = abs(rowsToGraph-np.max(rowsToGraph))
-        axs.plot(rowsToGraph,estimate,color=plot.colorPalette[0],linestyle="dashed",label=f"Expected TS\np = {getPvalue(cluster,section,estimate,spread,flipped,excludeCrossTalk=excludeCrossTalk):.4f}")
-        axs.fill_between(rowsToGraph,estimate-spread,estimate+spread, alpha=0.2,color=plot.colorPalette[0])
+        print(estimate)
+        index = (estimate>0)
+        index[0] = False
+        axs.plot(rowsToGraph[index],estimate[index],color=plot.colorPalette[0],linestyle="dashed",label=f"Expected TS\np = {cluster.pVal:.4f}")
+        axs.fill_between(rowsToGraph[index],estimate[index]-spread[index],estimate[index]+spread[index], alpha=0.2,color=plot.colorPalette[0])
     plot.set_config(axs,
         title="Relative TS in cluster",
         xlabel="Relative Row",
@@ -198,22 +196,13 @@ def graphGaussNorm(cluster,section,estimate,spread,flipped,path,excludeCrossTalk
     Rows = cluster.getRows(excludeCrossTalk=excludeCrossTalk)
     plot = plotClass(path)
     axs = plot.axs
-    relativeRows = Rows-np.min(Rows)
-    relativeTS = Timestamps - np.min(Timestamps)
-    if flipped:
-        anchor = np.argmax(relativeRows[section])
-        rowsForFunc = relativeRows[section][anchor]-relativeRows
-    else:
-        anchor = np.argmin(relativeRows[section])
-        rowsForFunc = relativeRows-relativeRows[section][anchor]
-    sortIndexes = np.argsort(relativeRows)
-    rowsForFunc = rowsForFunc[sortIndexes]
-    relativeTS = relativeTS[sortIndexes]
-    mask = np.ones(len(relativeRows), dtype=bool)
-    mask[section,] = False
-    index = (rowsForFunc<len(estimate))&(rowsForFunc>0)
-    y = (relativeTS[index]-estimate[rowsForFunc[index]])/spread[rowsForFunc[index]]
-    axs.scatter(y, np.zeros(y.size)+0.1, color=plot.colorPalette[2], marker="x",label="Cluster TS")
+    x,y = convertRowsForFit(Rows,Timestamps,flipped=cluster.flipped)
+    _y, _estimate, _spread = filterForTemplate(x,y,estimate,spread)
+    _y = _y.astype(float)
+    _y[_estimate!=0] = scaleOnLogGaussian(_y[_estimate!=0]+0.5, _estimate[_estimate!=0], _spread[_estimate!=0])
+    #_y[_estimate==0] = scaleOnGaussian(_y[_estimate==0]+0.5, 1, 1)
+    #y = (np.log(relativeTS[index])-np.log(estimate[rowsForFunc[index]]))/spread[rowsForFunc[index]]
+    axs.scatter(_y[_estimate>0], np.zeros(_y[_estimate>0].size)+0.1, color=plot.colorPalette[2], marker="x",label="Cluster TS")
     axs.plot(np.linspace(-4,4,100),gaussianFunc(np.linspace(-4,4,100),0,1,1), color=plot.colorPalette[0],label="Normal")
     plot.set_config(axs,
         title="Distrobution of TS",
@@ -284,7 +273,7 @@ def getGoodIndexes(dataFile,config,minPval=0.2):
     print(f"")
     return np.array(indexList),sectionList,np.array(flippedList)
 
-def isPerfectCluster(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
+def _isPerfectCluster(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True):
     cluster.pVal = 0.0
     cluster.flipped = False
     cluster.perm = ()
@@ -342,11 +331,8 @@ if __name__ == "__main__":
         clusters, indexes = dataFile.get_clusters(excludeCrossTalk=True, returnIndexes=True, layer=4)
         i = 0
         unFixedFitting = []
-        calcFileManager = calcDataFileManager(config["pathToCalcData"], "TSParams", config["maxLine"])
-        calcFileName = calcFileManager.generateFileName(
-            attribute=f"{dataFile.fileName}",
-        )
-        estimate,spread = calcFileManager.loadFile(calcFileName=calcFileName)
+        estimate,spread = dataFile.get_timeStampTemplate(layer=4)
+        print(estimate,spread)
         flippedList = []
         pValsList = []
         permList = []
@@ -358,7 +344,7 @@ if __name__ == "__main__":
         distFromTemplate = []
         for cluster in clusters[20000:]:
             print(f"Cluster: {cluster.getIndex()}",end="\r")
-            if i > 10000000:
+            if i > 50000:
                 break
             #addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
             #if not isPerfectCluster(cluster,estimate,spread,minPval=minPval,excludeCrossTalk=True):
@@ -395,18 +381,19 @@ if __name__ == "__main__":
             columnList.extend(cluster.getColumns(excludeCrossTalk=True)[sortIndexes][index])
             relativeTSList.extend(relativeTS[index])
             distFromTemplate.extend(relativeTS[index]-estimate[rowsForFunc[index]])
-            #continue
+            continue
             print("")
             print(cluster.pVal,cluster.flipped,cluster.perm)
-            print(f"p = {getPvalue(cluster,cluster.section,estimate,spread,cluster.flipped,excludeCrossTalk=excludeCrossTalk)}")
+            print(f"p = {cluster.pVal}")
             path = base_path + f"Cluster_{cluster.getIndex()}/"
+            print(estimate)
             graphTSonRows(cluster,cluster.section,estimate,spread,cluster.flipped,path,excludeCrossTalk=excludeCrossTalk)
             clusterPlotter(cluster, path, "Relative TS").finishPlot("Relative TS", cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.min(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)),excludeCrossTalk=excludeCrossTalk,cmap="plasma_r")
             clusterPlotter(cluster, path, "Cluster Map").finishPlot("Voltage", cluster.getHit_Voltages(excludeCrossTalk=excludeCrossTalk),excludeCrossTalk=excludeCrossTalk,cmap="hot")
             clusterPlotter(cluster, path, "ToT").finishPlot("ToT", cluster.getToTs(excludeCrossTalk=excludeCrossTalk),excludeCrossTalk=excludeCrossTalk)
-            if cluster.pVal < minPval:
-                input("")
-                continue
+            #if cluster.pVal < minPval:
+            #    input("")
+            #    continue
             graphGaussNorm(cluster,cluster.section,estimate,spread,cluster.flipped,path,excludeCrossTalk=excludeCrossTalk)
             input("")
         print("")
@@ -415,15 +402,16 @@ if __name__ == "__main__":
 
         plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
         axs = plot.axs
-        height, x = np.histogram(pValsList, bins=100)
+        height, x = np.histogram(pValsList, bins=100,range=(0.01,1))
         axs.stairs(height, x, baseline=None, color=plot.colorPalette[1])
         plot.set_config(axs,
             title="Distrobution of pVals",
             xlabel="p Value",
             ylabel="Count",
+            ylim=(0,None),
         )  
         plot.saveToPDF(f"Distrobution_of_pVals")
-        
+        print(np.sum(height))
         plot = plotClass(f"{config["pathToOutput"]}ClusterTracks/{dataFile.fileName}/TimeStamps/")
         axs = plot.axs
         height, x = np.histogram([len(perm) for perm in permList], bins=100)

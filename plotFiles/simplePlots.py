@@ -106,9 +106,61 @@ def runSimple(dataFiles,plotGen,config):
         )
         ToTPlot.saveToPDF("ToT")
 
+        rowPlot = plotGen.newPlot(path)
+        height, x = np.histogram(
+            dataFile.get_cluster_attr("RowWidths", layers = config["layers"])[0], bins=371, range=(0.5, 371.5)
+        )
+        rowPlot.axs.stairs(height, x, color=rowPlot.colorPalette[0], baseline=None, label="Raw")
+        height, x = np.histogram(
+            dataFile.get_cluster_attr("RowWidths", layers = config["layers"],excludeCrossTalk=True)[0],
+            bins=371,
+            range=(0.5, 371.5),
+        )
+        rowPlot.axs.stairs(
+            height, x, color=rowPlot.colorPalette[1], baseline=None, label="CrossTalk Removed"
+        )
+        rowPlot.set_config(
+            rowPlot.axs,
+            title=f"Row Widths on Layer {layer}",
+            xlabel="Rows Width",
+            ylabel="Counts",
+            legend=True,
+            xticks=[5, 1],
+            yticks=[10000, 2000],
+            ylim=(0, None),
+            xlim=(1, 50),
+        )
+        rowPlot.saveToPDF("RowWidth")
+
+        rowPlot = plotGen.newPlot(path)
+        for i in range(1,5):
+            height, x = np.histogram(
+                dataFile.get_base_attr("Row", layers = [i], excludeCrossTalk=True),
+                bins=371,
+                range=(0.5, 371.5),
+            )
+            rowPlot.axs.stairs(
+                height, x, color=rowPlot.colorPalette[i], baseline=None, label=f"Layer {i}"
+            )
+        rowPlot.set_config(
+            rowPlot.axs,
+            title=f"Rows",
+            xlabel="Rows",
+            ylabel="Counts",
+            legend=True,
+            xticks=[50, 10],
+            yticks=[2000, 200],
+            ylim=(0, None),
+            xlim=(1, 371),
+        )
+        rowPlot.saveToPDF("Rows_By_Layer")
+
+
 if __name__ == "__main__":
-    config = configLoader.loadConfig("config.json")
+    config = configLoader.loadConfig()
+    config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
     dataFiles = initDataFiles(config)
+    print(len(dataFiles))
     plotGen = plotGenerator(config["pathToOutput"])
     runSimple(dataFiles,plotGen,config)
 
