@@ -13,14 +13,14 @@ import numpy as np
 from dataAnalysis import initDataFiles, configLoader
 
 def runEfficiency(dataFiles,plotGen,config):
-    bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(8,6))
+    bigPlot = plotGen.newPlot("Combined/",sizePerPlot=(7,5),rect=(0.04,0.04,0.995,0.995))
     for i,dataFile in enumerate(dataFiles):
         path = f"Efficiency/{dataFile.fileName}/"
         clusters = dataFile.get_perfectClusters(excludeCrossTalk = True,layers=config["layers"])
         print(len(clusters))
         efficiencyDict = calcEfficiency(clusters,maxWidth=30)
         pList,errors = getPercentFromDict(efficiencyDict)
-        plot = plotGen.newPlot(path,sizePerPlot = (6,4))
+        plot = plotGen.newPlot(path,sizePerPlot=(7,5),rect=(0.08,0.09,0.98,0.98))
         axs = plot.axs
         axs.scatter(
             np.arange(pList.size),
@@ -39,7 +39,7 @@ def runEfficiency(dataFiles,plotGen,config):
         )
         plot.set_config(
             axs,
-            title="Efficiency by relative Row",
+            #title="Efficiency by relative Row",
             xlabel="Relative Row",
             ylabel="Efficiency",
             legend=True,
@@ -47,13 +47,13 @@ def runEfficiency(dataFiles,plotGen,config):
             xticks=[5,1],
             yticks=[0.005,0.001],
             yticksSig=3,
+            grid=True,
         )
-        plot.axs.grid(True)
         plot.saveToPDF(f"Efficiency_Relative_Row_ShortAxis",close=False)
 
         plot.set_config(
             axs,
-            title="Efficiency by relative Row",
+            #title="Efficiency by relative Row",
             xlabel="Relative Row",
             ylabel="Efficiency",
             legend=True,
@@ -61,6 +61,7 @@ def runEfficiency(dataFiles,plotGen,config):
             xticks=[5,1],
             yticks=[0.1,0.02],
             yticksSig=1,
+            grid=True,
         )
         plot.saveToPDF(f"Efficiency_Relative_Row")
 
@@ -82,8 +83,8 @@ def runEfficiency(dataFiles,plotGen,config):
         """
     bigPlot.set_config(
         bigPlot.axs,
-        title="Efficiency by relative Row",
-        xlabel="Row",
+        #title="Efficiency by Pixel in Cluster",
+        xlabel="Distance from Seed",
         ylabel="Efficiency",
         legend=True,
         ylim=(0, 1),
@@ -92,13 +93,14 @@ def runEfficiency(dataFiles,plotGen,config):
         yticksSig=1,
         #ncols=2,
         #loc="lower left",
+        grid=True,
     )
-    bigPlot.axs.grid(True)
+
     bigPlot.saveToPDF(f"Efficiency_Relative_Row",close=False)
 
     bigPlot.set_config(
         bigPlot.axs,
-        title="Efficiency by relative Row",
+        #title="Efficiency by relative Row",
         xlabel="Row",
         ylabel="Efficiency",
         legend=True,
@@ -108,12 +110,15 @@ def runEfficiency(dataFiles,plotGen,config):
         yticksSig=3,
         #ncols=2,
         #loc="lower left",
+        grid=True,
     )
     bigPlot.saveToPDF(f"Efficiency_Relative_Row_ShortAxis")
 
 if __name__ == "__main__":
     config = configLoader.loadConfig("config.json")
+    config["filterDict"] = {"fileName":["angle6_6Gev_kit_4"]}
     dataFiles = initDataFiles(config)
+    #dataFiles = [dataFiles[0]] + dataFiles[2:]
     plotGen = plotGenerator(config["pathToOutput"])
     runEfficiency(dataFiles,plotGen,config)
 

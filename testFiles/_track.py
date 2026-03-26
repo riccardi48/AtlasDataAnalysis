@@ -306,6 +306,7 @@ def sync_sensors(
     coincidence_window_ns: Optional[float] = None,
     # ── diagnostics ──────────────────────────────────────────────────────────
     verbose: bool = True,
+    max_Time_for_init_search=3000000000,
 ) -> SyncResult:
     """
     Synchronise two hit-time sensors and find shared (coincident) hits.
@@ -405,9 +406,10 @@ def sync_sensors(
     # ── 4.  Coarse offset via global cross-correlation ────────────────────────
     if verbose:
         print("[sync] Step 1/3 — Coarse cross-correlation …")
-
+    min_ts = np.min([np.min(ts_a),np.min(ts_b)])
+    maxTime = max_Time_for_init_search*_TS_NS
     bin_centres, counts = _cross_correlate_bounded(
-        ts_a, ts_b,
+        ts_a[ts_a<min_ts + maxTime], ts_b[ts_b<min_ts + maxTime],
         search_min_ns=-max_offset_ns_resolved,
         search_max_ns= max_offset_ns_resolved,
         bin_ns=_TS_NS*100,
@@ -458,7 +460,7 @@ def sync_sensors(
         3 * _TS_NS,                              # at least 3 ticks
         min(
             max_offset_ns_resolved / n_drift_chunks * 4,
-            max_offset_ns_resolved * 0.3,        # never more than 30 % of total range
+            max_offset_ns_resolved * 0.1,        # never more than 30 % of total range
         ),
     )
     # But always at least wide enough to detect the true drift across one chunk.
@@ -495,7 +497,7 @@ def sync_sensors(
             sub_a, sub_b,
             search_min_ns=coarse_offset - refine_window,
             search_max_ns=coarse_offset + refine_window,
-            bin_ns=_TS_NS*10,
+            bin_ns=_TS_NS*50,
         )
 
         if cnt.max() == 0:

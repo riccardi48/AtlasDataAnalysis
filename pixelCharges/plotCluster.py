@@ -66,14 +66,16 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
     if np.ptp(x) > 20:
         plot.axs.xaxis.set_major_locator(MultipleLocator(5))
         plot.axs.xaxis.set_major_formatter("{x:.0f}")
-        plot.axs.xaxis.set_minor_locator(MultipleLocator(1))
+        plot.axs.xaxis.set_minor_locator(MultipleLocator(1,0.5))
     else:
         plot.axs.xaxis.set_major_locator(MultipleLocator(1))
         plot.axs.xaxis.set_major_formatter("{x:.0f}")
-        plot.axs.xaxis.set_minor_locator(MultipleLocator(1))
+        plot.axs.xaxis.set_minor_locator(MultipleLocator(0.5,0.5))
     plot.axs.yaxis.set_major_locator(MultipleLocator(1))
     plot.axs.yaxis.set_major_formatter("{x:.0f}")
-    plot.axs.yaxis.set_minor_locator(MultipleLocator(1))
+    plot.axs.yaxis.set_minor_locator(MultipleLocator(1,0.5))
+    plot.axs.grid(which='minor')
+
     if textLabels:
         for i in range(len(x)):
             plot.axs.text(
@@ -90,7 +92,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
 class clusterPlotter():
     def __init__(self,cluster: clusterClass,path,name):
         self.cluster = cluster
-        self.plot = plotClass(path,sizePerPlot=(20,5))
+        self.plot = plotClass(path,sizePerPlot=(8,4))
         self.name = name
     def finishPlot(self,colorbarName, values, textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
         plotCluster(self.plot,self.cluster, values,self.name,colorbarName, textLabels=textLabels,excludeCrossTalk=excludeCrossTalk, cmap = cmap)

@@ -381,7 +381,7 @@ if __name__ == "__main__":
             columnList.extend(cluster.getColumns(excludeCrossTalk=True)[sortIndexes][index])
             relativeTSList.extend(relativeTS[index])
             distFromTemplate.extend(relativeTS[index]-estimate[rowsForFunc[index]])
-            continue
+            #continue
             print("")
             print(cluster.pVal,cluster.flipped,cluster.perm)
             print(f"p = {cluster.pVal}")

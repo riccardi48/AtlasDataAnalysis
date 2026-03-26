@@ -129,7 +129,7 @@ def getBestFitting(values, valuesErrors, x0, p):
                     points_per_bin=points_per_bin,
                     min_bin_width=min_bin_width,
                 )
-                if p == 1 or True:
+                if p == 1:
                     func = lambda x, x_mpv, x_xi, scaler: landauBinned(
                         x, x_mpv, x_xi, scaler, binEdges
                     )
@@ -243,7 +243,7 @@ def histogramHit_Voltage_Errors(
         else:
             new_edges.append(proposed_edge)
     binEdges = np.array(new_edges)
-    #hist, binEdges = np.histogram(values, bins=binEdges)
+    
     hist = np.sum(
             gaussianBinned(
                 np.tile([values], (binEdges.size - 1, 1)),
@@ -253,6 +253,7 @@ def histogramHit_Voltage_Errors(
             ),
             axis=1,
         )
+    #hist, binEdges = np.histogram(values, bins=binEdges)
     binCentres = (binEdges[:-1] + binEdges[1:]) / 2
     return hist, binEdges, binCentres
 

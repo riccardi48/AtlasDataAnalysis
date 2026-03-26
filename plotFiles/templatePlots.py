@@ -26,9 +26,9 @@ def findMPV(estimate,spread):
 def plotTemplate(plotGen,path,array, yedges, xedges,estimate, spread, estimate_e, spread_e):
     plot = plotGen.newPlot(path,sizePerPlot = (6,4))
     plot.axs.imshow(array,aspect='auto',origin="lower",extent=[xedges[0],xedges[-1],yedges[0],yedges[-1]])
-    median = np.array([findLogPercentile(mu,sig,0.5) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
-    upper = np.array([findLogPercentile(mu,sig,0.5+0.34) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
-    lower = np.array([findLogPercentile(mu,sig,0.5-0.34) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
+    #median = np.array([findLogPercentile(mu,sig,0.5) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
+    #upper = np.array([findLogPercentile(mu,sig,0.5+0.34) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
+    #lower = np.array([findLogPercentile(mu,sig,0.5-0.34) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
     mpvs = np.array([findMPV(mu,sig) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
     #print(lower)
     #print(upper)
@@ -76,10 +76,7 @@ def plotSlice(plotGen,path,array, yedges, xedges,estimate, spread, estimate_e, s
     if estimate[slice]>0:
         x = np.linspace(yedges[0],yedges[-1],1000)
         y = logGaussian(x+0.5,estimate[slice], spread[slice], np.sum(height))
-        plot.axs.plot(x,y,color=plot.colorPalette[2],label=f"Log Normal Fitting\n{estimate[slice]:.2f}±{estimate_e[slice]:.4f},{spread[slice]:.2f}±{spread_e[slice]:.4f}")
-        plot.axs.vlines(x[np.argmax(y)],0,np.max(y),label=f"MPV\n{x[np.argmax(y)]:.2f}",color=plot.colorPalette[5],linestyle="--")
-        y = logGaussian(x+0.5,estimate[slice], spread[slice]/2, np.sum(height))
-        plot.axs.plot(x,y,color=plot.colorPalette[3],label=f"Log Normal Fitting\n{estimate[slice]:.2f}±{estimate_e[slice]:.4f},{spread[slice]:.2f}±{spread_e[slice]:.4f}")
+        plot.axs.plot(x,y,color=plot.colorPalette[2],label=f"Log Normal Fitting\n{estimate[slice]:.2f}$\\pm${estimate_e[slice]:.4f},{spread[slice]:.2f}$\\pm${spread_e[slice]:.4f}")
         plot.axs.vlines(x[np.argmax(y)],0,np.max(y),label=f"MPV\n{x[np.argmax(y)]:.2f}",color=plot.colorPalette[5],linestyle="--")
     plot.set_config(plot.axs,
         title=f"Row vs TS Slice {slice}",
@@ -103,14 +100,14 @@ def plotLogSlice(plotGen,path,array, yedges, xedges,estimate, spread, estimate_e
     if estimate[slice]>0:
         x = np.linspace(yedges[0],yedges[-1],1000)
         y = logGaussian(x+0.5,estimate[slice], spread[slice], np.sum(height))
-        plot.axs.plot(np.log(x),y,color=plot.colorPalette[2],label=f"Log Normal Fitting\n{np.log(estimate[slice]):.2f}±{estimate_e[slice]:.4f},{np.log(spread[slice]):.2f}±{spread_e[slice]:.4f}")
-        plot.axs.vlines(np.log(x[np.argmax(y)]),0,np.max(y),label=f"MPV\n{x[np.argmax(y)]:.2f}",color=plot.colorPalette[5],linestyle="--")
-    plot.axs.set_xscale("log")
+        plot.axs.plot(np.log(x),y,color=plot.colorPalette[2],label=f"Log Normal Fitting\n{estimate[slice]:.2f}$\\pm${estimate_e[slice]:.4f},{spread[slice]:.2f}$\\pm${spread_e[slice]:.4f}")
+        plot.axs.vlines(np.log(x)[np.argmax(y)],0,np.max(y),label=f"MPV\n{np.log(x)[np.argmax(y)]:.2f}",color=plot.colorPalette[5],linestyle="--")
+    #plot.axs.set_xscale("log")
     plot.set_config(plot.axs,
         title=f"Row vs TS Slice {slice}",
         xlabel="Relative Row [px]",
         ylabel="Relative Timestamp [TS]",
-        xlim = (1,np.log(yedges[-1])),
+        xlim = (0,4),
         ylim = (0,None),
         legend=True,
         #xticks=[5,1],
@@ -129,11 +126,13 @@ def runTemplate(dataFiles,plotGen,config):
         layer = 4
         path = f"PerfectClusters/{dataFile.fileName}/"
         clusters = dataFile.get_clusters(layer=layer,excludeCrossTalk = True)
-        minExpectedClusterSize = int(np.ceil(np.sqrt(dataFile.voltage/48.6) * 8))
+        minExpectedClusterSize = 8
+        minExpectedClusterSize = int(np.floor(np.sqrt((minExpectedClusterSize**2)*(dataFile.voltage/48.6))))
         if dataFile.angle != 86.5:
             minExpectedClusterSize = 2
         relativeRowList, relativeTSList = getRelativeRowTS(clusters,TSRange=TSRange,maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize,numberOfClustersUsed=1000)
         estimate, spread, estimate_e, spread_e = calcTemplate(relativeRowList[relativeRowList<=maxRow],relativeTSList[relativeRowList<=maxRow])
+        #estimate, spread = dataFile.get_timeStampTemplate(layer=4)
         mpvs = np.array([findMPV(mu,sig) for mu,sig in zip(estimate[estimate>0],spread[estimate>0])])
         combinedPlot.axs.scatter(np.arange(len(estimate))[estimate>0],mpvs,marker="x",color=getColor(dataFile),label=f"{getName(dataFile)}")
         combinedPlot.axs.errorbar(

@@ -100,7 +100,7 @@ class trackClass():
         )
 
 
-def loadOrCalcTracks(clusters):
+def loadOrCalcTracks(clusters,dataFile):
     calcFileManager = calcDataFileManager(config["pathToCalcData"], f"{dataFile.fileName}", config["maxLine"])
     calcFileName = calcFileManager.generateFileName(attribute="Tracks")
     if not calcFileManager.fileExists(calcFileName=calcFileName):
@@ -280,7 +280,7 @@ for dataFile in dataFiles:
     clusters = dataFile.get_clusters(excludeCrossTalk = True)
     resetClusterIndexes(clusters)
     df = dataFile.get_dataFrame()
-    tracks = loadOrCalcTracks(clusters)
+    tracks = loadOrCalcTracks(clusters,dataFile)
     print(len([True for track in tracks if len(track.getLayers()) == 4]))
     print(len(tracks))
     offsets = alignment(tracks)
@@ -358,7 +358,25 @@ clusters3 = dataFiles[0].get_perfectClusters(excludeCrossTalk=True,layers=config
 times1 = np.array([np.min(cluster.getEXT_TSs(True)) for cluster in clusters1])
 times3 = np.array([np.min(cluster.getEXT_TSs(True)) for cluster in clusters3])
 
+config["filterDict"] = {"fileName":["angle6_4GeV_lancs_4"]}
+dataFiles2 = initDataFiles(config)
+clusters = dataFiles2[0].get_clusters(excludeCrossTalk = True)
+resetClusterIndexes(clusters)
+tracks = loadOrCalcTracks(clusters,dataFiles2[0])
+for track in tracks:
+    if len(track.getLayers()) != 4:
+        continue
+    track.fitTrack(offsets)
+tracks4Layer = [track for track in tracks if len(track.getLayers()) == 4]
+_goodTracks = np.array([track for track in tracks4Layer if track.checkCut(dxdzLimit=(-0.0025,0.0025),dydzLimit=(-0.0025,0.0025),residualsLimit=0.002)])
+
+_times2 = np.array([np.min(track.clusters[4].getEXT_TSs(True)) for track in _goodTracks])
+
+
+
 times2 = np.array([np.min(track.clusters[4].getEXT_TSs(True)) for track in goodTracks])
+
+times2 = np.concat((times2,_times2))
 
 bins1 = int(np.ptp(TStoMS(times1))/1000)
 print(bins1)
@@ -383,7 +401,7 @@ print(peak1)
 print(peak2)
 
 timeLength = 3000000000
-#timeLength = 20000000000
+timeLength = 200000000000
 tolerance = 2000
 
 syncTimes1 = times1[(times1>peak1)&(times1<peak1+timeLength)&(times1<np.max(times2))]-peak1
@@ -397,13 +415,13 @@ print(len(syncTimes3))
 from _track import sync_sensors, match_hits, DriftModel, MatchResult
 
 
-sub_result = sync_sensors(syncTimes1,syncTimes2,max_offset_ts=3e7,coincidence_window_ts=100,n_drift_chunks=6)
+sub_result = sync_sensors(syncTimes1,syncTimes2,max_offset_ts=1e8,coincidence_window_ts=100,n_drift_chunks=50,max_Time_for_init_search=3000000000)
 
 syncTimes1 = times1[(times1>peak1)&(times1<np.max(times2))]-peak1
 syncTimes2 = times2[(times2>peak2)&(times2<np.max(times1))]-peak2
 syncTimes3 = times3[(times3>peak1)&(times3<np.max(times2))]-peak1
 
-result = match_hits(syncTimes1, syncTimes2, drift_model=sub_result.drift_model, coincidence_window_ts=500)
+result = match_hits(syncTimes1, syncTimes2, drift_model=sub_result.drift_model, coincidence_window_ts=1500)
 print(result.summary())
 
 plot = plotGen.newPlot(f"{dataFiles[0].fileName}",sizePerPlot=(50,10))
@@ -508,3 +526,24 @@ plot.set_config(
         legend=True,
     )
 plot.saveToPDF(f"RowWidths")
+
+config["filterDict"] = {"fileName":["angle6_4GeV_lancs_4"]}
+dataFiles2 = initDataFiles(config)
+clusters = dataFiles2[0].get_clusters(excludeCrossTalk = True)
+resetClusterIndexes(clusters)
+tracks = loadOrCalcTracks(clusters,dataFiles2[0])
+for track in tracks:
+    if len(track.getLayers()) != 4:
+        continue
+    track.fitTrack(offsets)
+tracks4Layer = [track for track in tracks if len(track.getLayers()) == 4]
+goodTracks = np.array([track for track in tracks4Layer if track.checkCut(dxdzLimit=(-0.0025,0.0025),dydzLimit=(-0.0025,0.0025),residualsLimit=0.002)])
+
+times2 = np.array([np.min(track.clusters[4].getEXT_TSs(True)) for track in goodTracks])
+
+syncTimes1 = times1[(times1>peak1)&(times1<np.max(times2))]-peak1
+syncTimes2 = times2[(times2>peak2)&(times2<np.max(times1))]-peak2
+syncTimes3 = times3[(times3>peak1)&(times3<np.max(times2))]-peak1
+
+result = match_hits(syncTimes1, syncTimes2, drift_model=sub_result.drift_model, coincidence_window_ts=100)
+print(result.summary())

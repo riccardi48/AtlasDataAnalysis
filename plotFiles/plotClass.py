@@ -2,12 +2,27 @@ import sys
 sys.path.append("..")
 from dataAnalysis import dataAnalysis, clusterClass, clusterArray
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib import patheffects
 from matplotlib.ticker import MultipleLocator
 import os
 from typing import Optional, Any, TypeAlias
 import numpy as np
 import numpy.typing as npt
+
+
+
+from matplotlib import rc
+plt.rcParams['font.family'] = 'serif' # or 'sans-serif' or 'monospace'
+plt.rcParams['font.serif'] = 'cmr10'
+plt.rcParams['font.sans-serif'] = 'cmss10'
+plt.rcParams['font.monospace'] = 'cmtt10'
+plt.rcParams["axes.formatter.use_mathtext"] = True # to fix the minus signs
+#rc('text', usetex=True)
+rc("axes", titlesize=14,labelsize=10)
+rc("xtick", labelsize=10)
+rc("ytick",labelsize=10)
+rc("legend",fontsize=10)
 
 
 class plotGenerator:
@@ -28,6 +43,7 @@ class plotClass:
         sharex: bool = False,
         sharey: bool = False,
         hspace: Optional[float] = None,
+        rect=None
     ):
         self.sizePerPlot = sizePerPlot
         self.shape = shape
@@ -35,6 +51,7 @@ class plotClass:
         self.fig = plt.figure()
         gs = self.fig.add_gridspec(nrows=shape[1], ncols=shape[0], hspace=hspace)
         self.axs = gs.subplots(sharex=sharex, sharey=sharey)
+        gs.tight_layout(self.fig,rect=rect)
         self.colorPalette = [
             "#CC3F0C",
             "#8896AB",
@@ -70,6 +87,7 @@ class plotClass:
         yticks: list[int] = None,
         xticksSig: int = None,
         yticksSig: int = None,
+        grid = False,
     ) -> None:
         if ylim is not None:
             ax.set_ylim(ylim[0], ylim[1])
@@ -100,7 +118,9 @@ class plotClass:
             ax.yaxis.set_major_locator(MultipleLocator(yticks[0]))
             ax.yaxis.set_major_formatter("{x:."+f"{0 if yticksSig is None else yticksSig}"+"f}")
             ax.yaxis.set_minor_locator(MultipleLocator(yticks[1]))
-
+        if grid:
+            ax.grid(which='major', color="#BBBBBB", linewidth=0.8,zorder=0)
+            ax.grid(which='minor', color='#DDDDDD', linestyle=':', linewidth=0.5,zorder=-1)
 
 
     def finalizePlot(self) -> None:
