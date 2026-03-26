@@ -18,7 +18,7 @@ def isPerfectCluster(cluster: clusterClass,estimate,spread,minPval=0.2,excludeCr
         return False
     if cluster.getSize(excludeCrossTalk=excludeCrossTalk) <= 3:
         return False
-    addClusterValues(cluster,estimate,spread,minPval=0.5,excludeCrossTalk=True)
+    addClusterValues(cluster,estimate,spread,minPval=minPval,excludeCrossTalk=True)
     relativeTS = abs(cluster.getTSs(excludeCrossTalk=excludeCrossTalk) - np.max(cluster.getTSs(excludeCrossTalk=excludeCrossTalk)))
     if cluster.pVal < minPval:
         return False
@@ -74,15 +74,15 @@ def pValOfSection(cluster,section,estimate,spread,excludeCrossTalk=True):
     for _flipped in [False,True]:
         x,y = convertRowsForFit(Rows,Timestamps,flipped=_flipped)
         y, _estimate, _spread = filterForTemplate(x,y,estimate,spread)
-        _y = np.zeros(len(y))
-        _y[_estimate!=0] = scaleOnLogGaussian(y[_estimate!=0]+0.5, _estimate[_estimate!=0], _spread[_estimate!=0])
-        _y[_estimate==0] = scaleOnGaussian(y[_estimate==0]+0.5, 1, 1)
-        if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30 or len(_y[_estimate!=0]) < 3:
+        _y = np.zeros(len(y[_estimate!=0]))
+        _y = scaleOnLogGaussian(y[_estimate!=0]+0.5, _estimate[_estimate!=0], _spread[_estimate!=0])
+        #_y[_estimate==0] = scaleOnGaussian(y[_estimate==0]+0.5, 1, 1)
+        if np.sum((x<len(estimate))&(x>=0)) <= 3 or np.sum((x>len(estimate))|(x<0)) > 30 or len(_y) < 3:
             pVals.append(0)
         #elif np.sum(_y[_estimate!=0]>0)>len(_y[_estimate!=0])*0.75 or np.sum(_y[_estimate!=0]<0)>len(_y[_estimate!=0])*0.75:
         #    pVals.append(0)
         else:
-            pVals.append(gaussian_loglike_pval(_y[_estimate!=0],df=len(_y[_estimate!=0])-1))
+            pVals.append(gaussian_loglike_pval(_y,df=len(_y)-1))
     pVal = np.max([pVals])
     flipped = bool(np.argmax([pVals]))
     return pVal,flipped
@@ -108,7 +108,7 @@ def gaussian_loglike_pval(data,df=None):
     return pval
 
 def scaleOnLogGaussian(x, mu, sig):
-    return (np.log(x) - np.log(mu)) / sig
+    return (np.log(x) - mu) / sig
 
 def scaleOnGaussian(x, mu, sig):
     return (x - mu) / sig

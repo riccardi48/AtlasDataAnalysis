@@ -14,8 +14,14 @@ def isOnePixel(cluster: clusterClass) -> bool:
 
 
 def isOnEdge(cluster: clusterClass) -> bool:
-    return np.any((cluster.getRows(True) <= 1) | (cluster.getRows(True) >= 370)) or np.any(
-        (cluster.getColumns(True) <= 1) | (cluster.getColumns(True) >= 130)
+    #Resolution 132x372
+    #There are no hits with row or column 0 or 132,372
+    maxRow = 361
+    minRow = 10
+    maxColumn = 128
+    minColumn = 4
+    return np.any((cluster.getRows(True) < minRow) | (cluster.getRows(True) > maxRow)) or np.any(
+        (cluster.getColumns(True) < minColumn) | (cluster.getColumns(True) > maxColumn)
     )
 
 
@@ -116,12 +122,12 @@ def scaleTemplate(estimate, spread, angleScaler, flatScaler):
 
 def logGaussian(x,mu,sig,scaler):
     y = np.zeros_like(x)
-    y[x > 0] = lognorm.pdf(x[x > 0], sig, scale=mu) * scaler
+    y[x > 0] = lognorm.pdf(x[x > 0], sig, scale=np.exp(mu)) * scaler
     return y
 
 def logGaussianCDFFunc(x, mu, sig):
     y = np.zeros_like(x)
-    y[x > 0] = lognorm.cdf(x[x > 0], sig, scale=mu)
+    y[x > 0] = lognorm.cdf(x[x > 0], sig, scale=np.exp(mu))
     return y
 
 def logGaussianBinned(x, mu, sigma, scaler, edges):

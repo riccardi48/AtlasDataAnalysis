@@ -180,14 +180,13 @@ def fitHistLogGaussian(data):
     )
 
     binCentres = (edges[:-1] + edges[1:]) / 2
-    bounds = ((0, 0.2), (100, 10))
     popt, pcov = curve_fit(
         func,
         binCentres,
         height,
         maxfev=10000,
-        bounds=bounds
     )
+
     mu,sigma = popt
     mu_e,sigma_e = np.sqrt(np.diag(pcov))
     return mu, sigma, mu_e, sigma_e
