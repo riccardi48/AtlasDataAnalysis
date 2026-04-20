@@ -536,10 +536,8 @@ def plotPredictedEfficiency(dataFiles,path,plotGen,fittings,plot=None,close=True
             rect=(0.10,0.09,0.995,0.995),
         )
     func = lambda V, a, b, c: integrate.quad(chargeCollectionEfficiencyFunc, 0, V, args=(a, b, c))[0]
-    from test import uncertainty_budget
     for dataFile in dataFiles:
         popt,pcov = fittings[dataFile.fileName]
-        result = uncertainty_budget(popt[0], popt[1], popt[2], 100, pcov, 0.161)
         color = getColor(dataFile) if colorIndex is None else plot.colorPalette[colorIndex]
         totalCharge = func(100, *popt)/50
         plot.axs.scatter(
@@ -548,16 +546,6 @@ def plotPredictedEfficiency(dataFiles,path,plotGen,fittings,plot=None,close=True
             color=plot.colorPalette[0],
             marker="x",
             label="Predicted CCE",
-            zorder=10,
-        )
-        plot.axs.errorbar(
-            dataFile.voltage,
-            1 - landauCDFFunc(0.161, totalCharge, totalCharge/4),
-            yerr=result["total"],
-            fmt="none",
-            color=plot.colorPalette[0],
-            elinewidth=0.5,
-            capsize=1,
             zorder=10,
         )
     valuesFromSlides = [
