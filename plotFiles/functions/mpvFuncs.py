@@ -96,7 +96,6 @@ class mpvData:
         MPVs = np.zeros(self.maxWidth)
         for i in range(self.maxWidth-1):
             MPVs[i] = self.fittings[i][0] if i in self.fittings else np.nan
-        print(MPVs)
         totalVoltage = np.sum(MPVs) - MPVs[0]/2
         averageMaxVoltage = np.average(MPVs[2:8])
         N = (49.5/50 * np.tan(np.deg2rad(86.5)))
@@ -108,79 +107,85 @@ class mpvData:
 
 
 
-
 def getBestFitting(values, valuesErrors, x0, p):
+    func = lambda x, x_mpv, xi: landauFunc(
+        x, x_mpv, xi, 1
+    )
     x_mpvList = []
     xiList = []
     scaleList = []
     x_mpv_eList = []
     xi_eList = []
     scale_eList = []
-    for points_per_bin in [100, 200]:
-        for _range in ((0.160, 2.32), (0.160, 2), (0.160, 1.732)):
-            for min_bin_width in [
-                (_range[1] - _range[0]) / 80,
-                (_range[1] - _range[0]) / 40,
-            ]:
-                hist, binEdges, binCentres = histogramHit_Voltage_Errors(
-                    values,
-                    valuesErrors,
-                    _range=_range,
-                    points_per_bin=points_per_bin,
-                    min_bin_width=min_bin_width,
+    for _range in ((0.160, 2.32), (0.160, 2), (0.160, 1.732)):
+        for min_bin_width in [
+            (_range[1] - _range[0]) / 80,
+            (_range[1] - _range[0]) / 40,
+        ]:
+            hist, binEdges, binCentres = histogramHit_Voltage_Errors(
+                values,
+                valuesErrors,
+                _range=_range,
+                min_bin_width=min_bin_width,
+            )
+            if p == 1:
+                func = lambda x, x_mpv, x_xi, scaler: landauBinned(
+                    x, x_mpv, x_xi, scaler, binEdges
                 )
-                if p == 1:
-                    func = lambda x, x_mpv, x_xi, scaler: landauBinned(
-                        x, x_mpv, x_xi, scaler, binEdges
-                    )
-                    p0 = [0.4, 0.1, np.sum(hist) * 2]
-                    popt, pcov = curve_fit(
-                        func,
-                        binCentres,
-                        hist,
-                        maxfev=2000,
-                        p0=p0,
-                    )
-                    x_mpv, xi, scale = popt
-                    x_mpv_e, xi_e, scale_e = np.sqrt(np.diag(pcov))
+                p0 = [0.4, 0.1, np.sum(hist) * 2]
+                popt, pcov = curve_fit(
+                    func,
+                    binCentres,
+                    hist,
+                    maxfev=2000,
+                    p0=p0,
+                )
+                x_mpv, xi, scale = popt
+                x_mpv_e, xi_e, scale_e = np.sqrt(np.diag(pcov))
+            else:
+                if 1 - p <= landauCDFFunc(x0, x0, 1):
+                    bounds = ([x0*1.001, 0], [0.6, np.inf])
+                    p0 = [x0 * 2, np.sum(hist) * 2]
                 else:
-                    if 1 - p <= landauCDFFunc(x0, x0, 1):
-                        bounds = ([x0*1.001, 0], [0.6, np.inf])
-                        p0 = [x0 * 2, np.sum(hist) * 2]
-                    else:
-                        bounds = ([0, 0], [x0*0.999, np.inf])
-                        p0 = [x0 / 2, np.sum(hist) * 2]
-                    lower = 1e-12
-                    upper = 100000
-                    find_sigma = lambda mpv: brentq(
-                        lambda s: landauCDFFunc(x0, mpv, s) - (1 - p),
-                        lower,  # lower bound for sigma
-                        upper,  # upper bound
-                    )
-                    func = lambda x, x_mpv, scaler: landauBinned(
-                        x, x_mpv, find_sigma(x_mpv), scaler, binEdges
-                    )
-                    popt, pcov = curve_fit(
-                        func,
-                        binCentres,
-                        hist,
-                        maxfev=1200,
-                        bounds=bounds,
-                        p0=p0,
-                    )
-                    x_mpv, scale = popt
-                    x_mpv_e, scale_e = np.sqrt(np.diag(pcov))
-                    xi = find_sigma(x_mpv)
+                    bounds = ([0.01, 0], [x0*0.999, np.inf])
+                    p0 = [x0 / 2, np.sum(hist) * 2]
+                lower = 1e-12
+                upper = 1e6
+                find_sigma = lambda mpv: brentq(
+                    lambda s: landauCDFFunc(x0, mpv, s) - (1 - p),
+                    lower,  # lower bound for sigma
+                    upper,  # upper bound
+                )
+                func = lambda x, x_mpv, scaler: landauBinned(
+                    x, x_mpv, find_sigma(x_mpv), scaler, binEdges
+                )
+                popt, pcov = curve_fit(
+                    func,
+                    binCentres,
+                    hist,
+                    maxfev=1200,
+                    bounds=bounds,
+                    p0=p0,
+                )
+                x_mpv, scale = popt
+                x_mpv_e, scale_e = np.sqrt(np.diag(pcov))
+                xi = find_sigma(x_mpv)
+                if 1 - p <= landauCDFFunc(x0, x0, 1):
                     xi_e = (
-                        abs(find_sigma(x_mpv + x_mpv_e) - xi)
-                        + abs(find_sigma(x_mpv - x_mpv_e) - xi)
+                        abs(find_sigma(np.max([x_mpv + x_mpv_e,bounds[0][0]])) - xi)
+                        + abs(find_sigma(np.max([x_mpv - x_mpv_e,bounds[0][0]])) - xi)
                     ) / 2
-                x_mpvList.append(x_mpv)
-                xiList.append(xi)
-                scaleList.append(scale)
-                x_mpv_eList.append(x_mpv_e)
-                xi_eList.append(xi_e)
-                scale_eList.append(scale_e)
+                else:
+                    xi_e = (
+                        abs(find_sigma(np.min([x_mpv + x_mpv_e,bounds[1][0]])) - xi)
+                        + abs(find_sigma(np.min([x_mpv - x_mpv_e,bounds[1][0]])) - xi)
+                    ) / 2
+            x_mpvList.append(x_mpv)
+            xiList.append(xi)
+            scaleList.append(scale)
+            x_mpv_eList.append(x_mpv_e)
+            xi_eList.append(xi_e)
+            scale_eList.append(scale_e)
 
     e_stat = np.sqrt(np.mean(np.array(x_mpv_eList) ** 2))
     e_bin = np.std(np.array(x_mpvList))
@@ -194,6 +199,7 @@ def getBestFitting(values, valuesErrors, x0, p):
     e_bin = np.std(np.array(scaleList))
     scale = np.mean(scaleList)
     scale_e = np.sqrt(e_stat**2 + e_bin**2)
+    x_mpv_e = 1.3*xi/np.sqrt(len(values)) if x_mpv_e < 1.3*xi/np.sqrt(len(values)) else x_mpv_e
     return x_mpv, xi, scale, x_mpv_e, xi_e, scale_e
 
 def histogramHit_Voltage_Errors(
@@ -243,7 +249,7 @@ def histogramHit_Voltage_Errors(
         else:
             new_edges.append(proposed_edge)
     binEdges = np.array(new_edges)
-    
+    """
     hist = np.sum(
             gaussianBinned(
                 np.tile([values], (binEdges.size - 1, 1)),
@@ -253,7 +259,8 @@ def histogramHit_Voltage_Errors(
             ),
             axis=1,
         )
-    #hist, binEdges = np.histogram(values, bins=binEdges)
+    """
+    hist, binEdges = np.histogram(values, bins=binEdges)
     binCentres = (binEdges[:-1] + binEdges[1:]) / 2
     return hist, binEdges, binCentres
 
@@ -326,7 +333,7 @@ def fitVoltageDepth(
     yerr,
     GeV = 6,
 ):
-    unzippedBounds = [(0, np.inf), (0, 100), (0, np.inf)]
+    unzippedBounds = [(0, 1), (0, 100), (0, 200)]
     lower_bounds, upper_bounds = zip(*unzippedBounds)
     bounds = (list(lower_bounds), list(upper_bounds))
     initial_guess = [0.4, 15, 10]
@@ -339,10 +346,10 @@ def fitVoltageDepth(
         x[cut],
         y[cut],
         p0=initial_guess,
-        maxfev=10000000,
         bounds=bounds,
         sigma=yerr[cut] / y[cut],
         absolute_sigma=False,
+        method="trf",
     )
     return popt, pcov
 

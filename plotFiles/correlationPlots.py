@@ -62,8 +62,10 @@ def plotRowRow(
     log=False,
     showFunction=False,
     highToLow=False,
+    lines=False,
 ):
-    plot = plotGen.newPlot(path, sizePerPlot=(6, 4))
+    plot = plotGen.newPlot(path, sizePerPlot=(3.4,3.4),
+        rect=(0.08,0.06,0.995,0.995))
     axs = plot.axs
     RowRow = RowRowCorrelation(
         dataFile, config, recalc=recalc, excludeCrossTalk=excludeCrossTalk, highToLow=highToLow
@@ -75,20 +77,28 @@ def plotRowRow(
         371.5,
     )
     norm = None
+    vmin=0
     if log:
         norm = LogNorm(vmin=1, vmax=np.max(RowRow, where=~np.isnan(RowRow), initial=-1))
-    im = axs.imshow(RowRow, origin="lower", aspect="equal", extent=extent, norm=norm)
-    plot.set_config(axs, title="RowRow Correlation", xlabel="Row [px]", ylabel="Row [px]")
-    axs.xaxis.set_major_locator(MultipleLocator(100))
-    axs.xaxis.set_major_formatter("{x:.0f}")
-    axs.xaxis.set_minor_locator(MultipleLocator(20))
-    axs.yaxis.set_major_locator(MultipleLocator(100))
-    axs.yaxis.set_major_formatter("{x:.0f}")
-    axs.yaxis.set_minor_locator(MultipleLocator(20))
-    divider = make_axes_locatable(axs)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = plt.colorbar(im, cax=cax, orientation="vertical")
-    cbar.set_label("Frequency", rotation=270, labelpad=15)
+        vmin=None
+    im = axs.imshow(RowRow, origin="lower", aspect="equal", extent=extent, norm=norm, vmin=vmin)
+    if lines:
+        axs.vlines([124,248],0,372,color="gray",linestyle='--')
+        axs.hlines([124,248],0,372,color="gray",linestyle='--')
+    plot.set_config(axs, 
+        #title="RowRow Correlation", 
+        xlabel="Row [px]", 
+        ylabel="Row [px]",
+        yticks=[100,20],
+        xticks=[100,20],
+        xlim=(0.5,371.5),
+        ylim=(0.5,371.5),
+        )
+    #divider = make_axes_locatable(axs)
+    #cax = divider.append_axes("right", size="5%", pad=0.05)
+    #cbar = plt.colorbar(im, cax=cax, orientation="vertical")
+    #cbar.set_ticks([])
+    #cbar.set_label("Frequency", rotation=270, labelpad=15)
     if showFunction:
         tempCrossTalkFinder = crossTalkFinder()
         x = []
@@ -97,8 +107,11 @@ def plotRowRow(
             for i, j in _y:
                 x.append(i)
                 y.append(j)
+                x.append(j)
+                y.append(i)
 
-        axs.scatter(x, y, c="r", s=1)
+        axs.scatter(x, y, c="r", s=1, marker=".")
+    
     plot.saveToPDF(
         f"RowRowCorrelation"
         + f"{"_cut" if excludeCrossTalk else ""}"
@@ -201,6 +214,17 @@ def runCorrelation(
             recalc=True,
             excludeCrossTalk=False,
             log=False,
+            showFunction=True,
+            highToLow=True,
+        )
+        plotRowRow(
+            dataFile,
+            plotGen,
+            config,
+            path,
+            recalc=True,
+            excludeCrossTalk=False,
+            log=False,
             showFunction=False,
             highToLow=False,
         )
@@ -214,6 +238,7 @@ def runCorrelation(
             log=False,
             showFunction=False,
             highToLow=True,
+            lines=True,
         )
         plotRowRow(
             dataFile,
@@ -226,23 +251,12 @@ def runCorrelation(
             showFunction=False,
             highToLow=False,
         )
-        plotRowRow(
-            dataFile,
-            plotGen,
-            config,
-            path,
-            recalc=True,
-            excludeCrossTalk=False,
-            log=False,
-            showFunction=True,
-            highToLow=False,
-        )
-
+        
 
 if __name__ == "__main__":
     config = configLoader.loadConfig("config.json")
-    config["filterDict"] = {"fileName":"4Gev_kit_1"}
-    config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
+    #config["filterDict"] = {"fileName":"4Gev_kit_1"}
+    #config["filterDict"] = {"telescope": "lancs", "angle": 86.5}
     dataFiles = initDataFiles(config)
     plotGen = plotGenerator(config["pathToOutput"])
     runCorrelation(dataFiles, plotGen, config)

@@ -7,7 +7,7 @@ from dataAnalysis._dependencies import (
     np,  # numpy
     lambertw,  # scipy
 )
-from plotAnalysis import plotClass
+from plotFiles.plotClass import plotClass
 from dataAnalysis._memCheck import usage
 
 def _lambert_W_ToT_to_u(
@@ -69,16 +69,20 @@ def calibrate(k):
             )
             (a, b, c) = popt
             array[i % 132, i // 132] = [u_0, a, b, c]
-            plot = plotClass("/home/atlas/rballard/AtlasDataAnalysis/output/VoltageCalibration/")
+            plot = plotClass(
+                "/home/atlas/rballard/AtlasDataAnalysis/output/VoltageCalibration/",
+                sizePerPlot=(3.4,2.8),
+                rect = (0.08,0.08,0.95,0.95),
+        )
             axs = plot.axs
             axs.scatter(u, ToT, marker="x", s=3, color=plot.colorPalette[0])
             axs.errorbar(u, ToT, yerr=error, fmt="none", elinewidth=1, capsize=3, color=plot.colorPalette[0], alpha=0.5)
             x = np.linspace(0, 3, 1000)
             y = _lambert_W_u_to_ToT(x, u_0, a, b, c)
-            axs.plot(x, y, color=plot.colorPalette[1], label=f"Fit: $u_0$={u_0:.3f} V, a={a:.2f}, b={b:.2f}, c={c:.2f}")
+            axs.plot(x, y, color=plot.colorPalette[1], label=f"Fit: $u_0$={u_0:.3f} V, a={a:.2f}\n      b={b:.2f}, c={c:.2f}")
             plot.set_config(
                 axs,
-                title=f"Voltage Calibration Layer {k} Pixel ({i % 132},{i // 132})",
+                #title=f"Voltage Calibration Layer {k} Pixel ({i % 132},{i // 132})",
                 xlabel="Injected Voltage [V]",
                 ylabel="ToT [TS]",
                 xlim=(0, 1),

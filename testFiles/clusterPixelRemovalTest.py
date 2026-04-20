@@ -175,7 +175,7 @@ class clusterTestClass:
 
 
 def plotTestData(data, plotGen, name=""):
-    plot = plotGen.newPlot(f"Cluster_{cluster.getIndex()}/")
+    plot = plotGen.newPlot(f"Cluster_{cluster.getIndex()}/",sizePerPlot=(3.4,3),rect=(0.08,0.08,0.995,0.995))
     x = data.keys()
     y_min = []
     y_max = []
@@ -207,7 +207,7 @@ def plotTestData(data, plotGen, name=""):
 
     plot.set_config(
         plot.axs,
-        title="Removal of pixels effect on data",
+        #title="Removal of pixels effect on data",
         xlabel="Number of pixels removed",
         ylabel="p value",
         legend=True,
@@ -251,7 +251,7 @@ for dataFile in dataFiles:
         test = clusterTestClass(cluster, estimate, spread, True)
         test.testOnce(1, makePlot=True)
         test = clusterTestClass(cluster, estimate, spread, True)
-        for i in range(7):
+        for i in range(5):
             test.testOnce(i, makePlot=False)
         plotTestData(test.data, plotGen, name="_ExcludeEdges")
         test = clusterTestClass(cluster, estimate, spread, False)

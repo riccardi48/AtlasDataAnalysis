@@ -132,3 +132,4 @@ def logGaussianCDFFunc(x, mu, sig):
 
 def logGaussianBinned(x, mu, sigma, scaler, edges):
     return (logGaussianCDFFunc(edges[1:], mu, sigma) - logGaussianCDFFunc(edges[:-1], mu, sigma)) * scaler
+

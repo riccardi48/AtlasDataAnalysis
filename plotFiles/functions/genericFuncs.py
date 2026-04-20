@@ -19,6 +19,14 @@ def getColor(dataFile):
         color = "tab:blue"
     return color
 
+def colorGen():
+    cmap = plt.get_cmap("tab10")
+    cmap = plt.get_cmap("hsv")
+    for i in range(11):
+        color=cmap(0.1*i+0.05)
+        yield color
+
+
 def getName(dataFile):
     if "4Gev" in dataFile.fileName:
         name = "4 GeV"

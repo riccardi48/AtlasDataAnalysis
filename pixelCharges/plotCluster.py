@@ -1,6 +1,6 @@
 import sys
 sys.path.append("..")
-from plotAnalysis import plotClass
+from plotFiles.plotClass import plotClass
 import numpy as np
 from dataAnalysis import clusterClass
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -39,6 +39,10 @@ class displayClass():
 def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
     x = cluster.getRows(excludeCrossTalk=excludeCrossTalk)
     y = cluster.getColumns(excludeCrossTalk=excludeCrossTalk)
+    pixelPerInch = (np.ptp(x)+4)/(plot.sizePerPlot[0]-1)
+    print(pixelPerInch)
+    print((np.ptp(y)+4)/pixelPerInch+1)
+    plot.sizePerPlot = (plot.sizePerPlot[0], (np.ptp(y)+4)/pixelPerInch+1)
     display = displayClass(x,y, cmap = cmap)
     display.addToDisplay(x,y,values)
     vmax = None
@@ -56,7 +60,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
     plt.colorbar(im, ax=plot.axs, label=colorbarName)
     plot.set_config(
         plot.axs,
-        title=f"Cluster {name} Distribution",
+        #title=f"Cluster {name} Distribution",
         xlabel="Pixel Row",
         ylabel="Pixel Column",
         xlim=display.xlim,
@@ -92,7 +96,7 @@ def plotCluster(plot: plotClass,cluster: clusterClass, values,name,colorbarName,
 class clusterPlotter():
     def __init__(self,cluster: clusterClass,path,name):
         self.cluster = cluster
-        self.plot = plotClass(path,sizePerPlot=(8,4))
+        self.plot = plotClass(path,sizePerPlot=(3.4,2),rect=(0.08,0.09,0.995,0.995))
         self.name = name
     def finishPlot(self,colorbarName, values, textLabels=False,excludeCrossTalk=True, cmap: str = "plasma"):
         plotCluster(self.plot,self.cluster, values,self.name,colorbarName, textLabels=textLabels,excludeCrossTalk=excludeCrossTalk, cmap = cmap)

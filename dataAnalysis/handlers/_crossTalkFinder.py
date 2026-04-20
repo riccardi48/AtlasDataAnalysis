@@ -96,16 +96,16 @@ class crossTalkFinder:
         """Build cross-talk dictionary more efficiently"""
         crossTalkArray = self.calcCrossTalkArray()
         crossTalkDict = {}
-
         # Pre-allocate lists for better performance
         for i in range(372):
             pairs = []
 
             # Find all occurrences of i in the array
             rows_with_i, cols_with_i = np.where(crossTalkArray == i)
-
             for row_idx in rows_with_i:
                 row_data = crossTalkArray[row_idx]
+                #if row_data[0] !=i:
+                #    continue
                 for val in row_data:
                     if val != -1 and not (i - 2 <= val <= i + 2):
                         pairs.append([val, i])
@@ -113,7 +113,6 @@ class crossTalkFinder:
             crossTalkDict[i] = (
                 np.array(pairs, dtype=np.int32) if pairs else np.empty((0, 2), dtype=np.int32)
             )
-
         return crossTalkDict
 
     def calcCrossTalkArray(self) -> npt.NDArray[np.int_]:

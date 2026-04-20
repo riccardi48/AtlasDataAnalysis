@@ -50,8 +50,13 @@ class plotClass:
         self.pathToOutput = pathToOutput
         self.fig = plt.figure()
         gs = self.fig.add_gridspec(nrows=shape[1], ncols=shape[0], hspace=hspace)
-        self.axs = gs.subplots(sharex=sharex, sharey=sharey)
-        gs.tight_layout(self.fig,rect=rect)
+        if self.shape[1] != 1 or self.shape[0] != 1:
+            print("**")
+            gs.tight_layout(self.fig,rect=rect)
+            self.axs = gs.subplots(sharex=sharex, sharey=sharey)
+        else:
+            self.axs = gs.subplots(sharex=sharex, sharey=sharey)
+            gs.tight_layout(self.fig,rect=rect)
         self.colorPalette = [
             "#CC3F0C",
             "#8896AB",
@@ -120,7 +125,7 @@ class plotClass:
             ax.yaxis.set_minor_locator(MultipleLocator(yticks[1]))
         if grid:
             ax.grid(which='major', color="#BBBBBB", linewidth=0.8,zorder=0)
-            ax.grid(which='minor', color='#DDDDDD', linestyle=':', linewidth=0.5,zorder=-1)
+            ax.grid(which='minor', color='#DDDDDD', linestyle=':', linewidth=0.5,zorder=0)
 
 
     def finalizePlot(self) -> None:

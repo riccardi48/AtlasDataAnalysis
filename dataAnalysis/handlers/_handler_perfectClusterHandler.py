@@ -27,7 +27,7 @@ class perfectClusterHandler:
         self.clusterHandler = clusterHandler
 
     def getTimeStampTemplate(
-        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True,minExpectedClusterSize=8,numberOfClustersUsed=1000,TSRange=30
+        self, maxRow=25, layers: Optional[list[int]] = None, excludeCrossTalk: bool = True,minExpectedClusterSize=8,numberOfClustersUsed=1000,TSRange=35
     ):
         clusters = self.clusterHandler.getClusters(layers=layers, excludeCrossTalk=excludeCrossTalk)
         relativeRowList, relativeTSList = getRelativeRowTS(clusters,maxRow=maxRow,minExpectedClusterSize=minExpectedClusterSize,numberOfClustersUsed=numberOfClustersUsed,TSRange=TSRange)
@@ -64,12 +64,12 @@ def getRelativeRowTS(clusters: clusterArray,minExpectedClusterSize=8,numberOfClu
         relativeTS = Timestamps - np.min(Timestamps)
         if not goodCluster:
             continue
-        if np.any(relativeTS>=TSRange):
-            continue
+        #if np.any(relativeTS>=TSRange):
+        #    continue
         if len(findConnectedSections(cluster.getRows(True),cluster.getColumns(True))) != 1:
             continue
         relativeRows = cluster.getRows(True) - np.min(cluster.getRows(True))
-        if np.ptp(relativeRows)>=maxRow*1.25:
+        if np.ptp(relativeRows)>=maxRow*1.5:
             continue
         relativeTS = cluster.getTSs(True) - np.min(cluster.getTSs(True))
         sortIndexes = np.argsort(relativeRows)

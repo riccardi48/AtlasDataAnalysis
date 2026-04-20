@@ -82,35 +82,44 @@ def fitHistLogGaussian(data):
 
 
 plotGen = plotGenerator("/home/atlas/rballard/AtlasDataAnalysis/output/")
-plot = plotGen.newPlot(f"Sim/")
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(3.4,3),rect=(0.08,0.08,0.995,0.995))
 
 N_A = 2e14
-z = 15*10**(-6)
+z = 25*10**(-6)
 N = 100
 L_n = electron_diffusion_length_p_type(N_A)/100
+L_n = 40*10**(-6)
 D = 36*10**(-4)
 tao = (L_n**2) / D
-w = depletion_width_scaled(N_A, 48.6)
+w = 50*10**(-6)
 print(f"{w*10**6:.2f} µm")
 mpv = 100
 threshold = 38
 print(f"{L_n* 1e6:.2f} µm" )
 
-
-x = np.linspace(0.001*10**(-7),1*10**(-6),1000)
-y = CCEFunc(w+z,x,N,w,L_n,tao)
-plot.axs.plot(x*10**9,y)
+for _L_n in [10*10**(-6),20*10**(-6),40*10**(-6),80*10**(-6),100*10**(-6),200*10**(-6)]:
+    x = np.linspace(0.001*10**(-7),0.8*10**(-6),1000)
+    y = CCEFunc(w+z,x,N,w,_L_n,tao)
+    plot.axs.plot(x*10**9,y,label=f"{_L_n*10**6:.0f}")
 plot.set_config(
     plot.axs,
-    title=f"Charge Collection over time at depth {(w+z)*10**6:.2f} μm\n depletion width of {w*10**6:.2f} μm",
+    #title=f"Charge Collection over time at depth {(w+z)*10**6:.2f} μm\n depletion width of {w*10**6:.2f} μm",
     xlabel="Time [ns]",
     ylabel="Charge Collected [%]",
     xlim=(0,None),
     ylim=(0, None),
+    yticks=(10,5),
+    xticks=(100,25),
+    grid=True,
 )
-plot.saveToPDF(f"CDF_Charge_Collection_{N_A:.2e}")
+box = plot.axs.get_position()
+plot.axs.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+plot.axs.legend(loc='center left', bbox_to_anchor=(0.96, 0.5), frameon=False)
+plot.axs.text(1.03,0.75,"$L_n$ ($\\mu m$)", transform=plot.axs.transAxes)
+#plot.axs.legend(ncols=2,frameon=False)
+plot.saveToPDF(f"CDF_Charge_Collection_Combined")
 
-plot = plotGen.newPlot(f"Sim/")
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(3.4,3),rect=(0.08,0.08,0.995,0.995))
 x = np.linspace(0,100*10**(-6),1000)
 y = CCEFunc(w+x,1,N,w,L_n,tao)
 plot.axs.plot((x+w)*10**6,y)
@@ -126,7 +135,7 @@ plot.set_config(
 plot.saveToPDF(f"CCE_{N_A:.2e}")
 
 
-plot = plotGen.newPlot(f"Sim/")
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(3.4,3),rect=(0.08,0.08,0.995,0.995))
 dist = LandauDist(mpv,mpv/4)
 urng = np.random.default_rng()
 rng = NumericalInversePolynomial(dist, random_state=urng)
@@ -147,7 +156,7 @@ plot.set_config(
 )
 plot.saveToPDF(f"Landau_Test")
 
-plot = plotGen.newPlot(f"Sim/")
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(3.4,3),rect=(0.08,0.08,0.995,0.995))
 x = np.linspace(0,1000,1000)
 y = logGaussian(x,mpv,1,1)
 plot.axs.plot(x,y,color=plot.colorPalette[0],label="Log Normal PDF")
@@ -166,7 +175,7 @@ plot.saveToPDF(f"Log_Normal_VS_Landau")
 
 
 
-plot = plotGen.newPlot(f"Sim/",sizePerPlot=(10,7))
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(7,5),rect=(0.08,0.08,0.995,0.995))
 pixels = np.arange(0,30,2)
 depths = pixelToDepth(pixels)
 i = 0
@@ -179,7 +188,7 @@ for z in depths:
     height,x = np.histogram(timeToThreshold[np.invert(np.isnan(timeToThreshold))],bins=100)
     binCentres = (x[:-1] + x[1:]) / 2
     popt,pcov = fitLogGaussian(np.exp(binCentres),height)
-    plot.axs.stairs(height,x,label=f"{z*10**6:.0f} μm",color=plot.colorPalette[i])
+    plot.axs.stairs(height,x,label=f"{z*10**6:.0f} $\\mu$m",color=plot.colorPalette[i])
     E = logGaussian(np.exp(binCentres),*popt)
     O = height
     print(np.sum(((O - E)**2)/E)/(len(binCentres[height>0])-4))
@@ -190,14 +199,14 @@ for z in depths:
 plot.set_config(
     plot.axs,
     ylim=(0, None),
-    title=f"Time To Threshold With Landu Log Dist",
+    #title=f"Time To Threshold With Landu Log Dist",
     xlabel="log10(Time To Threshold)",
     ylabel="Count",
     legend=True,
 )
 plot.saveToPDF(f"Time_To_Threshold_{N_A:.2e}_log",close=False)
 
-plot = plotGen.newPlot(f"Sim/",sizePerPlot=(10,7))
+plot = plotGen.newPlot(f"Sim/",sizePerPlot=(10,7),rect=(0.08,0.08,0.995,0.995))
 binWidth = 1
 _range = (1,100)
 bins = int(np.ptp(_range)/binWidth)
