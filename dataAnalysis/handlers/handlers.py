@@ -147,7 +147,7 @@ class dataHandler:
         )
 
     def notCrossTalk(self) -> npt.NDArray[np.bool_]:
-        return np.invert(self.getCrossTalk())
+        return np.invert(self.getCrossTalk(initClusters=False))
 
     def getCrossTalk(
         self,

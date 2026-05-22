@@ -32,14 +32,14 @@ config["filterDict"] = {
         "angle6_6Gev_kitHV0_kit_14",
     ]
 }
-
+config["filterDict"] = {"fileName":"5p6Gev_kit_0"}
 dataFiles = initDataFiles(config)
 plotGen = plotGenerator(config["pathToOutput"])
 
 
 runSimple(dataFiles,plotGen,config)
-runCorrelation(dataFiles,plotGen,config)
-runTemplate(dataFiles,plotGen,config)
+#runCorrelation(dataFiles,plotGen,config)
+#runTemplate(dataFiles,plotGen,config)
 runCharge(dataFiles,plotGen,config)
-runEfficiency(dataFiles,plotGen,config)
-runMPV(dataFiles,plotGen,config)
+#runEfficiency(dataFiles,plotGen,config)
+#runMPV(dataFiles,plotGen,config)

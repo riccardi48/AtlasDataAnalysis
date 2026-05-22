@@ -5,7 +5,7 @@
 ###############################
 
 import sys
-from functions.mpvFuncs import mpvData,histogramHit_Voltage_Errors,landauFunc, landauCDFFunc,fitVoltageDepth,chargeCollectionEfficiencyFunc,depletionWidthFunc
+from functions.mpvFuncs import getBestFitting, mpvData,histogramHit_Voltage_Errors,landauFunc, landauCDFFunc,fitVoltageDepth,chargeCollectionEfficiencyFunc,depletionWidthFunc
 from functions.genericFuncs import colorGen,getName
 from plotClass import plotGenerator
 sys.path.append("..")
@@ -21,7 +21,7 @@ def legend_without_duplicate_labels(ax,loc="lower left"):
                 frameon=False,loc=loc)
 
 
-def plotVoltagePlots(data,path,plotGen,rangeOfRows = (0,30),xlim=(0,2)):
+def plotVoltagePlots(data,path,plotGen,rangeOfRows = (0,30),xlim=(0,2), combined = False):
     rangeToPlot = np.arange(rangeOfRows[0],rangeOfRows[1]+1)
     rangeToPlot = rangeToPlot[np.isin(rangeToPlot,list(data.fittings.keys()))]
     plot = plotGen.newPlot(
@@ -33,6 +33,53 @@ def plotVoltagePlots(data,path,plotGen,rangeOfRows = (0,30),xlim=(0,2)):
         rect=(0.08,0.01,0.99,0.99),
     )
     axs = plot.axs
+    if combined:
+        sumPlot = plotGen.newPlot(
+        path,
+        sizePerPlot=(3.4,1.36),
+        rect=(0.08,0.01,0.99,0.99),
+        )
+        combinedValues = np.concatenate([data.histLists[j] for j in rangeToPlot])
+        combinedValuesErrors = np.concatenate([data.histErrorsLists[j] for j in rangeToPlot])
+        hist, binEdges, binCentres = histogramHit_Voltage_Errors(
+            combinedValues, combinedValuesErrors, _range=data._range
+        )
+        sumPlot.axs.stairs(
+            hist / (binEdges[1:] - binEdges[:-1]),
+            binEdges,
+            color=plot.colorPalette[3],
+            baseline=None,
+        )
+        x_mpv, xi, scale, x_mpv_e, xi_e, scale_e = getBestFitting(
+                combinedValues, combinedValuesErrors, data._range[0], 1
+            )
+        x = np.linspace(0, np.max(binEdges) + 0.1, 1000)
+        y = landauFunc(x, x_mpv, xi, scale)
+        sumPlot.axs.plot(
+            x,
+            y,
+            c=plot.colorPalette[0],
+            label=f"{"Mpv": <7}: {x_mpv:.3f} $\\pm$ {x_mpv_e:.3f}\n{"Width": <7}: {xi:.3f} $\\pm$ {xi_e:.3f}\n{"Scale": <7}: {scale:.3f} $\\pm$ {scale_e:.3f}",
+        )
+        sumPlot.axs.errorbar(
+            x[np.argmax(y)],
+            y[np.argmax(y)],
+            xerr=[x_mpv_e],
+            fmt="none",
+            color=plot.colorPalette[0],
+            elinewidth=1,
+            capsize=3,
+        )
+        sumPlot.set_config(
+            sumPlot.axs,
+            ylim=(0, np.max(y) * 1.1),
+            xlim=xlim,
+            legend=True,
+            #yticks=[5000,1000],
+        )
+        sumPlot.saveToPDF(f"Voltages{"" if rangeOfRows==(0,30) else f"_{rangeOfRows[0]}_{rangeOfRows[1]}"}_Combined")
+        np.savetxt("/home/atlas/rballard/AtlasDataAnalysis/output/" + path + f"RawData_{path.split('/')[-2]}_Rows_{rangeOfRows[0]}_to_{rangeOfRows[1]}.txt", np.column_stack([combinedValues, combinedValuesErrors]))
+        return
     for i,j in enumerate(rangeToPlot):
         values = np.array(data.histLists[j])
         valuesErrors = np.array(data.histErrorsLists[j])
@@ -624,10 +671,12 @@ def runMPV(dataFiles,plotGen,config):
         mpvs_e1 = np.array([data.fittings[i][3] for i in data.fittings])
         mpvs2 = np.array([data.constrainedFittings[i][0] if not np.isnan(data.constrainedFittings[i][0]) else data.fittings[i][0] for i in data.constrainedFittings])
         mpvs_e2 = np.array([data.constrainedFittings[i][3] if not np.isnan(data.constrainedFittings[i][3]) else data.fittings[i][3] for i in data.constrainedFittings])
-        plotWidthvsMPV(data,dataFile,path,plotGen)
-        plotScale(data,dataFile,path,plotGen)
-        plotVoltagePlots(data,path,plotGen)
-        plotVoltagePlots(data,path,plotGen,rangeOfRows=(2,5),xlim=(0,2))
+        #plotWidthvsMPV(data,dataFile,path,plotGen)
+        #plotScale(data,dataFile,path,plotGen)
+        #plotVoltagePlots(data,path,plotGen)
+        #plotVoltagePlots(data,path,plotGen,rangeOfRows=(2,5),xlim=(0,2))
+        plotVoltagePlots(data,path,plotGen,rangeOfRows=(2,np.where(mpvs1>np.max(mpvs1)*0.9)[-1][-1]-2),xlim=(0,2),combined=True)
+        continue
         maxLength = np.where(np.invert(np.isnan(mpvs1)))[-1][-1]
         print(maxLength)
         plotVoltagePlots(data,path,plotGen,rangeOfRows=(maxLength-6,maxLength-3),xlim=(0,1))
